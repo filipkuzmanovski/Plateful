@@ -26,4 +26,6 @@ public interface RecipeRepository extends JpaRepository<Recipe, UUID>, JpaSpecif
 
     // dedup key when importing/re-importing from Spoonacular
     Optional<Recipe> findBySpoonacularId(Long spoonacularId);
+
+    boolean existsBySpoonacularId(Long spoonacularId);
 }
