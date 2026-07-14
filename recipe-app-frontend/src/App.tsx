@@ -1,3 +1,20 @@
+import { BrowserRouter } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '@/auth/AuthProvider';
+import AppRoutes from '@/AppRoutes';
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 2, staleTime: 30_000 } },
+});
+
 export default function App() {
-  return <h1 className="text-2xl font-extrabold tracking-tight">PLATEFUL</h1>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
 }
