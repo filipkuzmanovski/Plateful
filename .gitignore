@@ -12,5 +12,5 @@ Thumbs.db
 *.log
 
 #Claude
-.claude
-.superpowers
+.claude/
+.superpowers/
