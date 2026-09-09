@@ -16,6 +16,12 @@ Plateful is a full-stack web application designed for food enthusiasts to discov
 
 ## 🛠️ Tech Stack
 
+### **Frontend**
+* **Framework:** React
+* **Language:** TypeScript
+* **State Management & Routing:** React Router, Context API / Hooks
+* **HTTP Client:** Axios / Fetch API
+
 ### **Backend**
 * **Framework:** Java, Spring Boot
 * **Security:** Spring Security (Authentication & JWT/Session management)
