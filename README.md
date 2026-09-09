@@ -39,59 +39,6 @@ Database: Active Supabase project (PostgreSQL)
 
 API Key: Free API Key from Spoonacular API
 
-Backend Setup
-Navigate to the backend directory:
-
-Bash
-cd backend
-Configure your environment variables or update src/main/resources/application.properties:
-
-Properties
-# Supabase PostgreSQL Configuration
-spring.datasource.url=jdbc:postgresql://<YOUR_SUPABASE_HOST>:5432/postgres
-spring.datasource.username=<YOUR_DATABASE_USER>
-spring.datasource.password=<YOUR_DATABASE_PASSWORD>
-
-# Flyway Configuration
-spring.flyway.enabled=true
-
-# External API
-spoonacular.api.key=<YOUR_SPOONACULAR_API_KEY>
-Build and run the Spring Boot service:
-
-Bash
-./mvnw spring-boot:run
-Flyway will automatically execute database migrations on startup.
-
-Frontend Setup
-Navigate to the frontend directory:
-
-Bash
-cd ../frontend
-Install dependencies:
-
-Bash
-npm install
-Start the development server:
-
-Bash
-npm start
-# or npm run dev
-🔒 Security Architecture
-Application Level: Spring Security secures REST endpoints, restricting access based on user authentication states and roles.
-
-Database Level: Supabase Row Level Security (RLS) enforces rules directly on PostgreSQL tables, ensuring users can only edit or delete their own custom content and comments even if API boundaries are bypassed.
-
-📄 License
-Distributed under the MIT License. See LICENSE for more information.
-
-
-<ElicitationsGroup message="Would you like any further enhancements to the README?">
-  <Elicitation label="Add API endpoint table" query="Can you add a table of key REST API endpoints (auth, recipes, comments) to the README?"/>
-  <Elicitation label="Add frontend tech stack" query="Can you add specific frontend technologies (like React, Tailwind, Vite) to the Tech Stack section?"/>
-  <Elicitation label="Add GitHub Badges" query="Can you add stylish shield badges for Java, Spring Boot, Supabase, and License at the top of the README?"/>
-</ElicitationsGroup>
-    
 ## 📁 Repository Structure
 
 ```text
