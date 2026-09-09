@@ -30,7 +30,9 @@ Plateful is a full-stack web application designed for food enthusiasts to discov
 ---
 
 🚀 Getting Started
+
 Prerequisites
+
 Java: JDK 17 or higher
 
 Node.js: v18+ and npm
