@@ -29,14 +29,6 @@ Plateful is a full-stack web application designed for food enthusiasts to discov
 
 ---
 
-## 📁 Repository Structure
-
-```text
-RecipeApplication/
-├── frontend/          # Client-side web application
-├── backend/           # Spring Boot REST API
-└── README.md          # Project documentation
-
 🚀 Getting Started
 Prerequisites
 Java: JDK 17 or higher
@@ -99,3 +91,11 @@ Distributed under the MIT License. See LICENSE for more information.
   <Elicitation label="Add frontend tech stack" query="Can you add specific frontend technologies (like React, Tailwind, Vite) to the Tech Stack section?"/>
   <Elicitation label="Add GitHub Badges" query="Can you add stylish shield badges for Java, Spring Boot, Supabase, and License at the top of the README?"/>
 </ElicitationsGroup>
+    
+## 📁 Repository Structure
+
+```text
+RecipeApplication/
+├── frontend/          # Client-side web application
+├── backend/           # Spring Boot REST API
+└── README.md          # Project documentation
