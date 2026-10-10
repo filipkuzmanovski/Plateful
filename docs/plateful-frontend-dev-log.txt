@@ -733,3 +733,13 @@ A test fix during implementation: the planned query /like comment/i also
 matched "Dislike comment", so it was anchored to /^like comment$/i. That
 makes the test stricter, not looser.
 23/23 tests passing after this task.
+
+Review fix (96e9b87)
+--------------------
+The reviewer caught that a failed like/dislike (for example on a comment
+someone just deleted) failed silently, although the spec says every failed
+action shows the server's message. The error handler was hoisted to one
+module-level function, `showError`, and used by all five mutations: post,
+edit, delete, react and unreact. A new test makes the reaction PUT return
+404 and checks the server's "Comment with id c-1 not found" message appears
+as a toast. 24/24 tests passing.
