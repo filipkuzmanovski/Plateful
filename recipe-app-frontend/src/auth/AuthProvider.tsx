@@ -24,34 +24,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let lastUserKey: string | null | undefined; // undefined = nothing resolved yet
 
     async function resolveProfile(s: Session | null) {
+      const key = s?.user?.id ?? null;
+      if (key === lastUserKey) return; // dedupes INITIAL_SESSION/getSession double-fire and token refreshes
+      lastUserKey = key;
       if (!s) {
         if (!cancelled) { setProfileState(null); setStatus('anonymous'); }
         return;
       }
+      if (!cancelled) setStatus('loading');
       try {
         const me = await getMe();
         if (!cancelled) { setProfileState(me); setStatus('ready'); }
       } catch (e) {
-        if (!cancelled && e instanceof ApiError && e.status === 404) {
+        if (cancelled) return;
+        if (e instanceof ApiError && e.status === 404) {
           setProfileState(null);
           setStatus('needs-profile');
-        } else if (!cancelled) {
+        } else {
           setProfileState(null);
           setStatus('anonymous'); // e.g. 401 already signed us out
         }
       }
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      setSession(data.session);
-      void resolveProfile(data.session);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSession(data.session);
+        void resolveProfile(data.session);
+      })
+      .catch(() => {
+        // A failed session read must not strand the app on the spinner.
+        if (!cancelled) { setSession(null); setProfileState(null); setStatus('anonymous'); }
+      });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (cancelled) return;
       setSession(s);
-      setStatus('loading');
       void resolveProfile(s);
     });
     return () => { cancelled = true; subscription.unsubscribe(); };
