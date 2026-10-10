@@ -24,10 +24,12 @@ import java.util.List;
  * Two criteria deserve extra explanation:
  * <p>
  * CUISINE — recipes.cuisines is a Postgres text[] column, which standard
- * JPQL/Criteria can't query. Hibernate 6.4+ ships an array_contains()
- * function that we invoke through cb.function(). If this ever errors on
- * your Hibernate version or produces slow plans (check EXPLAIN — ideally it
- * should use the GIN index), the fallback is a native query for this path.
+ * JPQL/Criteria can't query. We call our own text_array_contains() function
+ * (registered by TextArrayFunctions) through cb.function(). It renders
+ * {@code cuisines @> cast(array[:cuisine] as text[])}, which can use the GIN
+ * index. Hibernate's built-in array_contains() can't be used here: it casts
+ * the value to varchar[], and Postgres has no text[] @> varchar[] operator
+ * (see TextArrayFunctions).
  * <p>
  * MIN RATING — average rating isn't a column on recipes, so this is a
  * correlated subquery: "(SELECT AVG(r.rating) FROM recipe_ratings r WHERE
@@ -46,9 +48,9 @@ public final class RecipeSpecifications {
             List<Predicate> predicates = new ArrayList<>();
 
             if (f.cuisine() != null && !f.cuisine().isBlank()) {
-                // array_contains(recipes.cuisines, :cuisine) — see class javadoc
+                // text_array_contains(recipes.cuisines, :cuisine) — see class javadoc
                 predicates.add(cb.isTrue(cb.function(
-                        "array_contains", Boolean.class,
+                        TextArrayFunctions.TEXT_ARRAY_CONTAINS, Boolean.class,
                         root.get("cuisines"),
                         cb.literal(f.cuisine().toLowerCase())
                 )));
