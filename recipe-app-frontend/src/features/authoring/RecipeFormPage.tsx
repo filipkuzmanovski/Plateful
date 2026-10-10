@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,13 +11,16 @@ import { Button, Field, SectionHeading, Spinner, TextInput } from '@/components/
 import { CUISINES } from '@/features/browse/FilterBar';
 import type { RecipeCreate } from '@/lib/types';
 
+// Mirrors the backend's @PositiveOrZero Integer; empty = not set.
+const wholeNumber = z.string().regex(/^\d*$/, 'Whole number ≥ 0');
+
 const schema = z.object({
-  title: z.string().min(1, 'Title is required').max(255),
+  title: z.string().trim().min(1, 'Title is required').max(255),
   image: z.string().max(2048),
-  servings: z.string(),
-  readyInMinutes: z.string(),
-  cookingMinutes: z.string(),
-  preparationMinutes: z.string(),
+  servings: wholeNumber,
+  readyInMinutes: wholeNumber,
+  cookingMinutes: wholeNumber,
+  preparationMinutes: wholeNumber,
   sourceName: z.string().max(255),
   sourceUrl: z.string().max(2048),
   instructions: z.string().max(50000),
@@ -70,6 +73,8 @@ function toDto(v: FormValues): RecipeCreate {
 export default function RecipeFormPage() {
   const { id } = useParams<{ id: string }>(); // present in edit mode only
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const hydratedFor = useRef<string | null>(null); // recipe id the form was last filled from
 
   const existing = useQuery({
     queryKey: ['recipe', id],
@@ -84,7 +89,8 @@ export default function RecipeFormPage() {
   const imageUrl = watch('image');
 
   useEffect(() => {
-    if (existing.data) {
+    if (existing.data && hydratedFor.current !== existing.data.id) {
+      hydratedFor.current = existing.data.id;
       const r = existing.data;
       reset({
         title: r.title, image: r.image ?? '', servings: r.servings?.toString() ?? '',
@@ -104,21 +110,33 @@ export default function RecipeFormPage() {
   async function onSubmit(values: FormValues) {
     try {
       const saved = id ? await updateRecipe(id, toDto(values)) : await createRecipe(toDto(values));
+      // The API returns the full saved recipe: seed the detail cache with it, and mark every
+      // list that might show it as stale.
+      queryClient.setQueryData(['recipe', saved.id], saved);
+      void queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      void queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
       navigate(`/recipes/${saved.id}`);
     } catch (e) {
       if (e instanceof ApiError && e.errors) {
         for (const [field, message] of Object.entries(e.errors)) {
-          // backend field names match ours except instructionsSteps→steps
-          const name = field.startsWith('instructionsSteps') ? 'steps' : field;
+          // Backend keys match ours except instructionsSteps[n].x → steps and cuisines[n] → cuisines.
+          const name = field.startsWith('instructionsSteps')
+            ? 'steps'
+            : field.startsWith('cuisines')
+              ? 'cuisines'
+              : field;
           setError(name as never, { message });
         }
-      } else {
-        toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
       }
+      // Always summarize, so a rejected save is never silent.
+      toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
     }
   }
 
   if (id && existing.isPending) return <Spinner />;
+  if (id && existing.isError) {
+    return <p className="py-12 text-center text-muted">Couldn't load this recipe for editing.</p>;
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-2xl">
@@ -134,14 +152,14 @@ export default function RecipeFormPage() {
         </Field>
         {imageUrl && <img src={imageUrl} alt="Preview" className="h-40 object-cover" />}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Field label="Servings"><TextInput type="number" min={0} {...register('servings')} /></Field>
-          <Field label="Ready (min)"><TextInput type="number" min={0} {...register('readyInMinutes')} /></Field>
-          <Field label="Cook (min)"><TextInput type="number" min={0} {...register('cookingMinutes')} /></Field>
-          <Field label="Prep (min)"><TextInput type="number" min={0} {...register('preparationMinutes')} /></Field>
+          <Field label="Servings" error={errors.servings?.message}><TextInput type="number" min={0} {...register('servings')} /></Field>
+          <Field label="Ready (min)" error={errors.readyInMinutes?.message}><TextInput type="number" min={0} {...register('readyInMinutes')} /></Field>
+          <Field label="Cook (min)" error={errors.cookingMinutes?.message}><TextInput type="number" min={0} {...register('cookingMinutes')} /></Field>
+          <Field label="Prep (min)" error={errors.preparationMinutes?.message}><TextInput type="number" min={0} {...register('preparationMinutes')} /></Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Source name"><TextInput {...register('sourceName')} /></Field>
-          <Field label="Source URL"><TextInput {...register('sourceUrl')} /></Field>
+          <Field label="Source name" error={errors.sourceName?.message}><TextInput {...register('sourceName')} /></Field>
+          <Field label="Source URL" error={errors.sourceUrl?.message}><TextInput {...register('sourceUrl')} /></Field>
         </div>
       </div>
 
@@ -160,6 +178,9 @@ export default function RecipeFormPage() {
           </label>
         ))}
       </div>
+      {errors.cuisines?.message && (
+        <p role="alert" className="mt-1 text-xs text-red-600">{errors.cuisines.message}</p>
+      )}
 
       <SectionHeading>Ingredients</SectionHeading>
       {errors.ingredients?.message && <p role="alert" className="mb-2 text-xs text-red-600">{errors.ingredients.message}</p>}
@@ -203,6 +224,11 @@ export default function RecipeFormPage() {
         />
       </Field>
       <p className="mt-3 mb-1 text-xs font-bold tracking-widest uppercase">Structured steps (optional)</p>
+      {(errors.steps?.message ?? errors.steps?.root?.message) && (
+        <p role="alert" className="mb-1 text-xs text-red-600">
+          {errors.steps?.message ?? errors.steps?.root?.message}
+        </p>
+      )}
       <div className="space-y-2">
         {steps.fields.map((field, i) => (
           <div key={field.id} className="flex gap-2">

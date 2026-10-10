@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { deleteRecipe, getRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
@@ -35,9 +35,15 @@ export default function RecipeDetailPage() {
   const { profile } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const removeRecipe = useMutation({
     mutationFn: (recipeId: string) => deleteRecipe(recipeId),
-    onSuccess: () => navigate('/'),
+    onSuccess: (_data, recipeId) => {
+      navigate('/'); // leave first, so the removed query isn't refetched by this page
+      queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
+      void queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      void queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
+    },
     onError: () => toast.error("Couldn't delete the recipe"),
   });
 
@@ -98,7 +104,7 @@ export default function RecipeDetailPage() {
               title="Delete recipe?"
               description="The recipe, its ratings and its comments will be permanently removed."
               confirmLabel="Confirm"
-              onConfirm={() => removeRecipe.mutate(recipe.id)}
+              onConfirm={() => { if (!removeRecipe.isPending) removeRecipe.mutate(recipe.id); }}
               onCancel={() => setConfirmDelete(false)}
             />
           </div>
