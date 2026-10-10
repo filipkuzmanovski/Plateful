@@ -899,3 +899,67 @@ always refetched in tests, so the stale-cache bug could never show up, and
 the new edit test passed even against the broken code. renderApp now uses
 the same 30-second staleTime as production; the edit test then failed
 first, as it should, and passed after the fix. 30/30 tests passing.
+
+
+================================================================================
+ TASK 8 — Profile pages
+ Commit on feature/frontend-pages: f73957f
+================================================================================
+
+What was built
+--------------
+Two pages: /users/:id, anyone's public profile (their name and the recipes
+they've published), and /me, your own profile, which adds editing your name
+and links to your recipes.
+
+How it was done
+---------------
+1. src/features/profile/PublicProfilePage.tsx runs two independent queries:
+     const user    = useQuery({ queryKey: ['user', id],
+                                queryFn: () => getUser(id!) });
+     const recipes = useQuery({ queryKey: ['userRecipes', id, page],
+                                queryFn: () => getUserRecipes(id!, page) });
+   They run in parallel, so the name and the recipe grid load at the same
+   time. The page waits only for the user query before rendering (an
+   unknown id shows "User not found."), then shows its own spinner, empty
+   state ("No recipes published yet.") or grid + Pagination for the
+   recipes. The grid reuses RecipeCard from Task 4.
+
+2. The cache key is deliberate. ['userRecipes', id, page] starts with
+   'userRecipes', the exact prefix Task 7's create / edit / delete code
+   invalidates. TanStack Query matches keys by prefix, so invalidating
+   ['userRecipes'] refreshes every user's every page. Publish a recipe and
+   your profile's list is up to date when you open it.
+
+3. src/features/profile/MyProfilePage.tsx — the same recipe grid, plus a
+   small form:
+
+     const [firstName, setFirstName] = useState(profile?.firstName ?? '');
+     ...
+     const updated = await updateMe({ firstName, lastName });
+     setProfile(updated);
+     toast.success('Profile updated');
+
+   setProfile() is the AuthProvider function from Task 3. Updating the
+   shared auth context means the header's user button switches to the new
+   first name immediately, with no reload and nothing else to refresh.
+   Failures show the server's message in a toast.
+
+   /me is wrapped in ProtectedRoute, which renders the page only once
+   auth status is 'ready', and 'ready' is only reached after the profile
+   loaded. So `profile` is already set when the useState initial values
+   are computed, and the inputs start pre-filled.
+
+   The recipes query uses `enabled: !!profile` and
+   ['userRecipes', profile?.id, page]. An empty list shows a "publish your
+   first recipe" link to /recipes/new.
+
+How it was tested
+-----------------
+src/features/profile/profiles.test.tsx (2 tests, logged-in fake session +
+MSW):
+  - /users/u-2 shows "Bob Smith" and his recipe "Bob Burgers"
+  - On /me, changing the first name to Janet and pressing "Save names"
+    sends PUT {firstName: 'Janet', lastName: 'Doe'}, and the header button
+    then reads "Janet"
+Both failed before the pages existed. 32/32 tests passing after this task.
