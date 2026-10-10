@@ -1135,3 +1135,65 @@ Known follow-ups (logged, not done):
     updates, and reordering ingredient rows.
   - Like/dislike highlights only reflect clicks made in the current visit.
     Showing them after a reload needs a new backend endpoint.
+
+
+================================================================================
+ BUG FIX — Cuisine filter returned a server error (backend)
+ Commit on main: see "fix: cuisine filter" below
+================================================================================
+
+Symptom
+-------
+Choosing a cuisine on the browse page showed "Couldn't load recipes". Every
+other filter worked. The frontend tests hadn't caught it because they fake
+the backend with MSW, so the real database query never ran in them.
+
+How it was tracked down
+-----------------------
+1. Reproduced against the running backend: /api/recipes?vegan=true answered
+   200, while /api/recipes?cuisine=italian answered 500 (server error). So
+   the frontend was sending the right request, and the crash was in the
+   backend.
+2. Read the backend's filter code (RecipeSpecifications.java). The cuisine
+   filter used Hibernate's built-in array_contains() function on the
+   recipes.cuisines column, a Postgres text[] (array of text).
+3. Decompiled Hibernate 7.4.1's array_contains implementation (from the
+   local Maven cache) to see the SQL it generates:
+     cuisines @> cast(array[?] as <the column's Hibernate type>)
+   The entity maps cuisines as List<String>, which Hibernate treats as an
+   array of varchar, not text.
+4. Ran that exact SQL straight against the database (read-only, over JDBC):
+     cast(... as varchar array) -> ERROR: operator does not exist:
+                                   text[] @> character varying[]
+     cast(... as text array)    -> OK, 40 recipes
+   That proved the root cause: Postgres won't compare a text[] column with
+   a varchar[] value, and Hibernate always cast the value to varchar[].
+
+The fix
+-------
+A small custom Hibernate SQL function,
+RecipeAppBackend/.../specification/TextArrayFunctions.java:
+
+  registerPattern("text_array_contains",
+                  "(?1 @> cast(array[?2] as text[]))", <boolean type>);
+
+?1 and ?2 are placeholders for the function's arguments: the column and
+the cuisine. Casting the value to text[] means both sides of @> have the
+same type. @> is also the operator the GIN index on cuisines supports, so
+the query stays index-friendly. Hibernate discovers the function through a
+one-line registration file,
+src/main/resources/META-INF/services/org.hibernate.boot.model.FunctionContributor,
+which is Java's standard plug-in mechanism. RecipeSpecifications now calls
+text_array_contains instead of array_contains.
+
+No database or schema change was needed.
+
+How it was tested
+-----------------
+  - TextArrayFunctionsTest (2 tests): the function registers, and Hibernate
+    can actually discover it via the registration file. Forgetting that
+    file would bring the 500 back silently. Both failed first (the class
+    didn't exist yet).
+  - All 66 existing backend tests still pass (68 total).
+  - End to end on the running backend: cuisine=italian -> 200 with 40
+    recipes, cuisine=mexican -> 200 with 40, cuisine+vegan combined -> 200.
