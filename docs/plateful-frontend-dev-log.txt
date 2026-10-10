@@ -963,3 +963,77 @@ MSW):
     sends PUT {firstName: 'Janet', lastName: 'Doe'}, and the header button
     then reads "Janet"
 Both failed before the pages existed. 32/32 tests passing after this task.
+
+
+================================================================================
+ POLISH PASS — reviewer findings, batched
+ Commit on feature/frontend-pages: 593153c
+================================================================================
+
+Every task review approved its task, but reviewers also logged small
+"nice to have" findings. Rather than interrupting each task, the
+user-visible ones were collected and fixed together here, test-first:
+
+Browse page
+  - Diet chips now set aria-pressed, so screen readers can tell which
+    filters are on. Before, colour was the only cue.
+  - The page number is parsed defensively:
+      Math.max(0, Number.parseInt(params.get('page') ?? '0', 10) || 0)
+    A hand-edited URL like ?page=abc used to send page=NaN to the API; it
+    now falls back to page 0, and negative pages are clamped.
+  - placeholderData: keepPreviousData keeps the current grid on screen
+    while the next page or filter loads, instead of flashing a spinner and
+    jumping the scroll position. The same was applied to the comments list.
+  - Cuisine names display capitalized ("Italian") while the value sent to
+    the API stays lowercase. A shared cuisineLabel() helper is used by the
+    filter bar and the recipe form.
+  - The pagination <nav> has aria-label="Pagination".
+
+Recipe detail
+  - Rating and un-rating now show the server's error in a toast if they
+    fail. The stars are disabled while a save is in flight, so rapid clicks
+    can't send duplicate requests.
+  - An imported recipe without a source URL shows "From {source}" as plain
+    text instead of a dead link.
+  - The photo has a fixed 4:3 box, so the page doesn't jump when the image
+    finishes loading.
+
+Comments
+  - The post and edit inputs have accessible labels; Edit and Delete
+    buttons say whose comment they act on ("Delete comment by Jane Doe");
+    an edit can't be saved empty.
+
+Profiles
+  - A failed recipe list shows "Couldn't load recipes." instead of
+    nothing.
+  - Moving from one user's profile to another resets to page 1. The page
+    component is keyed by the user id (<PublicProfileContent key={id} />),
+    so React builds a fresh component with fresh state for each user.
+
+New tests: unset filters are never sent and a filter change from page 3
+resets to page 0; ?page=abc requests page 0; a failed rating shows a
+toast; a missing source URL renders no link. 36/36 tests passing.
+
+
+================================================================================
+ TASK 9 — Final verification and live-run setup
+================================================================================
+
+  - Full suite: 36 tests across 8 files, all passing. Production build
+    (tsc type-check + Vite bundle) is clean. Its one warning is that the
+    single JS bundle is over 500 kB; for a project this size that's
+    acceptable, and route-based code splitting could reduce it later.
+  - recipe-app-frontend/.env.local was created (gitignored by the *.local
+    rule) with the project's Supabase URL, the API URL, and a placeholder
+    for the Supabase anon key.
+
+To run the whole app locally:
+  1. Paste the Supabase anon key into recipe-app-frontend/.env.local
+     (Supabase dashboard -> Project Settings -> API -> "anon public").
+     It is designed to be public; it only lets the browser talk to
+     Supabase Auth, and our backend still verifies every token.
+  2. Start the Spring backend in IntelliJ (env vars already configured).
+  3. In a terminal:  cd recipe-app-frontend  then  npm run dev
+  4. Open http://localhost:5173 and try: browse + filters -> open a recipe
+     -> sign up -> complete profile -> rate, comment, like -> create a
+     recipe -> edit it -> delete it.
