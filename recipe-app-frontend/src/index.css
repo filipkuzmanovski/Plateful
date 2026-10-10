@@ -49,6 +49,54 @@
       scale: 0.96;
     }
   }
+
+  /* Filter drawer: slides from the right on wide screens, rises as a bottom sheet on phones. */
+  --animate-overlay-out: overlay-out 180ms ease-in forwards;
+  --animate-drawer-in: drawer-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-drawer-out: drawer-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  --animate-sheet-in: sheet-in 340ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-sheet-out: sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  /* A view swapping in inside the drawer (main view and A-Z view). */
+  --animate-view-in: view-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-view-back: view-back 240ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes overlay-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes drawer-in {
+    from {
+      translate: 100% 0;
+    }
+  }
+  @keyframes drawer-out {
+    to {
+      translate: 100% 0;
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      translate: 0 100%;
+    }
+  }
+  @keyframes sheet-out {
+    to {
+      translate: 0 100%;
+    }
+  }
+  @keyframes view-in {
+    from {
+      opacity: 0;
+      translate: 1.5rem 0;
+    }
+  }
+  @keyframes view-back {
+    from {
+      opacity: 0;
+      translate: -1.5rem 0;
+    }
+  }
 }
 
 @layer base {

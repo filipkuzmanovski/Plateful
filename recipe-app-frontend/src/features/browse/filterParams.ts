@@ -29,14 +29,14 @@ function readList(params: URLSearchParams, key: string): string[] {
 }
 
 /** Integer 1-600, otherwise null. */
-function readMinutes(raw: string | null): number | null {
+export function readMinutes(raw: string | null): number | null {
   if (raw === null || !/^\d+$/.test(raw)) return null;
   const n = Number(raw);
   return n >= 1 && n <= 600 ? n : null;
 }
 
 /** 1-5 in 0.5 steps, otherwise null. */
-function readRating(raw: string | null): number | null {
+export function readRating(raw: string | null): number | null {
   if (raw === null || raw.trim() === '') return null;
   const n = Number(raw);
   return Number.isFinite(n) && n >= 1 && n <= 5 && Number.isInteger(n * 2) ? n : null;

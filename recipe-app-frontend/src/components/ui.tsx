@@ -67,12 +67,25 @@ export function Spinner() {
   );
 }
 
+const chipTones = {
+  olive: {
+    on: 'border-olive bg-olive text-cream shadow-button',
+    off: 'border-sand bg-paper text-olive hover:border-olive/40 hover:bg-cream',
+  },
+  /* Regions: a warm saffron wash, deep terracotta when on (cream on #9c4329 is about 6:1). */
+  saffron: {
+    on: 'border-[#9c4329] bg-[#9c4329] font-semibold text-cream shadow-button',
+    off: 'border-transparent bg-saffron/15 font-semibold text-[#7a4f16] hover:bg-saffron/25',
+  },
+} as const;
+
 /** A toggleable filter chip (region, cuisine). `aria-pressed` reflects `selected`. */
 export function Chip({
   selected,
   onClick,
   children,
   count,
+  tone = 'olive',
   className = '',
   ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'children'> & {
@@ -80,16 +93,15 @@ export function Chip({
   onClick: () => void;
   children: ReactNode;
   count?: number;
+  tone?: keyof typeof chipTones;
 }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition duration-150 ${
-        selected
-          ? 'border-olive bg-olive text-cream shadow-button'
-          : 'border-sand bg-paper text-olive hover:border-olive/40 hover:bg-cream'
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition duration-150 focus-visible:outline-olive active:scale-[0.97] ${
+        chipTones[tone][selected ? 'on' : 'off']
       } ${className}`}
       {...props}
     >

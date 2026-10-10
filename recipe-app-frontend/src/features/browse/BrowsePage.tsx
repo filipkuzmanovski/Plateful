@@ -1,86 +1,101 @@
+import { useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { SearchX, SlidersHorizontal } from 'lucide-react';
 import { browseRecipes } from '@/api/recipes';
-import type { RecipeFilter } from '@/lib/types';
+import { cuisinesQueryKey, getCuisines } from '@/api/cuisines';
 import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
-import { Spinner, Button } from '@/components/ui';
-import { FilterBar, type FilterValues } from './FilterBar';
-
-function readFilters(params: URLSearchParams): FilterValues {
-  return {
-    cuisine: params.get('cuisine') ?? '',
-    vegan: params.get('vegan') === 'true',
-    vegetarian: params.get('vegetarian') === 'true',
-    glutenFree: params.get('glutenFree') === 'true',
-    dairyFree: params.get('dairyFree') === 'true',
-    maxReadyInMinutes: params.get('maxReadyInMinutes') ?? '',
-    minRating: params.get('minRating') ?? '',
-  };
-}
-
-function toNumber(s: string): number | undefined {
-  const n = Number(s);
-  return s !== '' && Number.isFinite(n) ? n : undefined;
-}
-
-function toApiFilter(v: FilterValues): RecipeFilter {
-  return {
-    cuisine: v.cuisine ? [v.cuisine] : undefined,
-    vegan: v.vegan || undefined,
-    vegetarian: v.vegetarian || undefined,
-    glutenFree: v.glutenFree || undefined,
-    dairyFree: v.dairyFree || undefined,
-    maxReadyInMinutes: toNumber(v.maxReadyInMinutes),
-    minRating: toNumber(v.minRating),
-  };
-}
+import { Spinner, Button, EmptyState } from '@/components/ui';
+import { countActive, emptyFilters, readFilters, toApiFilter, writeFilters, type FilterState } from './filterParams';
+import { FilterDrawer } from './FilterDrawer';
+import { ActiveFilterChips } from './ActiveFilterChips';
 
 export default function BrowsePage() {
   const [params, setParams] = useSearchParams();
-  const values = readFilters(params);
+  const paramString = params.toString();
+  const applied = useMemo(() => readFilters(new URLSearchParams(paramString)), [paramString]);
   const page = Math.max(0, Number.parseInt(params.get('page') ?? '0', 10) || 0);
+  const active = countActive(applied);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const activeCountId = useId();
 
   const query = useQuery({
-    queryKey: ['recipes', params.toString()],
-    queryFn: () => browseRecipes(toApiFilter(values), page),
+    queryKey: ['recipes', paramString],
+    queryFn: () => browseRecipes(toApiFilter(applied), page),
     placeholderData: keepPreviousData,
   });
 
-  function patchParams(patch: Partial<FilterValues>) {
-    const next = new URLSearchParams(params);
-    for (const [key, value] of Object.entries(patch)) {
-      if (value === '' || value === false) next.delete(key);
-      else next.set(key, String(value));
-    }
-    next.delete('page'); // filter change resets pagination
-    setParams(next);
-  }
+  // Catalogue labels for the cuisine chips; only needed once a cuisine filter is applied.
+  const cuisines = useQuery({
+    queryKey: cuisinesQueryKey,
+    queryFn: getCuisines,
+    staleTime: 60_000,
+    enabled: applied.cuisine.length > 0,
+  });
 
-  const busyClass = query.isPlaceholderData ? ' opacity-50' : '';
+  const apply = (s: FilterState) => setParams(writeFilters(s, params));
+  const busy = query.isPlaceholderData;
+  const busyClass = busy ? 'pointer-events-none opacity-50' : '';
 
   return (
     <div>
-      <FilterBar values={values} onChange={patchParams} />
+      <section className="mb-8 sm:mb-10">
+        <h1 className="max-w-2xl font-serif text-4xl leading-[1.08] font-semibold tracking-tight text-balance text-olive sm:text-5xl">
+          Cook something <em className="font-medium text-terracotta italic">wonderful</em> tonight
+        </h1>
+
+        <div className="mt-6 flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            aria-label="Filters"
+            aria-describedby={active > 0 ? activeCountId : undefined}
+            onClick={() => setDrawerOpen(true)}
+            className={`inline-flex items-center gap-2 rounded-full border bg-paper py-2 pr-2.5 pl-4 text-sm font-semibold text-olive shadow-card transition duration-200 hover:-translate-y-px hover:shadow-lift focus-visible:outline-olive ${
+              active > 0 ? 'border-olive/40' : 'border-sand pr-4'
+            }`}
+          >
+            <SlidersHorizontal aria-hidden="true" className="size-4" strokeWidth={2.25} />
+            Filters
+            {active > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-saffron px-1.5 text-[11px] font-bold text-olive tabular-nums">
+                {active}
+              </span>
+            )}
+          </button>
+          {active > 0 && (
+            <span id={activeCountId} hidden>
+              {active === 1 ? '1 filter active' : `${active} filters active`}
+            </span>
+          )}
+          <ActiveFilterChips state={applied} cuisines={cuisines.data} onChange={apply} />
+        </div>
+      </section>
+
+      <FilterDrawer open={drawerOpen} onOpenChange={setDrawerOpen} applied={applied} onApply={apply} />
 
       {query.isPending && <Spinner />}
       {query.isError && (
         <div className="py-12 text-center">
-          <p className="mb-4 text-sm text-red-600">Couldn't load recipes.</p>
+          <p className="mb-4 text-sm text-danger">Couldn't load recipes.</p>
           <Button variant="outline" onClick={() => query.refetch()}>Retry</Button>
         </div>
       )}
       {query.data && query.data.content.length === 0 && (
-        <div aria-busy={query.isPlaceholderData} className={`py-12 text-center transition-opacity${busyClass}`}>
-          <p className="mb-4 text-muted">No recipes match these filters.</p>
-          <Button variant="outline" onClick={() => setParams(new URLSearchParams())}>Clear filters</Button>
+        <div aria-busy={busy} className={`transition-opacity ${busyClass}`}>
+          <EmptyState
+            icon={SearchX}
+            action={<Button variant="outline" onClick={() => apply(emptyFilters)}>Clear filters</Button>}
+          >
+            No recipes match these filters.
+          </EmptyState>
         </div>
       )}
       {query.data && query.data.content.length > 0 && (
         <>
           <div
-            aria-busy={query.isPlaceholderData}
-            className={`grid grid-cols-1 gap-5 transition-opacity sm:grid-cols-2 lg:grid-cols-4${query.isPlaceholderData ? ' opacity-50 pointer-events-none' : ''}`}
+            aria-busy={busy}
+            className={`grid grid-cols-1 gap-6 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${busyClass}`}
           >
             {query.data.content.map((recipe) => (
               <RecipeCard key={recipe.id} recipe={recipe} />
