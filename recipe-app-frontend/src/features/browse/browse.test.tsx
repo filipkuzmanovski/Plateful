@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { recipeFixture, pageOf } from '@/test/fixtures';
+import { expectNoEmoji } from '@/test/noEmoji';
 
 const BASE = 'http://localhost:8080';
 
@@ -108,4 +109,11 @@ test('while new results load, the old grid is marked busy', async () => {
   await vi.waitFor(() =>
     expect(screen.getByText('Bruschetta Pork & Pasta').closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false'),
   );
+});
+
+test('browse renders without emoji characters', async () => {
+  captureRecipesUrl({ url: '' });
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expectNoEmoji();
 });

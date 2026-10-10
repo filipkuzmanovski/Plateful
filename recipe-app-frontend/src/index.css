@@ -1,14 +1,71 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/inter';
+/* Fraunces with the optical-size axis: tight, high-contrast at display sizes, sturdier at small sizes. */
+@import '@fontsource-variable/fraunces/opsz.css';
+@import '@fontsource-variable/fraunces/opsz-italic.css';
 
 @theme {
-  --font-sans: 'Inter Variable', system-ui, sans-serif;
-  --color-ink: #111111;
-  --color-accent: #16a34a;
-  --color-hairline: #e5e5e5;
-  --color-muted: #737373;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Fraunces Variable', ui-serif, Georgia, 'Times New Roman', serif;
+
+  /* Golden Hour palette (spec section 1) */
+  --color-cream: #fbf6ee;
+  --color-paper: #fffdf8;
+  --color-olive: #2f3a2b;
+  --color-saffron: #e8a33d;
+  --color-terracotta: #c65d3b;
+  --color-sand: #eadfcd;
+  --color-muted: #8a8a7a;
+  /* Semantic: destructive actions. A warm brick that sits in the palette and passes AA on cream. */
+  --color-danger: #a63d2a;
+
+  /*
+   * Deprecated aliases for the old "Fresh Editorial" tokens, so pages not yet restyled
+   * (Task 8) keep rendering in the new palette. Remove once nothing uses them.
+   */
+  --color-ink: var(--color-olive);
+  --color-accent: var(--color-terracotta);
+  --color-hairline: var(--color-sand);
+
+  /* Soft, olive-tinted depth */
+  --shadow-card: 0 1px 2px rgb(47 58 43 / 0.05), 0 4px 16px -4px rgb(47 58 43 / 0.1);
+  --shadow-lift: 0 2px 4px rgb(47 58 43 / 0.05), 0 18px 36px -12px rgb(47 58 43 / 0.24);
+  --shadow-button: 0 1px 2px rgb(47 58 43 / 0.16), 0 4px 12px -4px rgb(47 58 43 / 0.35);
+
+  --radius-card: 1.25rem;
 }
 
-body {
-  @apply bg-white font-sans text-ink antialiased;
+@layer base {
+  html {
+    background-color: var(--color-cream);
+  }
+
+  body {
+    @apply min-h-screen bg-cream font-sans text-olive antialiased;
+    /* A faint late-afternoon glow from the top right. */
+    background-image: radial-gradient(70rem 32rem at 90% -12rem, rgb(232 163 61 / 0.1), transparent 70%);
+    background-repeat: no-repeat;
+    font-optical-sizing: auto;
+  }
+
+  ::selection {
+    background-color: rgb(232 163 61 / 0.3);
+    color: var(--color-olive);
+  }
+
+  /* One consistent saffron focus ring for keyboard users. */
+  :focus-visible {
+    outline: 2px solid var(--color-saffron);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
 }
