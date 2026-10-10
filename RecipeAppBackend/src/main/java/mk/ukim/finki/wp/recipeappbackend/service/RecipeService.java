@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
+import mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
@@ -43,6 +44,8 @@ import java.util.stream.Collectors;
 @Service
 public class RecipeService {
 
+    private static final int MAX_CUISINES = 10;
+
     private final RecipeRepository recipeRepository;
     private final RecipeIngredientRepository ingredientRepository;
     private final RecipeRatingRepository ratingRepository;
@@ -76,7 +79,9 @@ public class RecipeService {
 
         // Save parent first so it has an id for the ingredients to reference
         // (relationships are one-directional child -> parent by design).
-        Recipe saved = recipeRepository.save(dto.toEntity(owner));
+        Recipe toSave = dto.toEntity(owner);
+        toSave.setCuisines(validatedCuisines(dto));
+        Recipe saved = recipeRepository.save(toSave);
         List<RecipeIngredient> ingredients =
                 ingredientRepository.saveAll(dto.toIngredientEntities(saved));
 
@@ -130,6 +135,8 @@ public class RecipeService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
         assertOwnedBy(recipe, userId);
+        // Validate before mutating anything, so a rejected edit leaves the entity untouched.
+        List<String> cuisines = validatedCuisines(dto);
 
         recipe.setTitle(dto.title());
         recipe.setImage(dto.image());
@@ -145,7 +152,7 @@ public class RecipeService {
         recipe.setGlutenFree(dto.glutenFree());
         recipe.setVegan(dto.vegan());
         recipe.setVegetarian(dto.vegetarian());
-        recipe.setCuisines(dto.cuisines() != null ? dto.cuisines() : List.of());
+        recipe.setCuisines(cuisines);
         // NOT touched: source, spoonacularId, user, timestamps — server-owned.
         // @UpdateTimestamp refreshes updated_at automatically on flush.
 
@@ -168,6 +175,15 @@ public class RecipeService {
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
+
+    /** Normalize against the curated catalogue; the 10-cap applies after dedupe. */
+    private List<String> validatedCuisines(RecipeCreateDto dto) {
+        List<String> cuisines = cuisineCatalog.normalizeAndValidate(dto.cuisines());
+        if (cuisines.size() > MAX_CUISINES) {
+            throw new InvalidCuisineException("At most " + MAX_CUISINES + " cuisines");
+        }
+        return cuisines;
+    }
 
     /**
      * THE authorization check (see class javadoc). Imported recipes have no

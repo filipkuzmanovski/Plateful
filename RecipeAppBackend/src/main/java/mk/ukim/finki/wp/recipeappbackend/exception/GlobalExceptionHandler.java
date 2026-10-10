@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.exception;
 
+import mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -45,6 +46,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "Invalid value for parameter '" + ex.getName() + "'");
+    }
+
+    /** Unknown/too many cuisines -> 400 in the same shape as bean-validation failures. */
+    @ExceptionHandler(InvalidCuisineException.class)
+    ProblemDetail handleInvalidCuisine(InvalidCuisineException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        problem.setProperty("errors", Map.of("cuisines", ex.getMessage()));
+        return problem;
     }
 
     /** Catch-all: log the real cause server-side, leak nothing to the client. */

@@ -60,4 +60,15 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getProperties())
                 .containsEntry("errors", Map.of("firstName", "must not be blank"));
     }
+
+    @Test
+    void invalidCuisineMapsTo400WithCuisinesFieldError() {
+        ProblemDetail problem = handler.handleInvalidCuisine(
+                new mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException(java.util.List.of("lol")));
+
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getDetail()).isEqualTo("Validation failed");
+        assertThat(problem.getProperties())
+                .containsEntry("errors", Map.of("cuisines", "Unknown cuisine: lol"));
+    }
 }

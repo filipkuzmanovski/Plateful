@@ -11,6 +11,11 @@ public class InvalidCuisineException extends RuntimeException {
         this.unknown = List.copyOf(unknown);
     }
 
+    public InvalidCuisineException(String message) {
+        super(message);
+        this.unknown = List.of();
+    }
+
     public List<String> unknown() {
         return unknown;
     }
