@@ -19,6 +19,11 @@ function readFilters(params: URLSearchParams): FilterValues {
   };
 }
 
+function toNumber(s: string): number | undefined {
+  const n = Number(s);
+  return s !== '' && Number.isFinite(n) ? n : undefined;
+}
+
 function toApiFilter(v: FilterValues): RecipeFilter {
   return {
     cuisine: v.cuisine || undefined,
@@ -26,8 +31,8 @@ function toApiFilter(v: FilterValues): RecipeFilter {
     vegetarian: v.vegetarian || undefined,
     glutenFree: v.glutenFree || undefined,
     dairyFree: v.dairyFree || undefined,
-    maxReadyInMinutes: v.maxReadyInMinutes ? Number(v.maxReadyInMinutes) : undefined,
-    minRating: v.minRating ? Number(v.minRating) : undefined,
+    maxReadyInMinutes: toNumber(v.maxReadyInMinutes),
+    minRating: toNumber(v.minRating),
   };
 }
 
@@ -52,6 +57,8 @@ export default function BrowsePage() {
     setParams(next);
   }
 
+  const busyClass = query.isPlaceholderData ? ' opacity-50' : '';
+
   return (
     <div>
       <FilterBar values={values} onChange={patchParams} />
@@ -64,14 +71,17 @@ export default function BrowsePage() {
         </div>
       )}
       {query.data && query.data.content.length === 0 && (
-        <div className="py-12 text-center">
+        <div aria-busy={query.isPlaceholderData} className={`py-12 text-center transition-opacity${busyClass}`}>
           <p className="mb-4 text-muted">No recipes match these filters.</p>
           <Button variant="outline" onClick={() => setParams(new URLSearchParams())}>Clear filters</Button>
         </div>
       )}
       {query.data && query.data.content.length > 0 && (
         <>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div
+            aria-busy={query.isPlaceholderData}
+            className={`grid grid-cols-1 gap-5 transition-opacity sm:grid-cols-2 lg:grid-cols-4${query.isPlaceholderData ? ' opacity-50 pointer-events-none' : ''}`}
+          >
             {query.data.content.map((recipe) => (
               <RecipeCard key={recipe.id} recipe={recipe} />
             ))}

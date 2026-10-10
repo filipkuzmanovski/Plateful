@@ -151,3 +151,18 @@ test('a server error on a field without an inline slot is still shown', async ()
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
   expect(await screen.findByText('must be greater than or equal to 0')).toBeInTheDocument();
 });
+
+test('going from Edit to New Recipe starts with an empty form', async () => {
+  stubMe();
+  server.use(
+    http.get(`${BASE}/api/recipes/r-1`, () =>
+      HttpResponse.json(recipeFixture({ title: 'Old Pie', user: profileFixture })),
+    ),
+  );
+  renderApp('/recipes/r-1/edit');
+  const title = await screen.findByLabelText(/title/i);
+  await vi.waitFor(() => expect(title).toHaveValue('Old Pie'));
+  await userEvent.click(screen.getByRole('link', { name: /new recipe/i }));
+  expect(await screen.findByRole('heading', { name: /new recipe/i })).toBeInTheDocument();
+  expect(screen.getByLabelText(/title/i)).toHaveValue('');
+});

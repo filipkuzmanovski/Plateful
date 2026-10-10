@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from 'react-router';
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { useState } from 'react';
 import { Toaster } from 'sonner';
 import { useAuth } from '@/auth/AuthProvider';
@@ -8,6 +8,8 @@ export default function AppShell() {
   const { status, profile, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const handleSignOut = async () => { setMenuOpen(false); await signOut(); navigate('/'); };
 
   return (
     <div className="mx-auto max-w-6xl px-4">
@@ -32,7 +34,7 @@ export default function AppShell() {
                     My profile
                   </Link>
                   <button
-                    onClick={async () => { setMenuOpen(false); await signOut(); navigate('/'); }}
+                    onClick={handleSignOut}
                     className="block w-full px-3 py-2 text-left hover:bg-ink hover:text-white"
                   >
                     Sign out
@@ -40,6 +42,13 @@ export default function AppShell() {
                 </div>
               )}
             </div>
+          ) : status === 'needs-profile' ? (
+            <button
+              onClick={handleSignOut}
+              className="border-2 border-ink px-3 py-1 font-bold uppercase tracking-wide hover:bg-ink hover:text-white"
+            >
+              Sign out
+            </button>
           ) : status !== 'loading' ? (
             <Link to="/login" className="border-2 border-ink px-3 py-1 font-bold uppercase tracking-wide hover:bg-ink hover:text-white">
               Sign in
@@ -48,8 +57,12 @@ export default function AppShell() {
         </nav>
       </header>
       <main className="py-8">
-        <ErrorBoundary>
-          <Outlet />
+        <ErrorBoundary key={location.pathname}>
+          {status === 'needs-profile' && location.pathname !== '/complete-profile' ? (
+            <Navigate to="/complete-profile" replace />
+          ) : (
+            <Outlet />
+          )}
         </ErrorBoundary>
       </main>
       <Toaster position="bottom-right" />

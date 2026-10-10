@@ -117,7 +117,10 @@ export function CommentsSection({
         <p className="mb-6 text-sm text-muted">Sign in to join the conversation.</p>
       )}
 
-      <ul className="space-y-4">
+      <ul
+        aria-busy={query.isPlaceholderData}
+        className={`space-y-4 transition-opacity${query.isPlaceholderData ? ' opacity-50' : ''}`}
+      >
         {query.data.content.map((comment) => {
           const isAuthor = profile?.id === comment.user.id;
           const canDelete = isAuthor || (recipeOwnerId !== null && profile?.id === recipeOwnerId);
