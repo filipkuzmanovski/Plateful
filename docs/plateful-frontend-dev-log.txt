@@ -855,3 +855,47 @@ MSW):
     on the form
   - As the owner, Delete -> Confirm sends DELETE /api/recipes/r-1
 All 4 failed before the form existed. 28/28 tests passing after this task.
+
+Review fixes (371a95f)
+----------------------
+The reviewer found two real gaps in the planned code, both fixed test-first:
+
+1. Stale data after saving. TanStack Query treats data as fresh for 30
+   seconds, and nothing told it the recipe had changed. So after an edit
+   the detail page showed the OLD recipe, a deleted recipe lingered in the
+   browse grid, and new recipes were missing from cached lists. Fix:
+     queryClient.setQueryData(['recipe', saved.id], saved);
+     queryClient.invalidateQueries({ queryKey: ['recipes'] });
+     queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
+   The API answers a save with the full saved recipe, so it is written
+   straight into the detail cache (no extra request), and every list that
+   might show it is marked stale. Delete calls navigate('/') FIRST, then
+   removes the recipe from the cache, so the closing page never refetches
+   the deleted recipe and flashes "not found".
+
+2. Invisible server errors. A server rejection of servings, the minute
+   fields, source name/URL, cuisines or steps was recorded but had nowhere
+   to display, and the toast only fired when there were no field errors.
+   So the save silently did nothing. Fix: those fields now render their
+   errors, server keys like `cuisines[2]` and `instructionsSteps[0].step`
+   map onto the matching form sections, and every rejected save also shows
+   a toast.
+
+Hardenings made in the same commit:
+  - The edit form fills itself from the recipe only once per recipe id
+    (a useRef remembers which id it filled from). Before, any refetch,
+    e.g. someone rating the recipe while you edit, re-ran reset() and
+    wiped your unsaved changes.
+  - The numeric fields are validated as whole numbers ≥ 0
+    (regex /^\d*$/), matching the backend's @PositiveOrZero.
+  - The title is trimmed before validation, so "   " is rejected
+    client-side.
+  - A failed edit-mode load shows an error instead of an empty form.
+  - Confirming delete twice can no longer send two DELETEs.
+
+A test-harness bug found along the way: renderApp's QueryClient used
+staleTime 0, while the real app uses 30 seconds. With 0 the detail page
+always refetched in tests, so the stale-cache bug could never show up, and
+the new edit test passed even against the broken code. renderApp now uses
+the same 30-second staleTime as production; the edit test then failed
+first, as it should, and passed after the fix. 30/30 tests passing.
