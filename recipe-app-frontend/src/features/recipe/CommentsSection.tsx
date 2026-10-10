@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { addComment, deleteComment, editComment, getComments } from '@/api/comments';
 import { deleteMyReaction, putMyReaction } from '@/api/reactions';
@@ -69,6 +69,7 @@ export function CommentsSection({
   const query = useQuery({
     queryKey: ['comments', recipeId, page],
     queryFn: () => getComments(recipeId, page),
+    placeholderData: keepPreviousData,
   });
 
   const invalidate = () => {
@@ -103,6 +104,7 @@ export function CommentsSection({
           onSubmit={(e) => { e.preventDefault(); if (draft.trim()) post.mutate(); }}
         >
           <input
+            aria-label="Add a comment"
             placeholder="Add a comment…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -130,11 +132,13 @@ export function CommentsSection({
                   onSubmit={(e) => { e.preventDefault(); saveEdit.mutate(); }}
                 >
                   <input
+                    aria-label="Edit comment"
                     value={editDraft}
                     onChange={(e) => setEditDraft(e.target.value)}
+                    maxLength={5000}
                     className="flex-1 border border-hairline px-2 py-1 text-sm"
                   />
-                  <Button type="submit">Save</Button>
+                  <Button type="submit" disabled={!editDraft.trim()}>Save</Button>
                   <Button type="button" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
                 </form>
               ) : (
@@ -144,6 +148,7 @@ export function CommentsSection({
                 <ReactionButtons comment={comment} />
                 {isAuthor && editingId !== comment.id && (
                   <button
+                    aria-label={`Edit comment by ${comment.user.firstName} ${comment.user.lastName}`}
                     className="text-xs text-muted underline hover:text-ink"
                     onClick={() => { setEditingId(comment.id); setEditDraft(comment.body); }}
                   >
@@ -152,6 +157,7 @@ export function CommentsSection({
                 )}
                 {canDelete && (
                   <button
+                    aria-label={`Delete comment by ${comment.user.firstName} ${comment.user.lastName}`}
                     className="text-xs text-muted underline hover:text-red-600"
                     onClick={() => setDeletingId(comment.id)}
                   >

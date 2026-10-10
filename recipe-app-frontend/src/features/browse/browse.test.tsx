@@ -64,3 +64,28 @@ test('pagination renders page buttons from totalPages', async () => {
   await screen.findByText('Bruschetta Pork & Pasta');
   expect(screen.getByRole('button', { name: 'Go to page 3' })).toBeInTheDocument();
 });
+
+test('unset filters are never sent, and a filter change from a later page resets to page 0', async () => {
+  const store = { url: '' };
+  captureRecipesUrl(store, pageOf([recipeFixture()], { totalPages: 3, number: 2 }));
+  renderApp('/?page=2');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  await userEvent.click(screen.getByRole('button', { name: /vegetarian/i }));
+  await vi.waitFor(() => {
+    const params = new URL(store.url).searchParams;
+    expect(params.get('vegetarian')).toBe('true');
+    expect(params.get('page')).toBe('0');
+    for (const unset of ['cuisine', 'vegan', 'glutenFree', 'dairyFree', 'maxReadyInMinutes', 'minRating']) {
+      expect(params.has(unset)).toBe(false);
+    }
+  });
+  expect(screen.getByRole('button', { name: /vegetarian/i })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a garbage page param falls back to page 0', async () => {
+  const store = { url: '' };
+  captureRecipesUrl(store);
+  renderApp('/?page=abc');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(new URL(store.url).searchParams.get('page')).toBe('0');
+});

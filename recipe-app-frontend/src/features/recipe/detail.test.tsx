@@ -83,3 +83,25 @@ test('unknown recipe id shows not-found message', async () => {
   renderApp('/recipes/nope');
   expect(await screen.findByText(/recipe not found/i)).toBeInTheDocument();
 });
+
+test('a failed rating shows the server error in a toast', async () => {
+  stubDetail({ myRatingStatus: 404 });
+  server.use(
+    http.put(`${BASE}/api/recipes/r-1/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'Recipe with id r-1 not found' }, { status: 404 }),
+    ),
+  );
+  renderApp('/recipes/r-1');
+  await userEvent.click(await screen.findByRole('button', { name: /rate 5 stars/i }));
+  expect(await screen.findByText('Recipe with id r-1 not found')).toBeInTheDocument();
+});
+
+test('an imported recipe without a source URL shows its source as plain text', async () => {
+  stubDetail();
+  server.use(
+    http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json(recipeFixture({ sourceUrl: null }))),
+  );
+  renderApp('/recipes/r-1');
+  expect(await screen.findByText(/from pink when/i)).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /from pink when/i })).not.toBeInTheDocument();
+});

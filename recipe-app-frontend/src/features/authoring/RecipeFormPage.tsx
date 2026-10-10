@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { createRecipe, getRecipe, updateRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
 import { Button, Field, SectionHeading, Spinner, TextInput } from '@/components/ui';
-import { CUISINES } from '@/features/browse/FilterBar';
+import { CUISINES, cuisineLabel } from '@/features/browse/FilterBar';
 import type { RecipeCreate } from '@/lib/types';
 
 // Mirrors the backend's @PositiveOrZero Integer; empty = not set.
@@ -174,7 +174,7 @@ export default function RecipeFormPage() {
       <div className="mt-3 flex flex-wrap gap-3 text-sm">
         {CUISINES.map((c) => (
           <label key={c} className="flex items-center gap-1">
-            <input type="checkbox" value={c} className="accent-ink" {...register('cuisines')} /> {c}
+            <input type="checkbox" value={c} className="accent-ink" {...register('cuisines')} /> {cuisineLabel(c)}
           </label>
         ))}
       </div>

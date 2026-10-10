@@ -9,7 +9,7 @@ export function Pagination({
 }) {
   if (totalPages <= 1) return null;
   return (
-    <nav className="mt-8 flex justify-center gap-1">
+    <nav aria-label="Pagination" className="mt-8 flex justify-center gap-1">
       {Array.from({ length: totalPages }, (_, i) => (
         <button
           key={i}

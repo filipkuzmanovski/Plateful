@@ -6,13 +6,12 @@ import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { SectionHeading, Spinner } from '@/components/ui';
 
-export default function PublicProfilePage() {
-  const { id } = useParams<{ id: string }>();
+function PublicProfileContent({ id }: { id: string }) {
   const [page, setPage] = useState(0);
-  const user = useQuery({ queryKey: ['user', id], queryFn: () => getUser(id!) });
+  const user = useQuery({ queryKey: ['user', id], queryFn: () => getUser(id) });
   const recipes = useQuery({
     queryKey: ['userRecipes', id, page],
-    queryFn: () => getUserRecipes(id!, page),
+    queryFn: () => getUserRecipes(id, page),
   });
 
   if (user.isPending) return <Spinner />;
@@ -25,6 +24,7 @@ export default function PublicProfilePage() {
       </h1>
       <SectionHeading>Recipes</SectionHeading>
       {recipes.isPending && <Spinner />}
+      {recipes.isError && <p className="text-sm text-red-600">Couldn't load recipes.</p>}
       {recipes.data && recipes.data.content.length === 0 && (
         <p className="text-sm text-muted">No recipes published yet.</p>
       )}
@@ -38,4 +38,9 @@ export default function PublicProfilePage() {
       )}
     </div>
   );
+}
+
+export default function PublicProfilePage() {
+  const { id } = useParams<{ id: string }>();
+  return <PublicProfileContent key={id} id={id!} />;
 }

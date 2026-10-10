@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { ApiError } from '@/api/client';
 import { deleteMyRating, getMyRating, putMyRating } from '@/api/ratings';
 import { useAuth } from '@/auth/AuthProvider';
 
@@ -17,8 +19,9 @@ export function RatingBox({ recipeId }: { recipeId: string }) {
     void queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
     void queryClient.invalidateQueries({ queryKey: ['recipes'] });
   };
-  const rate = useMutation({ mutationFn: (n: number) => putMyRating(recipeId, n), onSuccess: invalidate });
-  const unrate = useMutation({ mutationFn: () => deleteMyRating(recipeId), onSuccess: invalidate });
+  const onError = (e: unknown) => toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
+  const rate = useMutation({ mutationFn: (n: number) => putMyRating(recipeId, n), onSuccess: invalidate, onError });
+  const unrate = useMutation({ mutationFn: () => deleteMyRating(recipeId), onSuccess: invalidate, onError });
 
   if (status !== 'ready') {
     return <p className="text-xs text-muted">Sign in to rate this recipe.</p>;
@@ -39,6 +42,7 @@ export function RatingBox({ recipeId }: { recipeId: string }) {
             key={n}
             aria-label={`Rate ${n} stars`}
             aria-pressed={current === n}
+            disabled={rate.isPending || unrate.isPending}
             onClick={() => (current === n ? unrate.mutate() : rate.mutate(n))}
             className={`text-2xl leading-none ${
               current !== null && n <= current ? 'text-accent' : 'text-hairline hover:text-accent'

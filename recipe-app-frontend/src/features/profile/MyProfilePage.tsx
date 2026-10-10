@@ -57,6 +57,7 @@ export default function MyProfilePage() {
 
       <SectionHeading>My recipes</SectionHeading>
       {recipes.isPending && <Spinner />}
+      {recipes.isError && <p className="text-sm text-red-600">Couldn't load recipes.</p>}
       {recipes.data && recipes.data.content.length === 0 && (
         <p className="text-sm text-muted">
           Nothing yet — <Link to="/recipes/new" className="text-accent underline">publish your first recipe</Link>.

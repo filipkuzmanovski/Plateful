@@ -1,5 +1,5 @@
 import { useSearchParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { browseRecipes } from '@/api/recipes';
 import type { RecipeFilter } from '@/lib/types';
 import { RecipeCard } from '@/components/RecipeCard';
@@ -34,11 +34,12 @@ function toApiFilter(v: FilterValues): RecipeFilter {
 export default function BrowsePage() {
   const [params, setParams] = useSearchParams();
   const values = readFilters(params);
-  const page = Number(params.get('page') ?? '0');
+  const page = Math.max(0, Number.parseInt(params.get('page') ?? '0', 10) || 0);
 
   const query = useQuery({
     queryKey: ['recipes', params.toString()],
     queryFn: () => browseRecipes(toApiFilter(values), page),
+    placeholderData: keepPreviousData,
   });
 
   function patchParams(patch: Partial<FilterValues>) {

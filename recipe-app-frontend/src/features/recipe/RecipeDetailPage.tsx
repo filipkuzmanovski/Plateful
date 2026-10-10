@@ -64,7 +64,7 @@ export default function RecipeDetailPage() {
       <aside className="lg:w-2/5">
         <div className="border border-hairline lg:sticky lg:top-4">
           {recipe.image ? (
-            <img src={recipe.image} alt={recipe.title} className="w-full object-cover" />
+            <img src={recipe.image} alt={recipe.title} className="aspect-[4/3] w-full object-cover" />
           ) : (
             <div className="flex h-52 items-center justify-center bg-hairline text-5xl">🍽</div>
           )}
@@ -116,9 +116,13 @@ export default function RecipeDetailPage() {
               by {recipe.user.firstName} {recipe.user.lastName}
             </Link>
           ) : recipe.sourceName ? (
-            <a href={recipe.sourceUrl ?? '#'} target="_blank" rel="noreferrer" className="text-sm text-muted underline">
-              From {recipe.sourceName} ↗
-            </a>
+            recipe.sourceUrl ? (
+              <a href={recipe.sourceUrl} target="_blank" rel="noreferrer" className="text-sm text-muted underline">
+                From {recipe.sourceName} ↗
+              </a>
+            ) : (
+              <span className="text-sm text-muted">From {recipe.sourceName}</span>
+            )
           ) : null}
         </div>
 

@@ -3,6 +3,8 @@ export const CUISINES = [
   'french', 'japanese', 'thai', 'spanish', 'american',
 ];
 
+export const cuisineLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1);
+
 const DIETS = [
   ['vegan', 'Vegan'],
   ['vegetarian', 'Vegetarian'],
@@ -39,7 +41,7 @@ export function FilterBar({
         >
           <option value="">All</option>
           {CUISINES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c}>{cuisineLabel(c)}</option>
           ))}
         </select>
       </label>
@@ -47,6 +49,7 @@ export function FilterBar({
       {DIETS.map(([key, label]) => (
         <button
           key={key}
+          aria-pressed={values[key]}
           onClick={() => onChange({ [key]: !values[key] } as Partial<FilterValues>)}
           className={`border px-3 py-1 text-xs font-bold tracking-wide uppercase ${
             values[key] ? 'border-ink bg-ink text-white' : 'border-hairline hover:border-ink'
