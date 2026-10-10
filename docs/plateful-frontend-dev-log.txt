@@ -1,0 +1,537 @@
+================================================================================
+ PLATEFUL FRONTEND — DEVELOPMENT LOG
+================================================================================
+
+What this file is
+-----------------
+A task-by-task record of how the Plateful frontend (recipe-app-frontend/) was
+built: what each task delivered, how it was done, and explanations of the key
+code. It follows the implementation plan in
+docs/superpowers/plans/2026-07-14-plateful-frontend.md, which was derived from
+the design spec docs/superpowers/specs/2026-07-14-frontend-design.md.
+
+Each task was built test-first (write a failing test, make it pass, commit),
+then checked by an independent reviewer before the next task started. Fixes
+that came out of a review are logged as their own entries.
+
+File paths below are relative to recipe-app-frontend/ unless they start with
+docs/ or RecipeAppBackend/.
+
+
+--------------------------------------------------------------------------------
+ THE BIG PICTURE (read this first)
+--------------------------------------------------------------------------------
+
+Plateful is a single-page app (SPA): the browser downloads one JavaScript
+bundle, and from then on React swaps "pages" in and out without full reloads.
+All recipe data lives in the Spring Boot backend (RecipeAppBackend/), which the
+frontend calls over HTTP at http://localhost:8080/api/... .
+
+Request flow for, say, opening the browse page:
+
+  Browser URL (/?cuisine=thai)
+     -> React Router picks the page component (BrowsePage)
+     -> TanStack Query asks "do I already have this data cached?"
+     -> if not, calls browseRecipes() in src/api/recipes.ts
+     -> which calls the shared fetch wrapper in src/api/client.ts
+     -> which adds the login token and calls the Spring API
+     -> JSON comes back, typed as Page<RecipeDisplay> (src/lib/types.ts)
+     -> React renders RecipeCard components from it
+
+Login works differently: Supabase (a hosted auth service) handles sign-up and
+sign-in and gives the browser a JWT (a signed token proving who you are). The
+frontend never reads recipe data from Supabase — it only borrows the token and
+attaches it to calls to our own API, where Spring verifies it.
+
+Tech stack, and what each piece is for:
+
+  Vite 8              Dev server + production bundler (npm run dev / build)
+  React 19            UI components
+  TypeScript 6        Types, in strict mode so mistakes fail at compile time
+  React Router 8      Maps URLs to page components
+  TanStack Query 5    Fetches, caches and refreshes server data
+  supabase-js 2       Sign-up / sign-in / session only
+  Tailwind CSS 4      Styling via utility classes, themed to our tokens
+  react-hook-form +   Form state and validation (used by the recipe form)
+    zod 4
+  Radix Dialog        Accessible confirm dialogs
+  sonner              Toast notifications
+  Vitest 4 + Testing  Test runner, React rendering in tests, and MSW, which
+    Library + MSW 2   fakes the backend at the HTTP level
+
+Visual direction ("Fresh Editorial", picked from mockups): near-black text on
+white, one green accent, thin gray hairlines, square corners, Inter font, and
+photography as the only real color.
+
+
+================================================================================
+ TASK 1 — Scaffold, theme, test infrastructure
+ Commits on main: 363fe69 (scaffold), 3fef2b2 (review fix: TypeScript strict)
+================================================================================
+
+What was built
+--------------
+An empty but fully wired project: Vite + React + TypeScript, the Tailwind
+theme, a handful of shared UI building blocks, and the testing setup that
+every later task relies on.
+
+How it was done
+---------------
+1. `npm create vite@latest recipe-app-frontend -- --template react-ts`
+   generated the skeleton. All libraries were installed in two npm commands
+   (runtime dependencies, then dev/test-only ones). The template's demo files
+   (App.css, logos) were deleted.
+
+2. vite.config.ts — three jobs in one file:
+     plugins: [react(), tailwindcss()]
+       React support, and Tailwind compiled at build time (Tailwind v4 is a
+       Vite plugin, with no separate config file).
+     resolve.alias: { '@': path.resolve(__dirname, 'src') }
+       Lets code write `import { api } from '@/api/client'` instead of
+       fragile relative paths like '../../api/client'.
+     test: { environment: 'jsdom', globals: true, setupFiles: ... }
+       Configures Vitest. jsdom is a fake browser DOM so React components
+       can render inside Node. `globals: true` makes test(), expect() and
+       vi available without imports.
+
+   tsconfig.app.json mirrors the alias ("paths": {"@/*": ["./src/*"]}) so
+   TypeScript understands '@/...' too. Vite and TypeScript resolve imports
+   independently, so the alias must be declared in both.
+
+3. src/index.css — the whole design system lives here:
+
+     @import 'tailwindcss';
+     @import '@fontsource-variable/inter';    <- self-hosted font, no CDN
+     @theme {
+       --font-sans: 'Inter Variable', system-ui, sans-serif;
+       --color-ink: #111111;
+       --color-accent: #16a34a;
+       --color-hairline: #e5e5e5;
+       --color-muted: #737373;
+     }
+
+   Tailwind v4 turns every `--color-x` in @theme into utility classes, so
+   `--color-accent` makes `text-accent`, `bg-accent`, `border-accent` and so
+   on available everywhere. Changing a token here re-skins the whole app.
+
+4. src/components/ui.tsx — small shared components:
+     Button          variant = 'primary' | 'outline' | 'danger'. A lookup
+                     object maps each variant to its classes, and the rest
+                     of the props are spread onto a real <button> so
+                     onClick, disabled, type etc. all just work.
+     Field           A <label> wrapping an uppercase caption + the input +
+                     an optional error line with role="alert" (so screen
+                     readers announce validation errors).
+     TextInput       A styled <input>.
+     SectionHeading  The uppercase, letter-spaced heading with a 2px black
+                     rule underneath (INGREDIENTS, INSTRUCTIONS, ...).
+     Spinner         A "Loading…" line with role="status".
+
+5. Test infrastructure:
+     src/test/server.ts  `export const server = setupServer();`
+       An MSW server. Tests register fake API responses on it with
+       server.use(http.get(url, handler)). MSW intercepts fetch() itself,
+       so our real API client code runs end-to-end in tests.
+     src/test/setup.ts   Runs before every test file: starts the MSW
+       server, resets handlers after each test (so tests can't leak fakes
+       into each other), and adds jest-dom matchers like
+       toBeInTheDocument().
+
+6. .env.example documents the three environment variables
+   (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_API_BASE_URL). The real
+   values go in .env.local, which git ignores. Vite only exposes variables
+   prefixed VITE_ to browser code, and inlines them at build time.
+
+Review fix (3fef2b2)
+--------------------
+The reviewer noticed the newer Vite template had shipped without
+`"strict": true` in tsconfig.app.json. Strict mode turns on null checking
+(a value typed `string | null` must be checked before use) and bans implicit
+`any`. Every later task depends on it to catch bugs at compile time, so it was
+enabled before anything else was built on top.
+
+How it was tested
+-----------------
+One smoke test rendered the app and checked the PLATEFUL wordmark appeared,
+proving React, Vitest, jsdom and the setup file were all wired together. It
+was deleted in Task 3 once real tests existed.
+
+
+================================================================================
+ TASK 2 — Types, API client, resource modules
+ Commit on main: 45828e7
+================================================================================
+
+What was built
+--------------
+The entire data layer: TypeScript types mirroring the backend's JSON, one
+fetch wrapper that every API call goes through, and one small module per
+backend resource.
+
+How it was done
+---------------
+1. src/lib/types.ts — interfaces copied field-for-field from the Spring DTOs
+   (RecipeDisplayDto, RecipeCommentDisplayDto, ...). Examples:
+
+     interface RecipeDisplay { id: string; title: string;
+       readyInMinutes: number | null; ... 28 fields total }
+     interface Page<T> { content: T[];
+       page: { size; number; totalElements; totalPages } }
+
+   Java Integer/BigDecimal fields that can be null become `number | null`,
+   so strict TypeScript forces the UI to handle "no value" (e.g. a recipe
+   with no cooking time). Page<T> is a generic: Page<RecipeDisplay>,
+   Page<CommentDisplay> and so on all share one definition, matching the
+   backend's paginated response shape.
+
+2. src/auth/supabaseClient.ts creates the one Supabase client for the app,
+   reading the URL and key from env vars. The comment marks it as auth-only.
+
+3. src/api/client.ts — the heart of the data layer. Walkthrough:
+
+     export class ApiError extends Error {
+       status: number; detail: string; errors?: Record<string, string>;
+       ...
+     }
+   A typed error. The backend returns failures as RFC 9457 "ProblemDetail"
+   JSON: { status, detail, errors? }. Turning that into an ApiError lets UI
+   code write `if (e instanceof ApiError && e.status === 404)` and lets
+   forms map `errors.title` onto the title field. (The fields are declared
+   explicitly instead of with TypeScript's constructor shorthand because the
+   project's `erasableSyntaxOnly` setting forbids that shorthand.)
+
+     async function request(path, init) {
+       const headers = new Headers(init.headers);
+       if (init.body) headers.set('Content-Type', 'application/json');
+       const { data } = await supabase.auth.getSession();
+       const token = data.session?.access_token;
+       if (token) headers.set('Authorization', `Bearer ${token}`);
+   Attaches the login token only when someone is logged in. Anonymous
+   visitors send no header, which the backend allows for public GETs.
+
+       const res = await fetch(`${BASE}${path}`, { ...init, headers });
+       if (res.ok) return res;
+       if (res.status === 401) await supabase.auth.signOut();
+   A 401 means the token expired or is invalid. Signing out clears the
+   session; the auth provider (Task 3) notices and the UI goes back to the
+   logged-out state.
+
+       const problem = await res.json().catch(() => null);
+       throw new ApiError(res.status, problem?.detail ?? `Request failed...`,
+                          problem?.errors);
+   Some errors (e.g. Spring Security's 401) have an empty body, so a JSON
+   parse failure falls back to a generic message instead of crashing.
+
+   Two exported wrappers: api<T>() returns parsed JSON typed as T, and
+   apiVoid() is for endpoints that answer 204 No Content.
+
+4. Resource modules — src/api/recipes.ts, users.ts, ratings.ts,
+   comments.ts, reactions.ts. These are the ONLY places URLs appear, so if
+   an endpoint moves, one line changes. Two worth explaining:
+
+     browseRecipes(filter, page):
+       for (const [key, value] of Object.entries(filter)) {
+         if (value !== undefined && value !== null && value !== '')
+           params.set(key, String(value));
+       }
+   Unset filters are left OUT of the query string entirely. Sending
+   vegan=false would ask the backend for non-vegan recipes, which is not
+   the same as "don't filter on vegan". Page size is fixed at 12 via the
+   exported PAGE_SIZE constant.
+
+     getMyRating(recipeId):
+       try { return (await api(...)).rating; }
+       catch (e) { if (e instanceof ApiError && e.status === 404) return null;
+                   throw e; }
+   The backend answers 404 when you haven't rated a recipe. That isn't an
+   error for the UI, it just means "no rating", so it becomes null. Every
+   other failure is re-thrown.
+
+5. src/test/fixtures.ts — builder functions for test data (recipeFixture,
+   commentFixture, pageOf, profileFixture). recipeFixture({ title: 'X' })
+   returns a complete, realistic recipe with just the title overridden, so
+   tests only spell out what they care about.
+
+How it was tested
+-----------------
+src/api/client.test.ts (4 tests, all through MSW):
+  - JSON parses, and no Authorization header is sent when logged out
+  - A ProblemDetail 400 becomes an ApiError with status, detail and errors
+  - browseRecipes sends cuisine/vegan/page/size but omits unset filters
+  - getMyRating turns a 404 into null
+
+
+================================================================================
+ TASK 3 — Auth provider, provisioning, routing shell
+ Commit on main: 934e653
+================================================================================
+
+What was built
+--------------
+Login and signup pages, the "complete your profile" step, the app header,
+route protection, and the full route table (later pages started as
+placeholders and are swapped in task by task).
+
+How it was done
+---------------
+1. The provisioning problem. Supabase knows a user's email and password, but
+   our database also needs a profile row with first and last name. The
+   backend contract: after login, GET /api/users/me returns the profile, or
+   404 if it doesn't exist yet. Then POST /api/users/me {firstName,
+   lastName} creates it (safe to repeat).
+
+2. src/auth/AuthProvider.tsx — a React Context that tracks login state for
+   the whole app as a small state machine:
+
+     'loading'        still finding out who you are
+     'anonymous'      not logged in
+     'needs-profile'  logged in, but no profile row yet
+     'ready'          logged in with a profile
+
+   On mount it reads the current session (supabase.auth.getSession()) and
+   subscribes to changes (supabase.auth.onAuthStateChange()). Whenever the
+   session changes, resolveProfile() calls GET /api/users/me: 200 sets the
+   profile and 'ready', and 404 sets 'needs-profile'. Components read all of
+   this with the useAuth() hook. (Task 3 Fix below hardens this logic.)
+
+   Context is used so any component — the header, the rating box, the
+   comment form — can ask "who is logged in?" without the state being passed
+   down through every component in between.
+
+3. src/auth/ProtectedRoute.tsx — wraps pages that need a login:
+     loading        -> spinner
+     anonymous      -> <Navigate to="/login" state={{ from: path }} />
+                       (login sends you back to where you were going)
+     needs-profile  -> <Navigate to="/complete-profile" />
+   The needs-profile redirect is skipped when you're already ON
+   /complete-profile. Without that check the page would redirect to itself
+   forever.
+
+4. Pages:
+     LoginPage / SignupPage  Call supabase.auth.signInWithPassword /
+                             signUp and show Supabase's error message on
+                             failure.
+     CompleteProfilePage     Collects first/last name, calls createMe(),
+                             hands the new profile to the context via
+                             setProfile(), and navigates to /me.
+
+5. src/components/AppShell.tsx — the layout around every page: the PLATEFUL
+   wordmark, nav links (Browse, plus New Recipe only when 'ready'), a user
+   menu (My profile / Sign out) or a Sign in link, an ErrorBoundary around
+   the page content, and the toast container.
+
+   src/components/ErrorBoundary.tsx is a class component (React still only
+   offers error boundaries as classes). If a page throws while rendering,
+   it shows a friendly message instead of a blank white screen.
+
+6. src/AppRoutes.tsx — the route table, final from day one:
+     /                    BrowsePage          public
+     /recipes/new         RecipeFormPage      protected
+     /recipes/:id         RecipeDetailPage    public
+     /recipes/:id/edit    RecipeFormPage      protected
+     /users/:id           PublicProfilePage   public
+     /me                  MyProfilePage       protected
+     /login, /signup      auth pages          public
+     /complete-profile    CompleteProfilePage protected
+   All routes nest under AppShell (React Router's <Outlet/> marks where the
+   page renders inside the layout).
+
+7. src/App.tsx stacks the providers: QueryClientProvider (data cache) >
+   AuthProvider (who's logged in) > BrowserRouter (URLs) > AppRoutes. The
+   QueryClient retries failed requests twice and treats data as fresh for
+   30 seconds.
+
+8. src/test/utils.tsx — renderApp('/some/route') renders the WHOLE app with
+   a MemoryRouter (an in-memory URL, so no real browser address bar is
+   needed) and a fresh cache with retries off, so tests are fast and
+   isolated.
+
+How it was tested
+-----------------
+src/auth/auth.test.tsx replaces the Supabase client with a fake that reports
+a logged-in session (vi.mock), while the backend is faked with MSW:
+  - A logged-in user with no profile who opens /me is redirected to
+    /complete-profile. After typing a name and saving, they land on /me
+    showing "Jane Doe", and the POST body is verified.
+  - A user with a profile sees their name in the header.
+
+
+================================================================================
+ TASK 3 FIX — Hardening the auth state machine
+ Commits on feature/frontend-pages: 8c9d049, a6a0216
+================================================================================
+
+Why
+---
+The reviewer found gaps in the AuthProvider logic as originally planned:
+
+  1. If supabase.auth.getSession() ever failed, nothing caught the error,
+     and the app would sit on 'loading' forever: every protected page shows
+     an endless spinner.
+  2. Supabase v2 fires an INITIAL_SESSION event through onAuthStateChange at
+     the same moment getSession() resolves, so GET /api/users/me was fetched
+     twice on every page load. Token refreshes (about hourly) fetched it
+     again.
+  3. (Found on the second review.) A brief network failure while loading the
+     profile left a logged-in user looking logged out, with no retry. And a
+     slow profile response for a previous user could arrive late and
+     overwrite the current user's state.
+
+How it was fixed (src/auth/AuthProvider.tsx)
+--------------------------------------------
+Three variables live inside the useEffect, so each mount gets fresh ones:
+
+  let cancelled = false;
+     Set by the cleanup function. Responses that arrive after the component
+     unmounted are ignored. (React StrictMode mounts, unmounts and re-mounts
+     every component in development, so this happens on every page load in
+     dev.)
+
+  let lastUserKey: string | null | undefined;
+     The user id the state was last resolved for (null = logged out,
+     undefined = nothing resolved yet). The first line of resolveProfile:
+
+       const key = s?.user?.id ?? null;
+       if (key === lastUserKey) return;
+
+     If the event is about the same user we already resolved (the
+     INITIAL_SESSION double-fire, a token refresh), there's nothing to do.
+     That fixes gap 2. A different user or a sign-out has a different key,
+     so it still re-resolves.
+
+  let latest = 0;
+     A counter bumped on every real resolution:
+
+       const run = ++latest;
+       const isCurrent = () => !cancelled && run === latest;
+
+     Each resolution remembers its own number. When its HTTP response comes
+     back it only applies the result if no newer resolution has started.
+     So a slow response for user A can never overwrite user B. That fixes
+     the stale half of gap 3.
+
+The error path:
+
+  } else {
+    lastUserKey = undefined; // transient failure: let the next auth event retry
+    setStatus('anonymous');
+  }
+
+On a non-404 failure the remembered key is cleared, so the next auth event
+for that same user is no longer treated as a duplicate and the profile load
+is retried. That fixes the retry half of gap 3.
+
+The getSession failure (gap 1) now has a .catch() that falls back to
+'anonymous'. But it only does so if `lastUserKey === undefined`, so a late
+failure can't overwrite a state that an auth event already resolved.
+
+How it was tested
+-----------------
+src/auth/auth-events.test.tsx. The fake Supabase client captures the
+onAuthStateChange callback, so tests can fire auth events by hand:
+  - SIGNED_IN fetches the profile once. A following TOKEN_REFRESHED for the
+    same user does NOT fetch again (counts real HTTP calls through MSW).
+  - getSession rejecting lands on 'anonymous' (the Sign in link appears)
+    rather than an endless spinner.
+  - Sign-in as user 1, sign-out, sign-in as user 2: two fetches, and the
+    header shows user 2.
+  - First profile fetch fails with a 500; the next event retries and
+    succeeds.
+The 500 case was written first and failed before the fix (only one fetch
+happened), proving the test actually detects the bug.
+
+
+================================================================================
+ TASK 4 — Browse page
+ Commit on feature/frontend-pages: 7a742a3
+================================================================================
+
+What was built
+--------------
+The home page: a filter bar on top, a responsive grid of recipe cards, and
+page-number pagination. Filters live in the URL.
+
+How it was done
+---------------
+1. Why the URL holds the filters. Instead of keeping filter choices in React
+   state, they are stored in the query string:
+     /?cuisine=thai&vegan=true&page=1
+   That gives three things for free: filtered views can be shared or
+   bookmarked, the browser Back button undoes a filter change, and a page
+   refresh keeps your filters.
+
+2. src/features/browse/BrowsePage.tsx
+
+     const [params, setParams] = useSearchParams();
+   React Router's hook for reading and writing the query string.
+
+     function readFilters(params): FilterValues { ... }
+   Turns URL strings into typed values: vegan is true only when the URL
+   says exactly "true", and missing values become '' / false.
+
+     function toApiFilter(v): RecipeFilter {
+       return { cuisine: v.cuisine || undefined,
+                vegan: v.vegan || undefined, ... }
+   `x || undefined` turns '' and false into undefined, which browseRecipes()
+   then leaves out of the request. (As in Task 2: "not filtering" must never
+   be sent as "false".)
+
+     useQuery({
+       queryKey: ['recipes', params.toString()],
+       queryFn: () => browseRecipes(toApiFilter(values), page),
+     })
+   TanStack Query caches results under the key. Because the key is the
+   whole query string, every filter combination is cached separately.
+   Switching back to a filter you used a moment ago is instant, and the old
+   result is never shown for a new filter.
+
+     function patchParams(patch) {
+       ... set or delete each changed key ...
+       next.delete('page');   // filter change resets pagination
+       setParams(next);
+     }
+   Writing the URL is the only thing a filter click does. React Router
+   re-renders, the query key changes, and TanStack Query fetches. Changing a
+   filter drops the page number, because page 3 of the old results means
+   nothing for the new filter.
+
+   The page then renders one of four states: loading spinner, error with a
+   Retry button (query.refetch()), "No recipes match" with Clear filters,
+   or the grid + pagination.
+
+3. src/features/browse/FilterBar.tsx — a "controlled" component: it owns no
+   state. It receives the current values and calls onChange with a patch.
+   Contents: a cuisine <select> over the exported CUISINES list (the 10
+   cuisines seeded from Spoonacular), four diet toggle buttons (filled black
+   when active), and max-time and min-rating selects. Each select has an
+   aria-label, so it's accessible and tests can find it by name.
+
+4. src/components/RecipeCard.tsx — a <Link> to /recipes/:id containing the
+   photo (or a 🍽 placeholder when there's none), title (turns green on
+   hover via Tailwind's `group-hover:`), StarDisplay, ready time, and
+   cuisines. Shared with the profile pages in Task 8.
+
+   src/components/StarDisplay.tsx shows "★ 4.6 (28)", or "No ratings yet"
+   when the average is null.
+
+   src/components/Pagination.tsx renders one button per page from the
+   backend's totalPages. The current page is filled black and marked
+   aria-current="page". It renders nothing when there's only one page.
+
+5. Responsive grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` gives one
+   column on phones, two on tablets and four on desktops (Tailwind's
+   breakpoint prefixes apply from that width up).
+
+How it was tested
+-----------------
+src/features/browse/browse.test.tsx (5 tests). MSW captures the actual
+request URL, so the tests assert what is really sent to the backend:
+  - Cards render title, rating and time from the API response
+  - Choosing cuisine=italian and clicking Vegan sends cuisine=italian,
+    vegan=true and page=0
+  - Opening /?cuisine=thai&maxReadyInMinutes=30&page=1 sends those exact
+    params, so URL to request works
+  - An empty result shows the empty state
+  - totalPages: 3 renders a "Go to page 3" button
+All 5 failed before the page existed. After implementing: 15/15 tests
+passing.
