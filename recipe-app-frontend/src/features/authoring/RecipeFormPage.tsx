@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -10,7 +10,7 @@ import { createRecipe, getRecipe, updateRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { Button, EmptyState, Field, Spinner, TextInput } from '@/components/ui';
-import { CUISINES, cuisineLabel } from '@/features/browse/FilterBar';
+import { CuisinePicker } from './CuisinePicker';
 import type { RecipeCreate } from '@/lib/types';
 
 // Mirrors the backend's @PositiveOrZero Integer; empty = not set.
@@ -217,21 +217,15 @@ export default function RecipeFormPage() {
               ))}
             </div>
           </fieldset>
-          <fieldset className="mt-5">
-            <legend className="mb-2 text-[13px] font-semibold text-olive">Cuisines</legend>
-            <div className="flex flex-wrap gap-2">
-              {CUISINES.map((c) => (
-                <label key={c} className={checkChip}>
-                  <input type="checkbox" value={c} className="sr-only" {...register('cuisines')} />
-                  <Check aria-hidden="true" className="hidden size-3.5 group-has-checked:block" strokeWidth={2.5} />
-                  {cuisineLabel(c)}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          {errors.cuisines?.message && (
-            <p role="alert" className="mt-2 text-xs font-medium text-danger">{errors.cuisines.message}</p>
-          )}
+          <div className="mt-5">
+            <Controller
+              control={control}
+              name="cuisines"
+              render={({ field }) => (
+                <CuisinePicker value={field.value} onChange={field.onChange} error={errors.cuisines?.message} />
+              )}
+            />
+          </div>
         </FormSection>
 
         <FormSection title="Ingredients">
