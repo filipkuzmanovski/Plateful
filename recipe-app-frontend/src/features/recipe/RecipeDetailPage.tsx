@@ -6,11 +6,7 @@ import { StarDisplay } from '@/components/StarDisplay';
 import { SectionHeading, Spinner } from '@/components/ui';
 import type { RecipeDisplay } from '@/lib/types';
 import { RatingBox } from './RatingBox';
-
-// Task 6 replaces this placeholder with the real CommentsSection.
-function CommentsSlot({ recipeId: _recipeId }: { recipeId: string }) {
-  return <p className="text-sm text-muted">Comments coming soon.</p>;
-}
+import { CommentsSection } from './CommentsSection';
 
 function DietBadges({ recipe }: { recipe: RecipeDisplay }) {
   const badges = [
@@ -120,7 +116,7 @@ export default function RecipeDetailPage() {
 
         <SectionHeading>Comments ({recipe.commentCount})</SectionHeading>
         <section aria-label="comments">
-          <CommentsSlot recipeId={recipe.id} />
+          <CommentsSection recipeId={recipe.id} recipeOwnerId={recipe.user?.id ?? null} />
         </section>
       </article>
     </div>
