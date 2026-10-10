@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CircleAlert, X } from 'lucide-react';
 import { cuisinesQueryKey, getCuisines } from '@/api/cuisines';
@@ -28,6 +28,8 @@ export function CuisinePicker({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const refocusOnReopen = useRef(false); // set when a chip removal frees a slot at the cap
 
   const cuisines = useQuery({ queryKey: cuisinesQueryKey, queryFn: getCuisines, staleTime: Infinity });
   const labelOf = useMemo(() => {
@@ -47,10 +49,31 @@ export function CuisinePicker({
   const activeIndex = Math.min(active, Math.max(options.length - 1, 0));
   const optionId = (key: string) => `${listId}-${key}`;
 
+  // Keep the highlighted option visible when arrowing through a long list (no-op where unsupported, e.g. jsdom).
+  const activeKey = showList ? options[activeIndex]?.key : undefined;
+  useEffect(() => {
+    if (activeKey) document.getElementById(optionId(activeKey))?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeKey]);
+
+  // The input is disabled at the cap and can't take focus until it re-enables.
+  useEffect(() => {
+    if (!atMax && refocusOnReopen.current) {
+      refocusOnReopen.current = false;
+      inputRef.current?.focus();
+    }
+  }, [atMax]);
+
   function select(key: string) {
     onChange([...value, key]);
     setQuery('');
     setActive(0);
+    // A disabled input fires no blur, so close explicitly or the list reopens itself later.
+    if (value.length + 1 >= MAX_CUISINES) setOpen(false);
+  }
+
+  function remove(key: string) {
+    if (atMax) refocusOnReopen.current = true;
+    onChange(value.filter((k) => k !== key));
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -89,7 +112,7 @@ export function CuisinePicker({
               <button
                 type="button"
                 aria-label={`Remove ${labelOf(key)}`}
-                onClick={() => onChange(value.filter((k) => k !== key))}
+                onClick={() => remove(key)}
                 className="flex size-6 items-center justify-center rounded-full transition hover:bg-cream/20 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-saffron"
               >
                 <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
@@ -111,6 +134,7 @@ export function CuisinePicker({
         <div className="relative">
           <input
             id={inputId}
+            ref={inputRef}
             role="combobox"
             aria-expanded={showList}
             aria-controls={listId}
@@ -125,7 +149,7 @@ export function CuisinePicker({
               setActive(0);
               setOpen(true);
             }}
-            onFocus={() => setOpen(true)}
+            onClick={() => setOpen(true)}
             onBlur={() => setOpen(false)}
             onKeyDown={onKeyDown}
             className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-saffron focus:ring-4 focus:ring-saffron/20 focus:outline-none disabled:cursor-not-allowed disabled:bg-cream disabled:opacity-70"

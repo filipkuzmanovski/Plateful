@@ -283,3 +283,43 @@ test('picker: a failed cuisines load offers Retry', async () => {
   await userEvent.click(screen.getByRole('button', { name: /retry/i }));
   expect(await screen.findByRole('combobox', { name: 'Cuisines' })).toBeInTheDocument();
 });
+
+test('selecting the tenth cuisine closes the list and removing a chip does not reopen it', async () => {
+  stubMe();
+  const many = Array.from({ length: 12 }, (_, i) => ({
+    key: `c${i}`, label: `Cuisine${String.fromCharCode(65 + i)}`, region: 'Europe', mediterranean: false, count: 1,
+  }));
+  server.use(http.get(`${BASE}/api/recipes/cuisines`, () => HttpResponse.json(many)));
+  renderApp('/recipes/new');
+  const input = await cuisineInput();
+  for (let i = 0; i < 10; i++) {
+    await userEvent.type(input, many[i].label);
+    await userEvent.click(await screen.findByRole('option', { name: many[i].label }));
+  }
+  expect(input).toBeDisabled();
+  expect(input).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Remove CuisineA' }));
+  expect(input).toBeEnabled();
+  expect(input).toHaveFocus(); // keyboard users are not stranded
+  expect(input).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+});
+
+test('picker: the highlighted option is scrolled into view as the user arrows down', async () => {
+  stubMe();
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  try {
+    renderApp('/recipes/new');
+    const input = await cuisineInput();
+    await userEvent.click(input);
+    scrollIntoView.mockClear();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    expect((scrollIntoView.mock.contexts.at(-1) as HTMLElement).textContent).toBe('Macedonian');
+  } finally {
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  }
+});
