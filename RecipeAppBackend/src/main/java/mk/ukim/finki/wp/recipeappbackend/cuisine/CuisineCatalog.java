@@ -78,7 +78,7 @@ public class CuisineCatalog {
         if (raw == null) {
             return "";
         }
-        return raw.trim().toLowerCase(Locale.ROOT).replaceAll("\s+", " ");
+        return raw.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
     }
 
     public Set<String> keysForRegion(String regionKey) {

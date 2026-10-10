@@ -46,6 +46,7 @@ class CuisineCatalogTest {
     @Test
     void normalizeTrimsLowercasesAndCollapses() {
         assertThat(CuisineCatalog.normalize("  Middle   Eastern ")).isEqualTo("middle eastern");
+        assertThat(CuisineCatalog.normalize("middle\teastern")).isEqualTo("middle eastern");
         assertThat(CuisineCatalog.normalize(null)).isEqualTo("");
     }
 
