@@ -1,9 +1,13 @@
-import { Link, useParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
-import { getRecipe } from '@/api/recipes';
+import { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { deleteRecipe, getRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
+import { useAuth } from '@/auth/AuthProvider';
 import { StarDisplay } from '@/components/StarDisplay';
-import { SectionHeading, Spinner } from '@/components/ui';
+import { Button, SectionHeading, Spinner } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { RecipeDisplay } from '@/lib/types';
 import { RatingBox } from './RatingBox';
 import { CommentsSection } from './CommentsSection';
@@ -28,6 +32,14 @@ function DietBadges({ recipe }: { recipe: RecipeDisplay }) {
 export default function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const query = useQuery({ queryKey: ['recipe', id], queryFn: () => getRecipe(id!), retry: false });
+  const { profile } = useAuth();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const navigate = useNavigate();
+  const removeRecipe = useMutation({
+    mutationFn: (recipeId: string) => deleteRecipe(recipeId),
+    onSuccess: () => navigate('/'),
+    onError: () => toast.error("Couldn't delete the recipe"),
+  });
 
   if (query.isPending) return <Spinner />;
   if (query.isError) {
@@ -73,6 +85,24 @@ export default function RecipeDetailPage() {
       {/* Right: content */}
       <article className="flex-1">
         <h1 className="text-3xl font-extrabold tracking-tight">{recipe.title}</h1>
+        {profile && recipe.user?.id === profile.id && (
+          <div className="mt-2 flex gap-2">
+            <Link to={`/recipes/${recipe.id}/edit`} className="border border-ink px-3 py-1 text-xs font-bold tracking-wide uppercase hover:bg-ink hover:text-white">
+              Edit
+            </Link>
+            <Button variant="danger" className="!px-3 !py-1 !text-xs" onClick={() => setConfirmDelete(true)}>
+              Delete recipe
+            </Button>
+            <ConfirmDialog
+              open={confirmDelete}
+              title="Delete recipe?"
+              description="The recipe, its ratings and its comments will be permanently removed."
+              confirmLabel="Confirm"
+              onConfirm={() => removeRecipe.mutate(recipe.id)}
+              onCancel={() => setConfirmDelete(false)}
+            />
+          </div>
+        )}
         <div className="mt-1 flex items-center gap-3">
           <StarDisplay average={recipe.averageRating} count={recipe.ratingCount} />
           {recipe.user ? (
