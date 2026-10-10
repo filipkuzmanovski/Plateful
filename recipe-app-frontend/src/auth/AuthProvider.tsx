@@ -25,26 +25,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     let lastUserKey: string | null | undefined; // undefined = nothing resolved yet
+    let latest = 0; // id of the newest resolution; results from older ones are dropped
 
     async function resolveProfile(s: Session | null) {
       const key = s?.user?.id ?? null;
       if (key === lastUserKey) return; // dedupes INITIAL_SESSION/getSession double-fire and token refreshes
       lastUserKey = key;
+      const run = ++latest;
+      const isCurrent = () => !cancelled && run === latest;
+
       if (!s) {
-        if (!cancelled) { setProfileState(null); setStatus('anonymous'); }
+        if (isCurrent()) { setProfileState(null); setStatus('anonymous'); }
         return;
       }
-      if (!cancelled) setStatus('loading');
+      if (isCurrent()) setStatus('loading');
       try {
         const me = await getMe();
-        if (!cancelled) { setProfileState(me); setStatus('ready'); }
+        if (isCurrent()) { setProfileState(me); setStatus('ready'); }
       } catch (e) {
-        if (cancelled) return;
+        if (!isCurrent()) return; // a newer session already took over
+        setProfileState(null);
         if (e instanceof ApiError && e.status === 404) {
-          setProfileState(null);
           setStatus('needs-profile');
         } else {
-          setProfileState(null);
+          lastUserKey = undefined; // transient failure: let the next auth event retry
           setStatus('anonymous'); // e.g. 401 already signed us out
         }
       }
@@ -57,8 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void resolveProfile(data.session);
       })
       .catch(() => {
-        // A failed session read must not strand the app on the spinner.
-        if (!cancelled) { setSession(null); setProfileState(null); setStatus('anonymous'); }
+        // A failed session read must not strand the app on the spinner — but if an auth
+        // event already resolved a state, keep it.
+        if (!cancelled && lastUserKey === undefined) {
+          setSession(null);
+          setProfileState(null);
+          setStatus('anonymous');
+        }
       });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
