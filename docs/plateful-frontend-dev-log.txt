@@ -639,3 +639,97 @@ as logged in, and MSW serves the recipe, comments and rating:
   - With no saved rating (404), clicking the 5th star sends PUT {rating: 5}
   - An unknown id (404) shows "Recipe not found"
 19/19 tests passing after this task.
+
+
+================================================================================
+ TASK 6 — Comments, reactions, and the confirm dialog
+ Commit on feature/frontend-pages: b0ff27b
+================================================================================
+
+What was built
+--------------
+The comment section at the bottom of every recipe: read comments (paginated,
+newest first), post one, edit or delete your own, like/dislike, and, if
+you own the recipe, delete anyone's comment on it. It also adds a
+reusable "Are you sure?" dialog, which Task 7 uses for deleting recipes.
+
+How it was done
+---------------
+1. The moderation rule. The backend enforces who may do what, and the UI
+   mirrors it so people only see buttons they're allowed to press:
+     - Edit:   only the comment's author.
+     - Delete: the author, OR the owner of the recipe ("my recipe, my
+               comment section"). Imported Spoonacular recipes have no
+               owner, so only authors can delete there.
+   In code (src/features/recipe/CommentsSection.tsx):
+
+     const isAuthor  = profile?.id === comment.user.id;
+     const canDelete = isAuthor ||
+                       (recipeOwnerId !== null && profile?.id === recipeOwnerId);
+
+   `profile?.id` uses optional chaining: for an anonymous visitor profile is
+   null, the expression is undefined, and both checks are false, so no
+   buttons are shown. The `recipeOwnerId !== null` guard stops an anonymous
+   visitor (undefined) from "matching" an ownerless recipe (null).
+   RecipeDetailPage passes `recipeOwnerId={recipe.user?.id ?? null}`.
+
+   Hiding buttons is a convenience, not security. The real check happens
+   on the server (CommentService in the backend), so even a hand-crafted
+   request can't delete someone else's comment.
+
+2. Data: one useQuery for the current page of comments
+   (queryKey ['comments', recipeId, page]) and three useMutation hooks
+   (post / save edit / delete). Every successful mutation calls
+   invalidate(), which refetches the comments and the recipe itself (its
+   comment count changed). Failures call
+     toast.error(e instanceof ApiError ? e.detail : 'Something went wrong')
+   so the server's own message ("Only the author can edit a comment")
+   shows in a toast.
+
+3. Editing happens in place. Local state `editingId` remembers which
+   comment is being edited. That comment's text swaps to an input
+   pre-filled with the current body, with Save / Cancel buttons. Only one
+   comment can be in edit mode at a time.
+
+4. Reactions (the ReactionButtons component inside CommentsSection).
+   The backend can toggle your reaction (PUT .../reactions/me {isLike},
+   DELETE .../reactions/me), but it has no endpoint that says what your
+   current reaction is. So the component remembers the reaction you made
+   in this session:
+
+     const [mine, setMine] = useState<boolean | null>(null);
+     onClick={() => (mine === isLike ? unreact.mutate() : react.mutate(isLike))}
+
+   Click 👍 once to like (PUT); click it again to remove it (DELETE).
+   Clicking 👎 while liked switches it, since the backend upserts the same
+   row. The counts come from the server, refetched after each change.
+   Buttons are disabled for anonymous visitors. The trade-off: after a page
+   reload, a thumb you'd pressed before doesn't show as highlighted. Fixing
+   that would need a new backend endpoint.
+
+5. src/components/ConfirmDialog.tsx — built on Radix UI's Dialog primitive
+   rather than hand-written, because accessible modals are hard to get
+   right. Radix moves keyboard focus into the dialog, traps Tab inside it,
+   closes on Escape, and links Dialog.Title / Dialog.Description to the
+   dialog for screen readers. Our part is the styling (square, black-bordered
+   box over a 40% black overlay) and the props:
+     ConfirmDialog({ open, title, description, confirmLabel,
+                     onConfirm, onCancel })
+   It's "controlled": the parent owns `open`. CommentsSection keeps
+   `deletingId`; clicking Delete sets it (dialog opens) and Confirm runs the
+   delete mutation, whose success clears it (dialog closes).
+
+How it was tested
+-----------------
+src/features/recipe/comments.test.tsx (4 tests, logged-in fake session +
+MSW):
+  - Typing "Yum" and pressing Post sends POST {body: "Yum"}
+  - 👍 sends PUT, and pressing it again sends DELETE (call order recorded)
+  - On your own comment, Delete opens the dialog, and Confirm sends the
+    DELETE request
+  - When you own the recipe and someone else wrote the comment, there is
+    no Edit button but there IS a Delete button (moderation)
+A test fix during implementation: the planned query /like comment/i also
+matched "Dislike comment", so it was anchored to /^like comment$/i. That
+makes the test stricter, not looser.
+23/23 tests passing after this task.
