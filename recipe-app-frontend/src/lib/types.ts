@@ -22,7 +22,7 @@ export interface ReactionDisplay { user: UserDisplay; isLike: boolean; createdAt
 export interface Page<T> { content: T[]; page: { size: number; number: number; totalElements: number; totalPages: number }; }
 
 export interface RecipeFilter {
-  cuisine?: string; dairyFree?: boolean; glutenFree?: boolean; vegan?: boolean;
+  cuisine?: string[]; region?: string[]; dairyFree?: boolean; glutenFree?: boolean; vegan?: boolean;
   vegetarian?: boolean; maxReadyInMinutes?: number; minRating?: number;
 }
 

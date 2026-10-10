@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '@/test/server';
 import { api, ApiError } from '@/api/client';
 import { browseRecipes } from '@/api/recipes';
+import { getCuisines } from '@/api/cuisines';
 import { getMyRating } from '@/api/ratings';
 import { recipeFixture, pageOf } from '@/test/fixtures';
 
@@ -46,7 +47,7 @@ test('browseRecipes serializes only the set filters and pagination', async () =>
       return HttpResponse.json(pageOf([recipeFixture()]));
     }),
   );
-  const result = await browseRecipes({ cuisine: 'italian', vegan: true }, 2);
+  const result = await browseRecipes({ cuisine: ['italian'], vegan: true }, 2);
   const params = new URL(url).searchParams;
   expect(params.get('cuisine')).toBe('italian');
   expect(params.get('vegan')).toBe('true');
@@ -54,6 +55,36 @@ test('browseRecipes serializes only the set filters and pagination', async () =>
   expect(params.get('page')).toBe('2');
   expect(params.get('size')).toBe('12');
   expect(result.content[0].title).toBe('Bruschetta Pork & Pasta');
+});
+
+test('browseRecipes sends repeated cuisine and region params', async () => {
+  let url = '';
+  server.use(
+    http.get(`${BASE}/api/recipes`, ({ request }) => {
+      url = request.url;
+      return HttpResponse.json(pageOf([recipeFixture()]));
+    }),
+  );
+  await browseRecipes({ cuisine: ['italian', 'greek'], region: ['asia', 'europe'] }, 0, 1);
+  const params = new URL(url).searchParams;
+  expect(params.getAll('cuisine')).toEqual(['italian', 'greek']);
+  expect(params.getAll('region')).toEqual(['asia', 'europe']);
+  expect(params.get('size')).toBe('1');
+  expect(params.getAll('sort')).toEqual(['createdAt,desc', 'id,asc']);
+});
+
+test('getCuisines fetches the catalogue', async () => {
+  server.use(
+    http.get(`${BASE}/api/recipes/cuisines`, () =>
+      HttpResponse.json([
+        { key: 'italian', label: 'Italian', region: 'europe', mediterranean: true, count: 40 },
+      ]),
+    ),
+  );
+  const cuisines = await getCuisines();
+  expect(cuisines).toEqual([
+    { key: 'italian', label: 'Italian', region: 'europe', mediterranean: true, count: 40 },
+  ]);
 });
 
 test('getMyRating maps 404 to null', async () => {

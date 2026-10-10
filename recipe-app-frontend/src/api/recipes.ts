@@ -3,13 +3,21 @@ import type { Page, RecipeCreate, RecipeDisplay, RecipeFilter } from '@/lib/type
 
 export const PAGE_SIZE = 12;
 
-export function browseRecipes(filter: RecipeFilter, page: number): Promise<Page<RecipeDisplay>> {
+export function browseRecipes(
+  filter: RecipeFilter,
+  page: number,
+  size: number = PAGE_SIZE,
+): Promise<Page<RecipeDisplay>> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filter)) {
-    if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
+    if (Array.isArray(value)) {
+      for (const v of value) if (v !== '') params.append(key, String(v));
+    } else if (value !== undefined && value !== null && value !== '') {
+      params.set(key, String(value));
+    }
   }
   params.set('page', String(page));
-  params.set('size', String(PAGE_SIZE));
+  params.set('size', String(size));
   params.append('sort', 'createdAt,desc');
   params.append('sort', 'id,asc');
   return api(`/api/recipes?${params}`);

@@ -26,7 +26,7 @@ function toNumber(s: string): number | undefined {
 
 function toApiFilter(v: FilterValues): RecipeFilter {
   return {
-    cuisine: v.cuisine || undefined,
+    cuisine: v.cuisine ? [v.cuisine] : undefined,
     vegan: v.vegan || undefined,
     vegetarian: v.vegetarian || undefined,
     glutenFree: v.glutenFree || undefined,
