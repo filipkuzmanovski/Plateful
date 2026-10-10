@@ -26,21 +26,25 @@ public class SpoonacularImportService {
     private final SpoonacularRecipeTranslator translator;
     private final SpoonacularRecipePersister persister;
     private final RecipeRepository recipeRepository;
+    private final SpoonacularImportCleaner cleaner;
     private final SpoonacularImportProperties properties;
 
     public SpoonacularImportService(SpoonacularClient client,
                                     SpoonacularRecipeTranslator translator,
                                     SpoonacularRecipePersister persister,
                                     RecipeRepository recipeRepository,
+                                    SpoonacularImportCleaner cleaner,
                                     SpoonacularImportProperties properties) {
         this.client = client;
         this.translator = translator;
         this.persister = persister;
         this.recipeRepository = recipeRepository;
+        this.cleaner = cleaner;
         this.properties = properties;
     }
 
     public ImportSummary runImport() {
+        int deleted = properties.replaceExisting() ? cleaner.deleteAllImported() : 0;
         List<ImportSummary.CuisineResult> results = new ArrayList<>();
         boolean quotaExhausted = false;
 
@@ -60,7 +64,7 @@ public class SpoonacularImportService {
 
             results.add(importCuisine(cuisine, response));
         }
-        return new ImportSummary(results, quotaExhausted);
+        return new ImportSummary(results, quotaExhausted, deleted);
     }
 
     private ImportSummary.CuisineResult importCuisine(String cuisine, SpoonacularSearchResponse response) {

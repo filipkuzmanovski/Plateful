@@ -40,6 +40,9 @@ public class SpoonacularImportRunner implements ApplicationRunner {
         log.info("Starting Spoonacular import...");
         ImportSummary summary = importService.runImport();
 
+        if (summary.deleted() > 0) {
+            log.info("Replace mode: deleted {} previously imported recipes before importing", summary.deleted());
+        }
         for (ImportSummary.CuisineResult r : summary.results()) {
             log.info("  {}: imported={}, skipped={}, failed={}",
                     r.cuisine(), r.imported(), r.skipped(), r.failed());

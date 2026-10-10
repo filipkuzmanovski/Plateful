@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.spoonacular;
 
+import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.InstructionStep;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeIngredient;
@@ -18,7 +19,7 @@ class SpoonacularRecipeTranslatorTest {
     private static SpoonacularSearchResponse.Result full;      // recipe 715538
     private static SpoonacularSearchResponse.Result sparse;    // recipe 999001
 
-    private final SpoonacularRecipeTranslator translator = new SpoonacularRecipeTranslator();
+    private final SpoonacularRecipeTranslator translator = new SpoonacularRecipeTranslator(new CuisineCatalog());
 
     @BeforeAll
     static void loadFixture() throws Exception {
@@ -81,6 +82,25 @@ class SpoonacularRecipeTranslatorTest {
     void emptyCuisinesFallBackToSearchedCuisine() {
         Recipe r = translator.translate(sparse, "Thai").recipe();
         assertThat(r.getCuisines()).containsExactly("thai");
+    }
+
+    @Test
+    void unknownTagsAreDroppedKnownKept() {
+        SpoonacularSearchResponse.Result r = withCuisines(List.of("Mediterranean", "Tex-Mex Fusion"));
+        assertThat(translator.translate(r, "italian").recipe().getCuisines()).containsExactly("mediterranean");
+    }
+
+    @Test
+    void allUnknownFallsBackToSearchedCuisine() {
+        SpoonacularSearchResponse.Result r = withCuisines(List.of("Tex-Mex Fusion"));
+        assertThat(translator.translate(r, "Thai").recipe().getCuisines()).containsExactly("thai");
+    }
+
+    private static SpoonacularSearchResponse.Result withCuisines(List<String> cuisines) {
+        return new SpoonacularSearchResponse.Result(
+                1L, "T", null, 2, 20, null, null, null, null,
+                "Cook it.", null, false, false, false, false,
+                cuisines, null, List.of());
     }
 
     @Test

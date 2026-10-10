@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -35,4 +36,9 @@ public interface RecipeRepository extends JpaRepository<Recipe, UUID>, JpaSpecif
     // recipe count per cuisine key (unnests the text[] column); callers map keys onto the catalogue
     @Query(value = "select c as key, count(*) as count from recipes, unnest(cuisines) c group by c", nativeQuery = true)
     List<CuisineCount> countCuisines();
+
+    // replace-mode import: children (ingredients, ratings, comments, reactions) go via ON DELETE CASCADE
+    @Modifying
+    @Query(value = "delete from recipes where source = 'spoonacular'", nativeQuery = true)
+    int deleteAllImported();
 }

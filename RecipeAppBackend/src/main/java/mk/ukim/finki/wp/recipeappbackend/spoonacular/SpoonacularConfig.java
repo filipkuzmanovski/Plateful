@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.spoonacular;
 
+import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
@@ -27,7 +28,7 @@ public class SpoonacularConfig {
     }
 
     @Bean
-    public SpoonacularRecipeTranslator spoonacularRecipeTranslator() {
-        return new SpoonacularRecipeTranslator();
+    public SpoonacularRecipeTranslator spoonacularRecipeTranslator(CuisineCatalog cuisineCatalog) {
+        return new SpoonacularRecipeTranslator(cuisineCatalog);
     }
 }

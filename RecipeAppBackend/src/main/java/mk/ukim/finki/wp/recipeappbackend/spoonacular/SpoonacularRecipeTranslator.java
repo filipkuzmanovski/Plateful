@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.spoonacular;
 
+import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.InstructionStep;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeIngredient;
@@ -7,7 +8,6 @@ import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeIngredient;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -19,6 +19,12 @@ import java.util.Map;
 public class SpoonacularRecipeTranslator {
 
     public record TranslationResult(Recipe recipe, List<RecipeIngredient> ingredients) {
+    }
+
+    private final CuisineCatalog catalog;
+
+    public SpoonacularRecipeTranslator(CuisineCatalog catalog) {
+        this.catalog = catalog;
     }
 
     public TranslationResult translate(SpoonacularSearchResponse.Result result, String searchedCuisine) {
@@ -84,12 +90,20 @@ public class SpoonacularRecipeTranslator {
                 .toList();
     }
 
-    /** Lowercase; fall back to the searched cuisine so every import stays filterable. */
+    /**
+     * Keep only tags present in the curated catalogue (normalized); if none
+     * remain, fall back to the searched cuisine so every import stays filterable.
+     */
     private List<String> mapCuisines(List<String> cuisines, String searchedCuisine) {
-        if (cuisines == null || cuisines.isEmpty()) {
-            return List.of(searchedCuisine.toLowerCase(Locale.ROOT));
+        List<String> known = cuisines == null ? List.of() : cuisines.stream()
+                .filter(c -> catalog.contains(c))
+                .map(CuisineCatalog::normalize)
+                .distinct()
+                .toList();
+        if (known.isEmpty()) {
+            return List.of(CuisineCatalog.normalize(searchedCuisine));
         }
-        return cuisines.stream().map(c -> c.toLowerCase(Locale.ROOT)).toList();
+        return known;
     }
 
     private java.math.BigDecimal findNutrient(SpoonacularSearchResponse.Nutrition nutrition, String name) {

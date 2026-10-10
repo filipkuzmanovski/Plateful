@@ -16,6 +16,7 @@ public record SpoonacularImportProperties(
         @DefaultValue({"italian", "mexican", "chinese", "indian", "greek",
                 "french", "japanese", "thai", "spanish", "american"}) List<String> cuisines,
         @DefaultValue("40") int recipesPerCuisine,
-        @DefaultValue("0") int offset
+        @DefaultValue("0") int offset,
+        @DefaultValue("false") boolean replaceExisting
 ) {
 }

@@ -2,8 +2,8 @@ package mk.ukim.finki.wp.recipeappbackend.spoonacular;
 
 import java.util.List;
 
-/** Outcome of one import run, per cuisine and in total. */
-public record ImportSummary(List<CuisineResult> results, boolean quotaExhausted) {
+/** Outcome of one import run, per cuisine and in total ({@code deleted} = imported rows removed by replace mode). */
+public record ImportSummary(List<CuisineResult> results, boolean quotaExhausted, int deleted) {
 
     public record CuisineResult(String cuisine, int imported, int skipped, int failed) {
     }

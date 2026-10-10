@@ -1,10 +1,11 @@
 package mk.ukim.finki.wp.recipeappbackend.spoonacular;
 
+import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestClientException;
@@ -18,6 +19,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,12 +34,18 @@ class SpoonacularImportServiceTest {
     SpoonacularRecipePersister persister;
     @Mock
     RecipeRepository recipeRepository;
+    @Mock
+    SpoonacularImportCleaner cleaner;
 
     private SpoonacularImportService serviceWith(List<String> cuisines) {
+        return serviceWith(cuisines, false);
+    }
+
+    private SpoonacularImportService serviceWith(List<String> cuisines, boolean replaceExisting) {
         SpoonacularImportProperties props =
-                new SpoonacularImportProperties(true, cuisines, 40, 0);
-        return new SpoonacularImportService(client, new SpoonacularRecipeTranslator(),
-                persister, recipeRepository, props);
+                new SpoonacularImportProperties(true, cuisines, 40, 0, replaceExisting);
+        return new SpoonacularImportService(client, new SpoonacularRecipeTranslator(new CuisineCatalog()),
+                persister, recipeRepository, cleaner, props);
     }
 
     private static SpoonacularSearchResponse responseWithIds(long... ids) {
@@ -66,6 +74,31 @@ class SpoonacularImportServiceTest {
         assertThat(summary.totalFailed()).isZero();
         assertThat(summary.quotaExhausted()).isFalse();
         verify(persister).persist(any(Recipe.class), anyList());
+    }
+
+    @Test
+    void replaceModeDeletesImportedBeforeFetching() {
+        when(cleaner.deleteAllImported()).thenReturn(7);
+        when(client.searchByCuisine("italian", 40, 0)).thenReturn(responseWithIds(1L));
+        when(recipeRepository.existsBySpoonacularId(1L)).thenReturn(false);
+
+        ImportSummary summary = serviceWith(List.of("italian"), true).runImport();
+
+        InOrder order = inOrder(cleaner, client);
+        order.verify(cleaner).deleteAllImported();
+        order.verify(client).searchByCuisine("italian", 40, 0);
+        assertThat(summary.deleted()).isEqualTo(7);
+    }
+
+    @Test
+    void defaultModeNeverDeletes() {
+        when(client.searchByCuisine("italian", 40, 0)).thenReturn(responseWithIds(1L));
+        when(recipeRepository.existsBySpoonacularId(1L)).thenReturn(false);
+
+        ImportSummary summary = serviceWith(List.of("italian")).runImport();
+
+        verify(cleaner, never()).deleteAllImported();
+        assertThat(summary.deleted()).isZero();
     }
 
     @Test

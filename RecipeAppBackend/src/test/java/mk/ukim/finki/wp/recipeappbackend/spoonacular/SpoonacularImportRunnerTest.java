@@ -33,7 +33,7 @@ class SpoonacularImportRunnerTest {
     @Test
     void runsImportAndSurvivesWhenKeyPresent() throws Exception {
         when(importService.runImport()).thenReturn(new ImportSummary(
-                List.of(new ImportSummary.CuisineResult("italian", 3, 1, 0)), false));
+                List.of(new ImportSummary.CuisineResult("italian", 3, 1, 0)), false, 0));
         SpoonacularImportRunner runner = new SpoonacularImportRunner(
                 new SpoonacularProperties("real-key", "https://api.spoonacular.com"), importService);
 

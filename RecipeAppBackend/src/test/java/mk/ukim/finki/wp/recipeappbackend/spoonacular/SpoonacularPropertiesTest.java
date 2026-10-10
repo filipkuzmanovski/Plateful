@@ -41,6 +41,13 @@ class SpoonacularPropertiesTest {
     }
 
     @Test
+    void replaceExistingDefaultsFalseAndBinds() {
+        runner.run(ctx -> assertThat(ctx.getBean(SpoonacularImportProperties.class).replaceExisting()).isFalse());
+        runner.withPropertyValues("spoonacular.import.replace-existing=true")
+                .run(ctx -> assertThat(ctx.getBean(SpoonacularImportProperties.class).replaceExisting()).isTrue());
+    }
+
+    @Test
     void importDisabledByDefaultAndBaseUrlDefaults() {
         runner.run(ctx -> {
             assertThat(ctx.getBean(SpoonacularImportProperties.class).enabled()).isFalse();
