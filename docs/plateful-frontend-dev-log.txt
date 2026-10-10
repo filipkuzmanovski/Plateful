@@ -743,3 +743,115 @@ module-level function, `showError`, and used by all five mutations: post,
 edit, delete, react and unreact. A new test makes the reaction PUT return
 404 and checks the server's "Comment with id c-1 not found" message appears
 as a toast. 24/24 tests passing.
+
+
+================================================================================
+ TASK 7 — Recipe authoring form + owner edit/delete
+ Commit on feature/frontend-pages: 57da9ac
+================================================================================
+
+What was built
+--------------
+One form page used for both creating (/recipes/new) and editing
+(/recipes/:id/edit) a recipe. It has dynamic ingredient and step rows,
+validation that runs before anything is sent, and server errors shown next
+to the right field. On the detail page, the recipe's owner now sees Edit
+and Delete buttons.
+
+How it was done
+---------------
+1. One page, two modes (src/features/authoring/RecipeFormPage.tsx):
+
+     const { id } = useParams<{ id: string }>();   // only present when editing
+     const existing = useQuery({ queryKey: ['recipe', id],
+                                 queryFn: () => getRecipe(id!),
+                                 enabled: !!id });
+
+   On /recipes/new there's no :id, so `enabled: !!id` is false and nothing
+   loads. On /recipes/:id/edit the recipe is fetched. It reuses the same
+   ['recipe', id] cache entry as the detail page, so coming from the detail
+   page the data is already there. On submit:
+     const saved = id ? await updateRecipe(id, dto) : await createRecipe(dto);
+     navigate(`/recipes/${saved.id}`);
+
+2. Validation with zod. A zod schema describes what a valid form looks like,
+   with the same limits the backend enforces (title 1–255 chars, ingredient
+   name ≤255, original text ≤500, instructions ≤50000, at least one
+   ingredient, at most 100 ingredients/steps, at most 10 cuisines):
+
+     ingredients: z.array(z.object({
+         ingredientName: z.string().min(1, 'Name required').max(255),
+         originalText:   z.string().min(1, 'Text required').max(500),
+       })).min(1, 'At least one ingredient').max(100),
+
+   `type FormValues = z.infer<typeof schema>` derives the TypeScript type
+   from the schema, so the validation rules and the type can't drift apart.
+   react-hook-form runs the schema through `zodResolver(schema)`: if
+   anything fails, submit is blocked and each message lands under its field
+   (role="alert", so screen readers announce it). Mirroring the backend's
+   limits gives instant feedback without a server round-trip, and the
+   server still re-validates everything.
+
+3. Why numbers are strings in the form. HTML inputs always produce strings,
+   and an empty box needs to mean "not set". So servings and the minute
+   fields are strings in the form, converted only when building the request:
+     const toInt  = (s: string) => (s.trim() === '' ? null : Number(s));
+     const toNull = (s: string) => (s.trim() === '' ? null : s);
+   An empty box becomes null, which the backend stores as "unknown".
+
+4. toDto() turns form values into the exact JSON the backend expects
+   (RecipeCreate). Steps become numbered InstructionStep objects:
+     v.steps.map((s, i) => ({ number: i + 1, step: s.text,
+                              ingredients: [], equipment: [] }))
+   Numbering is derived from row order at submit time, so deleting a middle
+   step can never leave a gap.
+
+5. Dynamic rows with useFieldArray. react-hook-form's useFieldArray manages
+   the ingredient and step lists: fields to render, append() for the "Add
+   ingredient" button, remove(i) for each ✕. Each row is registered as
+   `ingredients.${i}.ingredientName`, a dotted path into the form state.
+   The ✕ is disabled while only one ingredient row remains, since at least
+   one is required. Inputs carry aria-labels like "Ingredient 2 name" so
+   each row is distinguishable for screen readers and tests.
+
+6. Server errors onto fields. If the backend rejects the save with
+   ProblemDetail { errors: { title: 'must not be blank' } }, the catch block
+   loops over the errors and calls react-hook-form's setError(field,
+   {message}), so the server's message appears under the same input as
+   client-side errors would. Errors that aren't field-specific show as a
+   toast instead.
+
+7. Edit pre-fill. When the recipe arrives, a useEffect calls reset(...) with
+   the recipe converted back into form shape: numbers to strings, null to
+   '', steps to {text}. An existing recipe with zero ingredients still gets
+   one empty row.
+
+8. Image preview. `watch('image')` re-renders as you type the URL, and an
+   <img> shows a live preview.
+
+9. Owner actions on the detail page (RecipeDetailPage.tsx):
+     {profile && recipe.user?.id === profile.id && ( ...Edit link,
+       Delete button, ConfirmDialog... )}
+   Shown only when you're logged in AND the recipe's author is you.
+   Imported recipes (user = null) never show them. Delete goes through the
+   ConfirmDialog from Task 6, then a mutation calls DELETE /api/recipes/:id
+   and navigates home. The backend's ownership check is the real protection.
+
+   A React rule shaped where this code went: hooks (useAuth, useState,
+   useMutation, useNavigate) must run in the same order on every render, so
+   they sit at the top of the component, before the early returns for
+   "loading" and "not found". A hook placed after an early return would
+   only run on some renders, which React forbids.
+
+How it was tested
+-----------------
+src/features/authoring/authoring.test.tsx (4 tests, logged-in fake session +
+MSW):
+  - Fill in the title, fill ingredient 1, click "Add ingredient", fill
+    ingredient 2, save: the POST body contains both ingredients in order,
+    and the app navigates to the new recipe's page
+  - Saving an empty form shows validation errors and sends NO request
+  - A server 400 with errors {title: 'must not be blank'} shows that message
+    on the form
+  - As the owner, Delete -> Confirm sends DELETE /api/recipes/r-1
+All 4 failed before the form existed. 28/28 tests passing after this task.
