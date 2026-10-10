@@ -88,11 +88,36 @@ class RecipeControllerTest {
         ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
         verify(recipeService).browse(captor.capture(), any());
         RecipeFilter filter = captor.getValue();
-        assertThat(filter.cuisine()).isEqualTo("italian");
+        assertThat(filter.cuisine()).containsExactly("italian");
         assertThat(filter.vegan()).isTrue();
         assertThat(filter.maxReadyInMinutes()).isEqualTo(30);
         assertThat(filter.minRating()).isEqualTo(4.0);
         assertThat(filter.dairyFree()).isNull(); // unset params stay null, not false
+    }
+
+    @Test
+    void browse_bindsRepeatedCuisineAndRegionParams() throws Exception {
+        when(recipeService.browse(any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/recipes?cuisine=italian&cuisine=greek&region=asia"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
+        verify(recipeService).browse(captor.capture(), any());
+        assertThat(captor.getValue().cuisine()).containsExactly("italian", "greek");
+        assertThat(captor.getValue().region()).containsExactly("asia");
+    }
+
+    @Test
+    void browse_singleCuisineStillBinds() throws Exception {
+        when(recipeService.browse(any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/recipes?cuisine=thai"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
+        verify(recipeService).browse(captor.capture(), any());
+        assertThat(captor.getValue().cuisine()).containsExactly("thai");
     }
 
     @Test

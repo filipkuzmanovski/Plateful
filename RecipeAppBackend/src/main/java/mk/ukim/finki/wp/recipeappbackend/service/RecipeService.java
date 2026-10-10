@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
+import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
@@ -24,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,17 +48,20 @@ public class RecipeService {
     private final RecipeRatingRepository ratingRepository;
     private final RecipeCommentRepository commentRepository;
     private final UserRepository userRepository;
+    private final CuisineCatalog cuisineCatalog;
 
     public RecipeService(RecipeRepository recipeRepository,
                          RecipeIngredientRepository ingredientRepository,
                          RecipeRatingRepository ratingRepository,
                          RecipeCommentRepository commentRepository,
-                         UserRepository userRepository) {
+                         UserRepository userRepository,
+                         CuisineCatalog cuisineCatalog) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.ratingRepository = ratingRepository;
         this.commentRepository = commentRepository;
         this.userRepository = userRepository;
+        this.cuisineCatalog = cuisineCatalog;
     }
 
     /**
@@ -95,10 +101,16 @@ public class RecipeService {
      */
     @Transactional(readOnly = true)
     public Page<RecipeDisplayDto> browse(RecipeFilter filter, Pageable pageable) {
-        Page<Recipe> page = filter == null || filter.isEmpty()
-                ? recipeRepository.findAll(pageable)
-                : recipeRepository.findAll(RecipeSpecifications.withFilter(filter), pageable);
-        return assemblePage(page);
+        if (filter == null || filter.isEmpty()) {
+            return assemblePage(recipeRepository.findAll(pageable));
+        }
+        Optional<Set<String>> cuisineKeys = cuisineCatalog.resolveFilter(filter.cuisine(), filter.region());
+        if (cuisineKeys.isPresent() && cuisineKeys.get().isEmpty()) {
+            // Cuisines/regions were requested but none are known: nothing can match.
+            return Page.empty(pageable);
+        }
+        return assemblePage(recipeRepository.findAll(
+                RecipeSpecifications.withFilter(filter, cuisineKeys), pageable));
     }
 
     /** "Recipes by this user" — profile page, same batched assembly. */

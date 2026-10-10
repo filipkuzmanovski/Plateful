@@ -10,6 +10,8 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Builds the WHERE clause for the multi-criteria recipe browse, from a
@@ -23,7 +25,7 @@ import java.util.List;
  * <p>
  * Two criteria deserve extra explanation:
  * <p>
- * CUISINE — recipes.cuisines is a Postgres text[] column, which standard
+ * CUISINE — (any-of over several keys, one call per key) recipes.cuisines is a Postgres text[] column, which standard
  * JPQL/Criteria can't query. We call our own text_array_contains() function
  * (registered by TextArrayFunctions) through cb.function(). It renders
  * {@code cuisines @> cast(array[:cuisine] as text[])}, which can use the GIN
@@ -43,17 +45,29 @@ public final class RecipeSpecifications {
     private RecipeSpecifications() {
     }
 
-    public static Specification<Recipe> withFilter(RecipeFilter f) {
+    /**
+     * @param cuisineKeys resolved cuisine keys (see CuisineCatalog.resolveFilter):
+     *                    empty Optional = no cuisine predicate; an empty set =
+     *                    match nothing; otherwise a recipe matches if it has ANY key.
+     */
+    public static Specification<Recipe> withFilter(RecipeFilter f, Optional<Set<String>> cuisineKeys) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            if (f.cuisine() != null && !f.cuisine().isBlank()) {
-                // text_array_contains(recipes.cuisines, :cuisine) — see class javadoc
-                predicates.add(cb.isTrue(cb.function(
-                        TextArrayFunctions.TEXT_ARRAY_CONTAINS, Boolean.class,
-                        root.get("cuisines"),
-                        cb.literal(f.cuisine().toLowerCase())
-                )));
+            if (cuisineKeys.isPresent()) {
+                Set<String> keys = cuisineKeys.get();
+                if (keys.isEmpty()) {
+                    predicates.add(cb.disjunction()); // nothing can match
+                } else {
+                    // OR of text_array_contains(recipes.cuisines, :key) — see class javadoc
+                    Predicate[] anyOf = keys.stream()
+                            .map(key -> cb.isTrue(cb.function(
+                                    TextArrayFunctions.TEXT_ARRAY_CONTAINS, Boolean.class,
+                                    root.get("cuisines"),
+                                    cb.literal(key))))
+                            .toArray(Predicate[]::new);
+                    predicates.add(cb.or(anyOf));
+                }
             }
 
             // Diet flags: only filter when the client asked (null = skip).

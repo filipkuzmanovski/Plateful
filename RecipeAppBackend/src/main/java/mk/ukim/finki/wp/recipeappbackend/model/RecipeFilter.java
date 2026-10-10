@@ -1,9 +1,14 @@
 package mk.ukim.finki.wp.recipeappbackend.model;
 
+import java.util.List;
+
 /**
  * The multi-criteria browse filter — every field is optional (null = "don't
  * filter on this"). Bound from query parameters in the controller, e.g.
- * GET /api/recipes?cuisine=italian&vegan=true&maxReadyInMinutes=30&minRating=4
+ * GET /api/recipes?cuisine=italian&cuisine=greek&region=asia&vegan=true&maxReadyInMinutes=30&minRating=4
+ * <p>
+ * cuisine and region are repeatable params (lists); a recipe matches if it has
+ * ANY of the resolved cuisines. Null or empty means "not filtering".
  * <p>
  * Diet flags are Boolean (boxed), not boolean, on purpose — the same trick
  * as CommentReactionCreateDto.isLike: null must mean "not filtering", which
@@ -11,7 +16,8 @@ package mk.ukim.finki.wp.recipeappbackend.model;
  * non-vegan recipes when the user never asked for that).
  */
 public record RecipeFilter(
-        String cuisine,
+        List<String> cuisine,
+        List<String> region,
         Boolean dairyFree,
         Boolean glutenFree,
         Boolean vegan,
@@ -21,8 +27,12 @@ public record RecipeFilter(
 ) {
     /** True when no criteria are set — lets the service skip filtering. */
     public boolean isEmpty() {
-        return cuisine == null && dairyFree == null && glutenFree == null
+        return isUnset(cuisine) && isUnset(region) && dairyFree == null && glutenFree == null
                 && vegan == null && vegetarian == null
                 && maxReadyInMinutes == null && minRating == null;
+    }
+
+    private static boolean isUnset(List<String> values) {
+        return values == null || values.isEmpty();
     }
 }
