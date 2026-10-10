@@ -44,7 +44,7 @@ export function Field({
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-muted hover:border-olive/30 focus:border-saffron focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+      className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-saffron focus:ring-4 focus:ring-saffron/20 focus:outline-none"
       {...props}
     />
   );
