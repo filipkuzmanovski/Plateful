@@ -6,7 +6,7 @@ import AppRoutes from '@/AppRoutes';
 
 export function renderApp(initialRoute = '/') {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime: 30_000 }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>

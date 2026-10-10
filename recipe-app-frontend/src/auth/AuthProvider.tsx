@@ -24,34 +24,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let lastUserKey: string | null | undefined; // undefined = nothing resolved yet
+    let latest = 0; // id of the newest resolution; results from older ones are dropped
 
     async function resolveProfile(s: Session | null) {
+      const key = s?.user?.id ?? null;
+      if (key === lastUserKey) return; // dedupes INITIAL_SESSION/getSession double-fire and token refreshes
+      lastUserKey = key;
+      const run = ++latest;
+      const isCurrent = () => !cancelled && run === latest;
+
       if (!s) {
-        if (!cancelled) { setProfileState(null); setStatus('anonymous'); }
+        if (isCurrent()) { setProfileState(null); setStatus('anonymous'); }
         return;
       }
+      if (isCurrent()) setStatus('loading');
       try {
         const me = await getMe();
-        if (!cancelled) { setProfileState(me); setStatus('ready'); }
+        if (isCurrent()) { setProfileState(me); setStatus('ready'); }
       } catch (e) {
-        if (!cancelled && e instanceof ApiError && e.status === 404) {
-          setProfileState(null);
+        if (!isCurrent()) return; // a newer session already took over
+        setProfileState(null);
+        if (e instanceof ApiError && e.status === 404) {
           setStatus('needs-profile');
-        } else if (!cancelled) {
-          setProfileState(null);
+        } else {
+          lastUserKey = undefined; // transient failure: let the next auth event retry
           setStatus('anonymous'); // e.g. 401 already signed us out
         }
       }
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      setSession(data.session);
-      void resolveProfile(data.session);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSession(data.session);
+        void resolveProfile(data.session);
+      })
+      .catch(() => {
+        // A failed session read must not strand the app on the spinner — but if an auth
+        // event already resolved a state, keep it.
+        if (!cancelled && lastUserKey === undefined) {
+          setSession(null);
+          setProfileState(null);
+          setStatus('anonymous');
+        }
+      });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (cancelled) return;
       setSession(s);
-      setStatus('loading');
       void resolveProfile(s);
     });
     return () => { cancelled = true; subscription.unsubscribe(); };
