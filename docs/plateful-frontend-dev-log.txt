@@ -482,8 +482,10 @@ How it was done
      })
    TanStack Query caches results under the key. Because the key is the
    whole query string, every filter combination is cached separately.
-   Switching back to a filter you used a moment ago is instant, and the old
-   result is never shown for a new filter.
+   Switching back to a filter you used a moment ago is instant. (The polish
+   pass later added keepPreviousData, which keeps the previous grid visible,
+   dimmed and marked busy, while the new results load. See "Final review
+   fixes" at the end.)
 
      function patchParams(patch) {
        ... set or delete each changed key ...
@@ -942,7 +944,9 @@ How it was done
 
    setProfile() is the AuthProvider function from Task 3. Updating the
    shared auth context means the header's user button switches to the new
-   first name immediately, with no reload and nothing else to refresh.
+   first name immediately, with no reload. (Names shown elsewhere, like
+   recipe author lines and comments, come from cached API data; the final
+   review fixes refresh those caches after a rename too.)
    Failures show the server's message in a toast.
 
    /me is wrapped in ProtectedRoute, which renders the page only once
@@ -1037,3 +1041,97 @@ To run the whole app locally:
   4. Open http://localhost:5173 and try: browse + filters -> open a recipe
      -> sign up -> complete profile -> rate, comment, like -> create a
      recipe -> edit it -> delete it.
+
+Supabase settings worth checking before the first sign-up:
+  - Authentication -> URL Configuration: set the Site URL to
+    http://localhost:5173 (and add it to Redirect URLs). The email
+    confirmation link sends people there.
+  - "Confirm email" is ON by default. Signing up then shows a "check your
+    email" message; after clicking the link you're sent to finish your
+    profile. For quicker local testing you can turn it off.
+  - The backend verifies tokens with ES256 via the project's JWKS endpoint,
+    which needs Supabase's asymmetric JWT signing keys (Project Settings ->
+    JWT Keys). With the legacy HS256 secret, every logged-in API call would
+    get 401 and the app would sign you straight back out.
+
+
+================================================================================
+ FINAL REVIEW FIXES
+ Commits on feature/frontend-pages: 4ae9c61 (important), f83011a (minors)
+================================================================================
+
+A final review of the whole branch, on the most capable model, looked for
+problems that single-task reviews can't see. Verdict: ready to merge with
+fixes, nothing critical. Four issues would have shown up on first real use:
+
+1. Duplicate recipes from Edit -> New Recipe.
+   /recipes/new and /recipes/:id/edit render the same RecipeFormPage in the
+   same spot. React reuses a component when the same component type renders
+   in the same position, so going from editing recipe X to "New Recipe" kept
+   X's data in the form, and saving created a copy. Fix: each route's
+   element gets its own `key` ("recipe-new" / "recipe-edit"). A different
+   key tells React to throw the old component away and build a fresh one.
+
+2. Users without a profile hit a dead end.
+   Supabase emails a confirmation link by default, so after confirming, a
+   new user is logged in but has no profile row. Only protected pages
+   redirected them to "complete your profile"; public pages showed a
+   useless "Sign in" link. Fixes:
+     - AppShell now redirects 'needs-profile' users to /complete-profile from
+       any page (what the spec asks for) and shows a Sign out button.
+     - SignupPage checks whether signUp returned a session. With email
+       confirmation on it doesn't, so the page shows "Check your email to
+       confirm your account, then sign in" instead of bouncing to login.
+
+3. Stale results with no cue.
+   keepPreviousData (from the polish pass) keeps the old grid visible while
+   new results load. Without a cue, you'd click "Vegan" and keep seeing
+   non-vegan recipes for a moment. Now, while `query.isPlaceholderData` is
+   true, the grid (and the comment list) is dimmed (opacity-50), made
+   unclickable, and marked aria-busy="true" for screen readers.
+
+4. Pagination that broke on phones.
+   ~400 seeded recipes at 12 per page is ~34 page buttons, wider than a
+   phone screen. Pagination now shows Previous / Next, the first and last
+   page, the current page ±2, and "…" gaps. The window is a small exported
+   pure function, which makes it easy to unit-test:
+     pageWindow(15, 34) -> [0, 'gap', 13, 14, 15, 16, 17, 'gap', 33]
+
+Smaller fixes in the second commit:
+  - Your saved rating is now cached per user (['myRating', recipeId,
+    userId]), so after switching accounts you never briefly see the
+    previous user's stars. Rating also refreshes profile grids.
+  - Browse and profile lists request a stable order (newest first, then
+    by id), so pages don't shuffle and items never skip or repeat between
+    pages.
+  - Number filters in the URL (?minRating=abc) are parsed defensively,
+    like the page number.
+  - Posting a comment jumps to page 1, where it appears, since comments are
+    newest first. Deleting the last comment on a later page steps back a
+    page.
+  - Confirm dialogs disable their Confirm button while the delete runs.
+  - The diet checkboxes in the recipe form show proper labels ("Gluten
+    free", not "glutenFree").
+  - Opening the edit page for a recipe that isn't yours says so, instead of
+    showing a form that would fail on save.
+  - Recipe delete errors show the server's message.
+  - Changing your name refreshes every cached query, so author names update
+    everywhere.
+  - HTML tags in imported instruction text are stripped for display.
+  - The error boundary resets when you navigate (it's keyed by the URL
+    path), so one crashed page doesn't break every page.
+
+Six new tests, each written to fail first: Edit -> New Recipe starts empty;
+a needs-profile user is redirected from a public page; signup without a
+session shows the check-your-email message; the grid is marked busy while
+new results load; and two Pagination tests. 42/42 tests passing, build
+clean.
+
+Known follow-ups (logged, not done):
+  - A 401 on a public page signs you out silently; a "session expired"
+    message would be friendlier.
+  - Some spec niceties the plan didn't include: skeleton loading cards,
+    removable filter chips, a mobile filter drawer, optimistic rating
+    updates, and reordering ingredient rows.
+  - Like/dislike highlights only reflect clicks made in the current visit.
+    Showing them after a reload needs a new backend endpoint.

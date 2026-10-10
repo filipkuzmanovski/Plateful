@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { createRecipe, getRecipe, updateRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
+import { useAuth } from '@/auth/AuthProvider';
 import { Button, Field, SectionHeading, Spinner, TextInput } from '@/components/ui';
 import { CUISINES, cuisineLabel } from '@/features/browse/FilterBar';
 import type { RecipeCreate } from '@/lib/types';
@@ -49,6 +50,13 @@ const emptyValues: FormValues = {
   cuisines: [], ingredients: [{ ingredientName: '', originalText: '' }],
 };
 
+const DIET_LABELS = {
+  vegan: 'Vegan',
+  vegetarian: 'Vegetarian',
+  glutenFree: 'Gluten free',
+  dairyFree: 'Dairy free',
+} as const;
+
 const toInt = (s: string) => (s.trim() === '' ? null : Number(s));
 const toNull = (s: string) => (s.trim() === '' ? null : s);
 
@@ -74,6 +82,7 @@ export default function RecipeFormPage() {
   const { id } = useParams<{ id: string }>(); // present in edit mode only
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
   const hydratedFor = useRef<string | null>(null); // recipe id the form was last filled from
 
   const existing = useQuery({
@@ -138,6 +147,10 @@ export default function RecipeFormPage() {
     return <p className="py-12 text-center text-muted">Couldn't load this recipe for editing.</p>;
   }
 
+  if (id && existing.data && existing.data.user?.id !== profile?.id) {
+    return <p className="py-12 text-center text-muted">You can only edit your own recipes.</p>;
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-extrabold tracking-tight">{id ? 'Edit recipe' : 'New recipe'}</h1>
@@ -165,9 +178,9 @@ export default function RecipeFormPage() {
 
       <SectionHeading>Tags</SectionHeading>
       <div className="flex flex-wrap gap-4 text-sm">
-        {(['vegan', 'vegetarian', 'glutenFree', 'dairyFree'] as const).map((flag) => (
+        {(Object.keys(DIET_LABELS) as (keyof typeof DIET_LABELS)[]).map((flag) => (
           <label key={flag} className="flex items-center gap-1">
-            <input type="checkbox" className="accent-ink" {...register(flag)} /> {flag}
+            <input type="checkbox" className="accent-ink" {...register(flag)} /> {DIET_LABELS[flag]}
           </label>
         ))}
       </div>

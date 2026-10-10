@@ -11,4 +11,6 @@ export const updateMe = (names: Names) =>
   api<UserDisplay>('/api/users/me', { method: 'PUT', body: JSON.stringify(names) });
 export const getUser = (id: string) => api<UserDisplay>(`/api/users/${id}`);
 export const getUserRecipes = (id: string, page: number) =>
-  api<Page<RecipeDisplay>>(`/api/users/${id}/recipes?page=${page}&size=${PAGE_SIZE}`);
+  api<Page<RecipeDisplay>>(
+    `/api/users/${id}/recipes?page=${page}&size=${PAGE_SIZE}&sort=createdAt,desc&sort=id,asc`,
+  );

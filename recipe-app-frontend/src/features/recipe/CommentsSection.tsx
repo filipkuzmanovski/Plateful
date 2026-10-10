@@ -79,7 +79,7 @@ export function CommentsSection({
 
   const post = useMutation({
     mutationFn: () => addComment(recipeId, draft),
-    onSuccess: () => { setDraft(''); invalidate(); },
+    onSuccess: () => { setDraft(''); setPage(0); invalidate(); },
     onError: showError,
   });
   const saveEdit = useMutation({
@@ -89,7 +89,11 @@ export function CommentsSection({
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteComment(id),
-    onSuccess: () => { setDeletingId(null); invalidate(); },
+    onSuccess: () => {
+      setDeletingId(null);
+      if (query.data?.content.length === 1 && page > 0) setPage(page - 1);
+      invalidate();
+    },
     onError: showError,
   });
 
@@ -117,7 +121,10 @@ export function CommentsSection({
         <p className="mb-6 text-sm text-muted">Sign in to join the conversation.</p>
       )}
 
-      <ul className="space-y-4">
+      <ul
+        aria-busy={query.isPlaceholderData}
+        className={`space-y-4 transition-opacity${query.isPlaceholderData ? ' opacity-50' : ''}`}
+      >
         {query.data.content.map((comment) => {
           const isAuthor = profile?.id === comment.user.id;
           const canDelete = isAuthor || (recipeOwnerId !== null && profile?.id === recipeOwnerId);
@@ -138,7 +145,7 @@ export function CommentsSection({
                     maxLength={5000}
                     className="flex-1 border border-hairline px-2 py-1 text-sm"
                   />
-                  <Button type="submit" disabled={!editDraft.trim()}>Save</Button>
+                  <Button type="submit" disabled={!editDraft.trim() || saveEdit.isPending}>Save</Button>
                   <Button type="button" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
                 </form>
               ) : (
@@ -178,6 +185,7 @@ export function CommentsSection({
         title="Delete comment?"
         description="This can't be undone."
         confirmLabel="Confirm"
+        busy={remove.isPending}
         onConfirm={() => deletingId && remove.mutate(deletingId)}
         onCancel={() => setDeletingId(null)}
       />

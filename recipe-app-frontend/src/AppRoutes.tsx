@@ -15,9 +15,9 @@ export default function AppRoutes() {
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/" element={<BrowsePage />} />
-        <Route path="/recipes/new" element={<ProtectedRoute><RecipeFormPage /></ProtectedRoute>} />
+        <Route path="/recipes/new" element={<ProtectedRoute key="recipe-new"><RecipeFormPage /></ProtectedRoute>} />
         <Route path="/recipes/:id" element={<RecipeDetailPage />} />
-        <Route path="/recipes/:id/edit" element={<ProtectedRoute><RecipeFormPage /></ProtectedRoute>} />
+        <Route path="/recipes/:id/edit" element={<ProtectedRoute key="recipe-edit"><RecipeFormPage /></ProtectedRoute>} />
         <Route path="/users/:id" element={<PublicProfilePage />} />
         <Route path="/me" element={<ProtectedRoute><MyProfilePage /></ProtectedRoute>} />
         <Route path="/login" element={<LoginPage />} />

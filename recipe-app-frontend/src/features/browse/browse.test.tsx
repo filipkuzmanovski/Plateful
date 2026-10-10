@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
@@ -88,4 +88,24 @@ test('a garbage page param falls back to page 0', async () => {
   renderApp('/?page=abc');
   await screen.findByText('Bruschetta Pork & Pasta');
   expect(new URL(store.url).searchParams.get('page')).toBe('0');
+});
+
+test('while new results load, the old grid is marked busy', async () => {
+  let calls = 0;
+  server.use(
+    http.get(`${BASE}/api/recipes`, async () => {
+      calls += 1;
+      if (calls > 1) await delay(150);
+      return HttpResponse.json(pageOf([recipeFixture()]));
+    }),
+  );
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  await userEvent.click(screen.getByRole('button', { name: /vegan/i }));
+  await vi.waitFor(() =>
+    expect(screen.getByText('Bruschetta Pork & Pasta').closest('[aria-busy]')).toHaveAttribute('aria-busy', 'true'),
+  );
+  await vi.waitFor(() =>
+    expect(screen.getByText('Bruschetta Pork & Pasta').closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false'),
+  );
 });
