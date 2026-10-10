@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MessageCircle, Pencil, ThumbsDown, ThumbsUp, Trash2, type LucideIcon } from 'lucide-react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { addComment, deleteComment, editComment, getComments } from '@/api/comments';
@@ -12,6 +13,34 @@ import type { CommentDisplay } from '@/lib/types';
 
 const showError = (e: unknown) =>
   toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
+
+const fieldClass =
+  'min-w-0 flex-1 rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-saffron focus:ring-4 focus:ring-saffron/20 focus:outline-none';
+
+/** A small round-ended text action under a comment (Edit, Delete). */
+const actionClass =
+  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-olive/70 transition-colors';
+
+function Avatar({ name, tone = 'sand' }: { name: string; tone?: 'sand' | 'olive' }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex size-9 shrink-0 items-center justify-center rounded-full font-serif text-sm font-semibold ${
+        tone === 'olive' ? 'bg-olive text-cream' : 'bg-sand text-olive'
+      }`}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+function formatDate(iso: string | null) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 function ReactionButtons({ comment }: { comment: CommentDisplay }) {
   const { status } = useAuth();
@@ -33,20 +62,30 @@ function ReactionButtons({ comment }: { comment: CommentDisplay }) {
   });
 
   const disabled = status !== 'ready';
-  const btn = (isLike: boolean, count: number, label: string, glyph: string) => (
-    <button
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => (mine === isLike ? unreact.mutate() : react.mutate(isLike))}
-      className={`text-xs ${mine === isLike ? 'font-bold text-accent' : 'text-muted hover:text-ink'} disabled:opacity-40`}
-    >
-      {glyph} {count}
-    </button>
-  );
+  const btn = (isLike: boolean, count: number, label: string, Icon: LucideIcon) => {
+    const active = mine === isLike;
+    return (
+      <button
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => (active ? unreact.mutate() : react.mutate(isLike))}
+        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors disabled:pointer-events-none ${
+          active
+            ? isLike
+              ? 'bg-saffron/15 text-[#7a4f16]'
+              : 'bg-terracotta/10 text-[#9c4329]'
+            : 'text-olive/70 hover:bg-sand/60 hover:text-olive'
+        }`}
+      >
+        <Icon aria-hidden="true" className="size-3.5" strokeWidth={active ? 2.25 : 1.75} />
+        {count}
+      </button>
+    );
+  };
   return (
-    <span className="flex gap-3">
-      {btn(true, comment.likeCount, `Like comment`, '👍')}
-      {btn(false, comment.dislikeCount, `Dislike comment`, '👎')}
+    <span className="flex gap-1">
+      {btn(true, comment.likeCount, `Like comment`, ThumbsUp)}
+      {btn(false, comment.dislikeCount, `Dislike comment`, ThumbsDown)}
     </span>
   );
 }
@@ -98,85 +137,110 @@ export function CommentsSection({
   });
 
   if (query.isPending) return <Spinner />;
-  if (query.isError) return <p className="text-sm text-red-600">Couldn't load comments.</p>;
+  if (query.isError) return <p className="text-sm text-danger">Couldn't load comments.</p>;
 
   return (
     <div>
       {status === 'ready' ? (
         <form
-          className="mb-6 flex gap-2"
+          className="mb-8 flex items-center gap-3"
           onSubmit={(e) => { e.preventDefault(); if (draft.trim()) post.mutate(); }}
         >
+          {profile && <Avatar name={profile.firstName} tone="olive" />}
           <input
             aria-label="Add a comment"
             placeholder="Add a comment…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={5000}
-            className="flex-1 border border-hairline px-3 py-2 text-sm focus:border-ink focus:outline-none"
+            className={fieldClass}
           />
           <Button type="submit" disabled={post.isPending || !draft.trim()}>Post</Button>
         </form>
       ) : (
-        <p className="mb-6 text-sm text-muted">Sign in to join the conversation.</p>
+        <p className="mb-8 flex items-center gap-2.5 rounded-2xl bg-sand/40 px-4 py-3 text-sm text-olive">
+          <MessageCircle aria-hidden="true" className="size-4 shrink-0 text-olive/60" />
+          Sign in to join the conversation.
+        </p>
       )}
 
       <ul
         aria-busy={query.isPlaceholderData}
-        className={`space-y-4 transition-opacity${query.isPlaceholderData ? ' opacity-50' : ''}`}
+        className={`space-y-5 transition-opacity${query.isPlaceholderData ? ' opacity-50' : ''}`}
       >
         {query.data.content.map((comment) => {
           const isAuthor = profile?.id === comment.user.id;
           const canDelete = isAuthor || (recipeOwnerId !== null && profile?.id === recipeOwnerId);
+          const date = formatDate(comment.createdAt);
           return (
-            <li key={comment.id} className="border-b border-hairline pb-3">
-              <p className="text-xs font-bold tracking-wide uppercase">
-                {comment.user.firstName} {comment.user.lastName}
-              </p>
-              {editingId === comment.id ? (
-                <form
-                  className="mt-1 flex gap-2"
-                  onSubmit={(e) => { e.preventDefault(); saveEdit.mutate(); }}
-                >
-                  <input
-                    aria-label="Edit comment"
-                    value={editDraft}
-                    onChange={(e) => setEditDraft(e.target.value)}
-                    maxLength={5000}
-                    className="flex-1 border border-hairline px-2 py-1 text-sm"
-                  />
-                  <Button type="submit" disabled={!editDraft.trim() || saveEdit.isPending}>Save</Button>
-                  <Button type="button" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
-                </form>
-              ) : (
-                <p className="mt-1 text-sm">{comment.body}</p>
-              )}
-              <div className="mt-2 flex items-center gap-4">
-                <ReactionButtons comment={comment} />
-                {isAuthor && editingId !== comment.id && (
-                  <button
-                    aria-label={`Edit comment by ${comment.user.firstName} ${comment.user.lastName}`}
-                    className="text-xs text-muted underline hover:text-ink"
-                    onClick={() => { setEditingId(comment.id); setEditDraft(comment.body); }}
-                  >
-                    Edit
-                  </button>
-                )}
-                {canDelete && (
-                  <button
-                    aria-label={`Delete comment by ${comment.user.firstName} ${comment.user.lastName}`}
-                    className="text-xs text-muted underline hover:text-red-600"
-                    onClick={() => setDeletingId(comment.id)}
-                  >
-                    Delete
-                  </button>
-                )}
+            <li key={comment.id} className="flex gap-3">
+              <Avatar name={comment.user.firstName} />
+              <div className="min-w-0 flex-1">
+                <div className="rounded-2xl rounded-tl-md bg-paper px-4 py-3 shadow-card ring-1 ring-sand/60">
+                  <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                    <span className="font-semibold text-olive">
+                      {comment.user.firstName} {comment.user.lastName}
+                    </span>
+                    {date && comment.createdAt && (
+                      <time dateTime={comment.createdAt} className="text-xs text-olive/70">{date}</time>
+                    )}
+                  </p>
+                  {editingId === comment.id ? (
+                    <form
+                      className="mt-2 flex flex-wrap gap-2"
+                      onSubmit={(e) => { e.preventDefault(); saveEdit.mutate(); }}
+                    >
+                      <input
+                        aria-label="Edit comment"
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        maxLength={5000}
+                        className={`${fieldClass} basis-56`}
+                      />
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={!editDraft.trim() || saveEdit.isPending}>Save</Button>
+                        <Button type="button" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <p className="mt-1 text-[15px] leading-relaxed break-words whitespace-pre-line text-olive">
+                      {comment.body}
+                    </p>
+                  )}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-1">
+                  <ReactionButtons comment={comment} />
+                  {isAuthor && editingId !== comment.id && (
+                    <button
+                      aria-label={`Edit comment by ${comment.user.firstName} ${comment.user.lastName}`}
+                      className={`${actionClass} hover:bg-sand/60 hover:text-olive`}
+                      onClick={() => { setEditingId(comment.id); setEditDraft(comment.body); }}
+                    >
+                      <Pencil aria-hidden="true" className="size-3" />
+                      Edit
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      aria-label={`Delete comment by ${comment.user.firstName} ${comment.user.lastName}`}
+                      className={`${actionClass} hover:bg-danger/10 hover:text-danger`}
+                      onClick={() => setDeletingId(comment.id)}
+                    >
+                      <Trash2 aria-hidden="true" className="size-3" />
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           );
         })}
-        {query.data.content.length === 0 && <p className="text-sm text-muted">No comments yet.</p>}
       </ul>
+      {query.data.content.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-sand px-4 py-8 text-center text-sm text-olive/70">
+          No comments yet.
+        </p>
+      )}
 
       <Pagination page={query.data.page.number} totalPages={query.data.page.totalPages} onPage={setPage} />
 

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
+import { expectNoEmoji } from '@/test/noEmoji';
 
 const BASE = 'http://localhost:8080';
 
@@ -44,6 +45,7 @@ test('create: fills the form, adds an ingredient row, POSTs, navigates to the ne
   await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'apples');
   await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), '3 tart apples, sliced');
   await userEvent.click(screen.getByRole('button', { name: /add ingredient/i }));
+  expectNoEmoji();
   await userEvent.type(screen.getByLabelText(/ingredient 2 name/i), 'sugar');
   await userEvent.type(screen.getByLabelText(/ingredient 2 text/i), '1 cup sugar');
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { recipeFixture, profileFixture, commentFixture, pageOf } from '@/test/fixtures';
+import { expectNoEmoji } from '@/test/noEmoji';
 
 const BASE = 'http://localhost:8080';
 
@@ -62,6 +63,7 @@ test('reaction thumb PUTs then toggles off with DELETE', async () => {
   );
   renderApp('/recipes/r-1');
   const likeBtn = await screen.findByRole('button', { name: /^like comment$/i });
+  expectNoEmoji();
   await userEvent.click(likeBtn);
   await vi.waitFor(() => expect(calls).toEqual(['put']));
   await userEvent.click(likeBtn);

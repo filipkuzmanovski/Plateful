@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
+import { expectNoEmoji } from '@/test/noEmoji';
 
 const BASE = 'http://localhost:8080';
 
@@ -41,6 +42,8 @@ test('renders title, ingredients, structured steps, badges and macros', async ()
   expect(screen.getByText(/gluten free/i)).toBeInTheDocument();
   expect(screen.getByText(/543/)).toBeInTheDocument(); // calories
   expect(screen.getByText(/from pink when/i)).toBeInTheDocument();
+  await screen.findByRole('button', { name: /rate 4 stars/i }); // rating box loaded
+  expectNoEmoji();
 });
 
 test('rating box pre-fills my rating and un-rates on clicking the same star', async () => {

@@ -1,4 +1,6 @@
 import { Route, Routes } from 'react-router';
+import { SearchX } from 'lucide-react';
+import { EmptyState } from '@/components/ui';
 import AppShell from '@/components/AppShell';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import LoginPage from '@/features/auth/LoginPage';
@@ -23,7 +25,7 @@ export default function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfilePage /></ProtectedRoute>} />
-        <Route path="*" element={<p className="py-12 text-center text-muted">Page not found.</p>} />
+        <Route path="*" element={<EmptyState icon={SearchX}>Page not found.</EmptyState>} />
       </Route>
     </Routes>
   );

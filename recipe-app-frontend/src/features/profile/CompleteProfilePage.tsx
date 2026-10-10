@@ -4,6 +4,7 @@ import { createMe } from '@/api/users';
 import { useAuth } from '@/auth/AuthProvider';
 import { ApiError } from '@/api/client';
 import { Button, Field, TextInput } from '@/components/ui';
+import { AuthCard, FormError } from '@/features/auth/AuthCard';
 
 export default function CompleteProfilePage() {
   const [firstName, setFirstName] = useState('');
@@ -29,9 +30,10 @@ export default function CompleteProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-sm py-16">
-      <h1 className="mb-2 text-2xl font-extrabold tracking-tight">Complete your profile</h1>
-      <p className="mb-6 text-sm text-muted">Tell us what to call you — shown next to your recipes and comments.</p>
+    <AuthCard
+      title="Complete your profile"
+      subtitle="Tell us what to call you — shown next to your recipes and comments."
+    >
       <form onSubmit={onSubmit} className="space-y-4">
         <Field label="First name">
           <TextInput value={firstName} onChange={(e) => setFirstName(e.target.value)} required maxLength={255} />
@@ -39,9 +41,9 @@ export default function CompleteProfilePage() {
         <Field label="Last name">
           <TextInput value={lastName} onChange={(e) => setLastName(e.target.value)} required maxLength={255} />
         </Field>
-        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={busy} className="w-full">Save</Button>
+        {error && <FormError>{error}</FormError>}
+        <Button type="submit" disabled={busy} className="mt-2 w-full">Save</Button>
       </form>
-    </div>
+    </AuthCard>
   );
 }

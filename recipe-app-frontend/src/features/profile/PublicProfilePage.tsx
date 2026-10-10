@@ -4,7 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { getUser, getUserRecipes } from '@/api/users';
 import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
-import { SectionHeading, Spinner } from '@/components/ui';
+import { UserRoundX } from 'lucide-react';
+import { EmptyState, SectionHeading, Spinner } from '@/components/ui';
+import { ProfileHeader } from './ProfileHeader';
 
 function PublicProfileContent({ id }: { id: string }) {
   const [page, setPage] = useState(0);
@@ -15,18 +17,22 @@ function PublicProfileContent({ id }: { id: string }) {
   });
 
   if (user.isPending) return <Spinner />;
-  if (user.isError) return <p className="py-12 text-center text-muted">User not found.</p>;
+  if (user.isError) return <EmptyState icon={UserRoundX}>User not found.</EmptyState>;
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold tracking-tight">
-        {user.data.firstName} {user.data.lastName}
-      </h1>
+      <ProfileHeader
+        firstName={user.data.firstName}
+        lastName={user.data.lastName}
+        recipeTotal={recipes.data?.page.totalElements}
+      />
       <SectionHeading>Recipes</SectionHeading>
       {recipes.isPending && <Spinner />}
-      {recipes.isError && <p className="text-sm text-red-600">Couldn't load recipes.</p>}
+      {recipes.isError && <p className="text-sm text-danger">Couldn't load recipes.</p>}
       {recipes.data && recipes.data.content.length === 0 && (
-        <p className="text-sm text-muted">No recipes published yet.</p>
+        <p className="rounded-card border border-dashed border-sand px-4 py-10 text-center text-sm text-olive/70">
+          No recipes published yet.
+        </p>
       )}
       {recipes.data && recipes.data.content.length > 0 && (
         <>

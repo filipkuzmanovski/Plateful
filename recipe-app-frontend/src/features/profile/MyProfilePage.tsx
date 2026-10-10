@@ -8,6 +8,7 @@ import { ApiError } from '@/api/client';
 import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { Button, Field, SectionHeading, Spinner, TextInput } from '@/components/ui';
+import { ProfileHeader } from './ProfileHeader';
 
 export default function MyProfilePage() {
   const { profile, setProfile } = useAuth();
@@ -42,27 +43,39 @@ export default function MyProfilePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold tracking-tight">
-        {profile.firstName} {profile.lastName}
-      </h1>
+      <ProfileHeader
+        firstName={profile.firstName}
+        lastName={profile.lastName}
+        recipeTotal={recipes.data?.page.totalElements}
+      />
 
-      <SectionHeading>Profile</SectionHeading>
-      <form onSubmit={onSubmit} className="flex max-w-lg flex-wrap items-end gap-3">
-        <Field label="First name">
-          <TextInput value={firstName} onChange={(e) => setFirstName(e.target.value)} required maxLength={255} />
-        </Field>
-        <Field label="Last name">
-          <TextInput value={lastName} onChange={(e) => setLastName(e.target.value)} required maxLength={255} />
-        </Field>
-        <Button type="submit" disabled={busy}>Save names</Button>
-      </form>
+      <section className="mt-10 max-w-3xl rounded-card bg-paper p-5 shadow-card ring-1 ring-sand/70 sm:p-7">
+        <h2 className="font-serif text-2xl font-semibold tracking-tight text-olive">Profile</h2>
+        <p className="mt-1 text-sm text-olive/70">Your name appears next to your recipes and comments.</p>
+        <form onSubmit={onSubmit} className="mt-5 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <Field label="First name">
+            <TextInput value={firstName} onChange={(e) => setFirstName(e.target.value)} required maxLength={255} />
+          </Field>
+          <Field label="Last name">
+            <TextInput value={lastName} onChange={(e) => setLastName(e.target.value)} required maxLength={255} />
+          </Field>
+          <Button type="submit" disabled={busy}>Save names</Button>
+        </form>
+      </section>
 
       <SectionHeading>My recipes</SectionHeading>
       {recipes.isPending && <Spinner />}
-      {recipes.isError && <p className="text-sm text-red-600">Couldn't load recipes.</p>}
+      {recipes.isError && <p className="text-sm text-danger">Couldn't load recipes.</p>}
       {recipes.data && recipes.data.content.length === 0 && (
-        <p className="text-sm text-muted">
-          Nothing yet — <Link to="/recipes/new" className="text-accent underline">publish your first recipe</Link>.
+        <p className="rounded-card border border-dashed border-sand px-4 py-10 text-center text-sm text-olive/70">
+          Nothing yet —{' '}
+          <Link
+            to="/recipes/new"
+            className="font-semibold text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
+          >
+            publish your first recipe
+          </Link>
+          .
         </p>
       )}
       {recipes.data && recipes.data.content.length > 0 && (

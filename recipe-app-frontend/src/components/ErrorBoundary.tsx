@@ -1,4 +1,6 @@
 import { Component, type ReactNode } from 'react';
+import { CircleAlert } from 'lucide-react';
+import { EmptyState } from './ui';
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -9,7 +11,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError
 
   render() {
     if (this.state.hasError) {
-      return <p className="py-12 text-center text-muted">Something went wrong rendering this page.</p>;
+      return <EmptyState icon={CircleAlert}>Something went wrong rendering this page.</EmptyState>;
     }
     return this.props.children;
   }

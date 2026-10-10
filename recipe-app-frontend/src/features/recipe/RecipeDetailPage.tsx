@@ -1,16 +1,42 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import {
+  Check,
+  CircleAlert,
+  Clock,
+  ExternalLink,
+  Flame,
+  Leaf,
+  Pencil,
+  SearchX,
+  Trash2,
+  Users,
+  UtensilsCrossed,
+  type LucideIcon,
+} from 'lucide-react';
 import { deleteRecipe, getRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { StarDisplay } from '@/components/StarDisplay';
-import { Button, SectionHeading, Spinner } from '@/components/ui';
+import { Button, EmptyState, Pill, SectionHeading, Spinner } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { RecipeDisplay } from '@/lib/types';
 import { RatingBox } from './RatingBox';
 import { CommentsSection } from './CommentsSection';
+
+/** One time/servings fact in the photo card: a terracotta icon, a value and a small label. */
+function Fact({ icon: Icon, value, label }: { icon: LucideIcon; value: ReactNode; label: string }) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-2xl bg-cream px-2 py-3 text-center">
+      <Icon aria-hidden="true" className="size-4.5 text-terracotta" strokeWidth={1.75} />
+      {/* dt before dd for valid markup; `order-last` shows the label under the value. */}
+      <dt className="order-last text-xs text-olive/70">{label}</dt>
+      <dd className="font-serif text-lg leading-tight font-semibold text-olive tabular-nums">{value}</dd>
+    </div>
+  );
+}
 
 function DietBadges({ recipe }: { recipe: RecipeDisplay }) {
   const badges = [
@@ -21,9 +47,12 @@ function DietBadges({ recipe }: { recipe: RecipeDisplay }) {
   ].filter(Boolean) as string[];
   if (badges.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-1.5">
       {badges.map((b) => (
-        <span key={b} className="border border-ink px-2 py-0.5 text-xs font-bold tracking-wide uppercase">{b}</span>
+        <Pill key={b} tone="olive" className="py-1">
+          <Leaf aria-hidden="true" className="size-3" strokeWidth={2} />
+          {b}
+        </Pill>
       ))}
     </div>
   );
@@ -51,37 +80,58 @@ export default function RecipeDetailPage() {
   if (query.isError) {
     const notFound = query.error instanceof ApiError && query.error.status === 404;
     return (
-      <p className="py-12 text-center text-muted">
+      <EmptyState
+        icon={notFound ? SearchX : CircleAlert}
+        action={
+          <Link to="/" className="text-sm font-semibold text-olive underline underline-offset-4 hover:decoration-saffron">
+            Back to all recipes
+          </Link>
+        }
+      >
         {notFound ? 'Recipe not found.' : "Couldn't load this recipe."}
-      </p>
+      </EmptyState>
     );
   }
   const recipe = query.data;
+  const isOwner = !!profile && recipe.user?.id === profile.id;
+  const hasFacts = recipe.readyInMinutes !== null || recipe.cookingMinutes !== null || recipe.servings !== null;
 
   return (
-    <div className="flex flex-col gap-8 lg:flex-row">
-      {/* Left: sticky facts card */}
-      <aside className="lg:w-2/5">
-        <div className="border border-hairline lg:sticky lg:top-4">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
+      {/* Left: sticky photo and facts card */}
+      <aside>
+        <div className="overflow-hidden rounded-card bg-paper shadow-card ring-1 ring-sand/70 lg:sticky lg:top-24">
           {recipe.image ? (
             <img src={recipe.image} alt={recipe.title} className="aspect-[4/3] w-full object-cover" />
           ) : (
-            <div className="flex h-52 items-center justify-center bg-hairline text-5xl">🍽</div>
-          )}
-          <div className="space-y-3 p-4 text-sm">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted">
-              {recipe.readyInMinutes !== null && <span>⏱ {recipe.readyInMinutes} min total</span>}
-              {recipe.cookingMinutes !== null && <span>cook {recipe.cookingMinutes} min</span>}
-              {recipe.servings !== null && <span>🍽 {recipe.servings} servings</span>}
+            <div className="flex aspect-[4/3] items-center justify-center bg-sand text-olive/30">
+              <UtensilsCrossed aria-hidden="true" className="size-14" strokeWidth={1.25} />
             </div>
+          )}
+          <div className="space-y-5 p-5 sm:p-6">
+            {hasFacts && (
+              <dl className="flex gap-2">
+                {recipe.readyInMinutes !== null && (
+                  <Fact icon={Clock} value={`${recipe.readyInMinutes} min`} label="total" />
+                )}
+                {recipe.cookingMinutes !== null && (
+                  <Fact icon={Flame} value={`${recipe.cookingMinutes} min`} label="cook" />
+                )}
+                {recipe.servings !== null && <Fact icon={Users} value={recipe.servings} label="servings" />}
+              </dl>
+            )}
             <DietBadges recipe={recipe} />
             {recipe.calories !== null && (
-              <p className="text-muted">
-                {Math.round(recipe.calories)} kcal · {recipe.proteinGrams ?? '–'}g protein ·{' '}
-                {recipe.fatGrams ?? '–'}g fat · {recipe.carbsGrams ?? '–'}g carbs
-              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <Pill className="py-1 tabular-nums">
+                  <span className="font-semibold">{Math.round(recipe.calories)}</span> kcal
+                </Pill>
+                <Pill className="py-1 tabular-nums">{recipe.proteinGrams ?? '–'}g protein</Pill>
+                <Pill className="py-1 tabular-nums">{recipe.fatGrams ?? '–'}g fat</Pill>
+                <Pill className="py-1 tabular-nums">{recipe.carbsGrams ?? '–'}g carbs</Pill>
+              </div>
             )}
-            <div className="border-t border-hairline pt-3">
+            <div className="border-t border-sand pt-5">
               <RatingBox recipeId={recipe.id} />
             </div>
           </div>
@@ -89,14 +139,53 @@ export default function RecipeDetailPage() {
       </aside>
 
       {/* Right: content */}
-      <article className="flex-1">
-        <h1 className="text-3xl font-extrabold tracking-tight">{recipe.title}</h1>
-        {profile && recipe.user?.id === profile.id && (
-          <div className="mt-2 flex gap-2">
-            <Link to={`/recipes/${recipe.id}/edit`} className="border border-ink px-3 py-1 text-xs font-bold tracking-wide uppercase hover:bg-ink hover:text-white">
+      <article className="min-w-0">
+        {recipe.cuisines.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {recipe.cuisines.map((c) => (
+              <Pill key={c} tone="saffron" className="capitalize">{c}</Pill>
+            ))}
+          </div>
+        )}
+        <h1 className="font-serif text-4xl leading-[1.05] font-semibold tracking-tight text-balance text-olive sm:text-5xl">
+          {recipe.title}
+        </h1>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <StarDisplay average={recipe.averageRating} count={recipe.ratingCount} />
+          {recipe.user ? (
+            <Link
+              to={`/users/${recipe.user.id}`}
+              className="text-sm text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
+            >
+              by {recipe.user.firstName} {recipe.user.lastName}
+            </Link>
+          ) : recipe.sourceName ? (
+            recipe.sourceUrl ? (
+              <a
+                href={recipe.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
+              >
+                From {recipe.sourceName}
+                <ExternalLink aria-hidden="true" className="size-3.5 text-olive/60" />
+              </a>
+            ) : (
+              <span className="text-sm text-olive/70">From {recipe.sourceName}</span>
+            )
+          ) : null}
+        </div>
+        {isOwner && (
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link
+              to={`/recipes/${recipe.id}/edit`}
+              className="inline-flex items-center gap-2 rounded-full border border-olive/20 bg-paper px-4 py-2 text-sm font-semibold text-olive transition hover:border-olive/50 hover:bg-cream"
+            >
+              <Pencil aria-hidden="true" className="size-3.5" />
               Edit
             </Link>
-            <Button variant="danger" className="!px-3 !py-1 !text-xs" onClick={() => setConfirmDelete(true)}>
+            <Button variant="danger" className="!px-4 !py-2" onClick={() => setConfirmDelete(true)}>
+              <Trash2 aria-hidden="true" className="size-3.5" />
               Delete recipe
             </Button>
             <ConfirmDialog
@@ -110,30 +199,26 @@ export default function RecipeDetailPage() {
             />
           </div>
         )}
-        <div className="mt-1 flex items-center gap-3">
-          <StarDisplay average={recipe.averageRating} count={recipe.ratingCount} />
-          {recipe.user ? (
-            <Link to={`/users/${recipe.user.id}`} className="text-sm text-muted underline">
-              by {recipe.user.firstName} {recipe.user.lastName}
-            </Link>
-          ) : recipe.sourceName ? (
-            recipe.sourceUrl ? (
-              <a href={recipe.sourceUrl} target="_blank" rel="noreferrer" className="text-sm text-muted underline">
-                From {recipe.sourceName} ↗
-              </a>
-            ) : (
-              <span className="text-sm text-muted">From {recipe.sourceName}</span>
-            )
-          ) : null}
-        </div>
 
         <SectionHeading>Ingredients</SectionHeading>
-        <ul className="space-y-1">
+        <ul className="rounded-card bg-paper p-2 shadow-card ring-1 ring-sand/70">
           {recipe.ingredients.map((ing, i) => (
             <li key={i}>
-              <label className="flex cursor-pointer items-baseline gap-2 text-sm">
-                <input type="checkbox" className="accent-ink" />
-                <span>{ing.originalText}</span>
+              <label className="group flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-cream">
+                <span className="relative mt-0.5 flex size-5 shrink-0">
+                  <input
+                    type="checkbox"
+                    className="peer size-5 cursor-pointer appearance-none rounded-md border border-olive/30 bg-paper transition checked:border-olive checked:bg-olive"
+                  />
+                  <Check
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 m-auto size-3.5 text-cream opacity-0 transition-opacity peer-checked:opacity-100"
+                    strokeWidth={3}
+                  />
+                </span>
+                <span className="text-[15px] leading-relaxed text-olive transition-colors group-has-checked:text-olive/70 group-has-checked:line-through group-has-checked:decoration-olive/40">
+                  {ing.originalText}
+                </span>
               </label>
             </li>
           ))}
@@ -141,21 +226,27 @@ export default function RecipeDetailPage() {
 
         <SectionHeading>Instructions</SectionHeading>
         {recipe.instructionsSteps.length > 0 ? (
-          <ol className="space-y-3">
+          <ol className="space-y-6">
             {recipe.instructionsSteps.map((step) => (
-              <li key={step.number} className="flex gap-3 text-sm">
-                <span className="font-extrabold">{step.number}.</span>
-                <span>{step.step}</span>
+              <li key={step.number} className="flex gap-4 sm:gap-5">
+                <span className="w-8 shrink-0 text-right font-serif text-3xl leading-none font-medium text-terracotta italic tabular-nums">
+                  {step.number}
+                </span>
+                <span className="pt-1 text-[15px] leading-relaxed text-olive">{step.step}</span>
               </li>
             ))}
           </ol>
         ) : recipe.instructions ? (
-          <p className="text-sm whitespace-pre-line">{recipe.instructions.replace(/<[^>]+>/g, ' ').replace(/\s+\n/g, '\n').trim()}</p>
+          <p className="text-[15px] leading-relaxed whitespace-pre-line text-olive">
+            {recipe.instructions.replace(/<[^>]+>/g, ' ').replace(/\s+\n/g, '\n').trim()}
+          </p>
         ) : (
-          <p className="text-sm text-muted">No instructions provided.</p>
+          <p className="text-sm text-olive/70 italic">No instructions provided.</p>
         )}
 
-        <SectionHeading>Comments ({recipe.commentCount})</SectionHeading>
+        <SectionHeading>
+          Comments <span className="font-sans text-base font-medium text-olive/70 tabular-nums">({recipe.commentCount})</span>
+        </SectionHeading>
         <section aria-label="comments">
           <CommentsSection recipeId={recipe.id} recipeOwnerId={recipe.user?.id ?? null} />
         </section>

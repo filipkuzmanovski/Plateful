@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
+import { expectNoEmoji } from '@/test/noEmoji';
 
 const BASE = 'http://localhost:8080';
 
@@ -32,6 +33,7 @@ test('public profile shows the user name and their recipes', async () => {
   renderApp('/users/u-2');
   expect(await screen.findByRole('heading', { name: /bob smith/i })).toBeInTheDocument();
   expect(await screen.findByText('Bob Burgers')).toBeInTheDocument();
+  expectNoEmoji();
 });
 
 test('my profile edits names via PUT', async () => {

@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { LoaderCircle, type LucideIcon } from 'lucide-react';
 
 type ButtonVariant = 'primary' | 'outline' | 'danger' | 'ghost';
 
@@ -130,5 +130,26 @@ export function Pill({
     >
       {children}
     </span>
+  );
+}
+
+/** A centered, quiet message for empty and error states: a soft icon medallion above serif text. */
+export function EmptyState({
+  icon: Icon,
+  children,
+  action,
+}: {
+  icon: LucideIcon;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-4 px-4 py-16 text-center">
+      <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-full bg-sand/60">
+        <Icon className="size-6 text-muted" strokeWidth={1.5} />
+      </span>
+      <p className="max-w-sm font-serif text-xl text-olive">{children}</p>
+      {action}
+    </div>
   );
 }
