@@ -1,11 +1,14 @@
 package mk.ukim.finki.wp.recipeappbackend.repository;
 
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
+import mk.ukim.finki.wp.recipeappbackend.model.projection.CuisineCount;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,4 +31,8 @@ public interface RecipeRepository extends JpaRepository<Recipe, UUID>, JpaSpecif
     Optional<Recipe> findBySpoonacularId(Long spoonacularId);
 
     boolean existsBySpoonacularId(Long spoonacularId);
+
+    // recipe count per cuisine key (unnests the text[] column); callers map keys onto the catalogue
+    @Query(value = "select c as key, count(*) as count from recipes, unnest(cuisines) c group by c", nativeQuery = true)
+    List<CuisineCount> countCuisines();
 }
