@@ -535,3 +535,107 @@ request URL, so the tests assert what is really sent to the backend:
   - totalPages: 3 renders a "Go to page 3" button
 All 5 failed before the page existed. After implementing: 15/15 tests
 passing.
+
+
+================================================================================
+ TASK 5 — Recipe detail page + rating box
+ Commit on feature/frontend-pages: ac911fc
+================================================================================
+
+What was built
+--------------
+The page at /recipes/:id, in the two-column layout chosen from the mockups:
+a "facts card" on the left that stays pinned while you scroll, and the
+recipe content on the right. The left card holds your own star rating.
+
+How it was done
+---------------
+1. src/features/recipe/RecipeDetailPage.tsx
+
+     const { id } = useParams<{ id: string }>();
+     const query = useQuery({ queryKey: ['recipe', id],
+                              queryFn: () => getRecipe(id!), retry: false });
+   useParams reads the :id from the URL. retry: false because a 404 (bad
+   recipe id) will never succeed on retry, so it should fail fast. The
+   error branch checks
+     query.error instanceof ApiError && query.error.status === 404
+   to show "Recipe not found." instead of a generic error. This is where
+   the typed ApiError from Task 2 pays off.
+
+   Layout:
+     <div className="flex flex-col gap-8 lg:flex-row">
+       <aside className="lg:w-2/5"> <div className="lg:sticky lg:top-4"> ...
+       <article className="flex-1"> ...
+   Below the `lg` breakpoint everything stacks vertically (facts card
+   first). On large screens it becomes a row, and `sticky top-4` keeps the
+   facts card in view while the instructions and comments scroll.
+
+   Left card:
+     - photo, or a 🍽 placeholder when the recipe has none
+     - ready / cook time and servings, each shown only when not null (this
+       is where the `number | null` types force a check)
+     - diet badges built by DietBadges: an array of
+       `recipe.vegan && 'Vegan'` etc. filtered to the truthy entries
+     - calories / protein / fat / carbs, shown only when calories exist
+       (imported recipes have them; hand-written ones usually don't)
+     - the RatingBox
+
+   Right column:
+     - title and StarDisplay (the average)
+     - attribution: user recipes link to the author's profile
+       ("by Jane Doe" -> /users/:id); imported recipes link out to the
+       original site ("From Pink When ↗", target="_blank"
+       rel="noreferrer", so the other site can't control our tab)
+     - ingredients as a checklist. The checkboxes are purely visual and
+       nothing is saved; they help while cooking.
+     - instructions: the numbered structured steps when the recipe has
+       them, else the raw instructions text (whitespace-pre-line keeps its
+       line breaks), else "No instructions provided"
+     - the comments heading and a CommentsSlot placeholder (Task 6)
+
+2. src/features/recipe/RatingBox.tsx
+
+     const myRating = useQuery({ queryKey: ['myRating', recipeId],
+                                 queryFn: () => getMyRating(recipeId),
+                                 enabled: status === 'ready' });
+   `enabled` stops the query from running for anonymous visitors, who have
+   no rating to fetch.
+
+     const rate   = useMutation({ mutationFn: (n) => putMyRating(recipeId, n),
+                                  onSuccess: invalidate });
+     const unrate = useMutation({ mutationFn: () => deleteMyRating(recipeId),
+                                  onSuccess: invalidate });
+   useMutation is TanStack Query's tool for writes. On success, invalidate()
+   marks three cached queries as stale so they refetch: your rating, this
+   recipe (its average changed), and every browse list (the cards show
+   averages too).
+
+     onClick={() => (current === n ? unrate.mutate() : rate.mutate(n))}
+   Clicking a different star rates; clicking the star you already gave
+   removes your rating. That is the backend's DELETE .../ratings/me.
+
+   Each star is a <button> with aria-label="Rate 4 stars" and
+   aria-pressed={current === n}. The label lets screen readers (and tests)
+   identify each star, and aria-pressed announces which one is selected.
+
+   Deviation from the plan, made by the implementer and confirmed by test:
+     if (myRating.isPending) return <p>Loading your rating…</p>;
+   The planned code drew the stars immediately while your saved rating was
+   still loading. That had a real bug: clicking your current star before
+   the load finished would send "rate 4" again instead of "remove rating",
+   because the component didn't know yet that 4 was your rating. The stars
+   now appear only once your rating is known. If loading the rating fails,
+   isPending becomes false and the stars render unselected, so the box
+   can't get stuck.
+
+How it was tested
+-----------------
+src/features/recipe/detail.test.tsx (4 tests). The Supabase client is faked
+as logged in, and MSW serves the recipe, comments and rating:
+  - The title, an ingredient, a structured step, the Gluten free badge,
+    calories and the "From Pink When" attribution all render
+  - With a saved rating of 4, the 4th star is aria-pressed, and clicking it
+    sends DELETE (un-rate)
+  - With no saved rating (404), clicking the 5th star sends PUT {rating: 5}
+  - An unknown id (404) shows "Recipe not found"
+19/19 tests passing after this task.
