@@ -10,6 +10,9 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Pagination } from '@/components/Pagination';
 import type { CommentDisplay } from '@/lib/types';
 
+const showError = (e: unknown) =>
+  toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
+
 function ReactionButtons({ comment }: { comment: CommentDisplay }) {
   const { status } = useAuth();
   // The API has no "my reaction" read endpoint; we track the reaction made
@@ -21,10 +24,12 @@ function ReactionButtons({ comment }: { comment: CommentDisplay }) {
   const react = useMutation({
     mutationFn: (isLike: boolean) => putMyReaction(comment.id, isLike),
     onSuccess: (_d, isLike) => { setMine(isLike); invalidate(); },
+    onError: showError,
   });
   const unreact = useMutation({
     mutationFn: () => deleteMyReaction(comment.id),
     onSuccess: () => { setMine(null); invalidate(); },
+    onError: showError,
   });
 
   const disabled = status !== 'ready';
@@ -70,22 +75,21 @@ export function CommentsSection({
     void queryClient.invalidateQueries({ queryKey: ['comments', recipeId] });
     void queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
   };
-  const onError = (e: unknown) => toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
 
   const post = useMutation({
     mutationFn: () => addComment(recipeId, draft),
     onSuccess: () => { setDraft(''); invalidate(); },
-    onError,
+    onError: showError,
   });
   const saveEdit = useMutation({
     mutationFn: () => editComment(editingId!, editDraft),
     onSuccess: () => { setEditingId(null); invalidate(); },
-    onError,
+    onError: showError,
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteComment(id),
     onSuccess: () => { setDeletingId(null); invalidate(); },
-    onError,
+    onError: showError,
   });
 
   if (query.isPending) return <Spinner />;

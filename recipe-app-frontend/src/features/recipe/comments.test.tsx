@@ -97,3 +97,15 @@ test("someone else's comment shows no Edit, and Delete only when I own the recip
   expect(within(item).queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
   expect(within(item).getByRole('button', { name: /delete/i })).toBeInTheDocument();
 });
+
+test('a failed reaction shows the server error in a toast', async () => {
+  stubPage();
+  server.use(
+    http.put(`${BASE}/api/comments/c-1/reactions/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'Comment with id c-1 not found' }, { status: 404 }),
+    ),
+  );
+  renderApp('/recipes/r-1');
+  await userEvent.click(await screen.findByRole('button', { name: /^like comment$/i }));
+  expect(await screen.findByText('Comment with id c-1 not found')).toBeInTheDocument();
+});
