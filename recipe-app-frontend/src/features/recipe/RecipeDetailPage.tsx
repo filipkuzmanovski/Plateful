@@ -44,7 +44,7 @@ export default function RecipeDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ['recipes'] });
       void queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
     },
-    onError: () => toast.error("Couldn't delete the recipe"),
+    onError: (e) => toast.error(e instanceof ApiError ? e.detail : "Couldn't delete the recipe"),
   });
 
   if (query.isPending) return <Spinner />;
@@ -104,6 +104,7 @@ export default function RecipeDetailPage() {
               title="Delete recipe?"
               description="The recipe, its ratings and its comments will be permanently removed."
               confirmLabel="Confirm"
+              busy={removeRecipe.isPending}
               onConfirm={() => { if (!removeRecipe.isPending) removeRecipe.mutate(recipe.id); }}
               onCancel={() => setConfirmDelete(false)}
             />
@@ -149,7 +150,7 @@ export default function RecipeDetailPage() {
             ))}
           </ol>
         ) : recipe.instructions ? (
-          <p className="text-sm whitespace-pre-line">{recipe.instructions}</p>
+          <p className="text-sm whitespace-pre-line">{recipe.instructions.replace(/<[^>]+>/g, ' ').replace(/\s+\n/g, '\n').trim()}</p>
         ) : (
           <p className="text-sm text-muted">No instructions provided.</p>
         )}

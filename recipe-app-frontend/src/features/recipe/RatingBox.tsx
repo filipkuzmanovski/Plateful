@@ -5,11 +5,11 @@ import { deleteMyRating, getMyRating, putMyRating } from '@/api/ratings';
 import { useAuth } from '@/auth/AuthProvider';
 
 export function RatingBox({ recipeId }: { recipeId: string }) {
-  const { status } = useAuth();
+  const { status, profile } = useAuth();
   const queryClient = useQueryClient();
 
   const myRating = useQuery({
-    queryKey: ['myRating', recipeId],
+    queryKey: ['myRating', recipeId, profile?.id],
     queryFn: () => getMyRating(recipeId),
     enabled: status === 'ready',
   });
@@ -18,6 +18,7 @@ export function RatingBox({ recipeId }: { recipeId: string }) {
     void queryClient.invalidateQueries({ queryKey: ['myRating', recipeId] });
     void queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
     void queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    void queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
   };
   const onError = (e: unknown) => toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
   const rate = useMutation({ mutationFn: (n: number) => putMyRating(recipeId, n), onSuccess: invalidate, onError });

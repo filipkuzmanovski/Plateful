@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { updateMe, getUserRecipes } from '@/api/users';
 import { useAuth } from '@/auth/AuthProvider';
@@ -15,6 +15,7 @@ export default function MyProfilePage() {
   const [lastName, setLastName] = useState(profile?.lastName ?? '');
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
+  const queryClient = useQueryClient();
 
   const recipes = useQuery({
     queryKey: ['userRecipes', profile?.id, page],
@@ -28,6 +29,7 @@ export default function MyProfilePage() {
     try {
       const updated = await updateMe({ firstName, lastName });
       setProfile(updated);
+      void queryClient.invalidateQueries(); // names appear in author lines, comments, public profile
       toast.success('Profile updated');
     } catch (err) {
       toast.error(err instanceof ApiError ? err.detail : 'Something went wrong');

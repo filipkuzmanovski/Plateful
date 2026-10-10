@@ -10,6 +10,8 @@ export function browseRecipes(filter: RecipeFilter, page: number): Promise<Page<
   }
   params.set('page', String(page));
   params.set('size', String(PAGE_SIZE));
+  params.append('sort', 'createdAt,desc');
+  params.append('sort', 'id,asc');
   return api(`/api/recipes?${params}`);
 }
 
