@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 
 class CuisineCatalogTest {
 
+    private static final String NBSP = String.valueOf((char) 0x00A0);
+
     private final CuisineCatalog catalog = new CuisineCatalog();
 
     @Test
@@ -47,6 +49,8 @@ class CuisineCatalogTest {
     void normalizeTrimsLowercasesAndCollapses() {
         assertThat(CuisineCatalog.normalize("  Middle   Eastern ")).isEqualTo("middle eastern");
         assertThat(CuisineCatalog.normalize("middle\teastern")).isEqualTo("middle eastern");
+        assertThat(CuisineCatalog.normalize("middle" + NBSP + "eastern")).isEqualTo("middle eastern");
+        assertThat(CuisineCatalog.normalize(NBSP + "Italian" + NBSP)).isEqualTo("italian");
         assertThat(CuisineCatalog.normalize(null)).isEqualTo("");
     }
 

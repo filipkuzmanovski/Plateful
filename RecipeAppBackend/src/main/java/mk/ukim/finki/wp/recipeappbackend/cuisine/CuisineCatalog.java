@@ -78,7 +78,8 @@ public class CuisineCatalog {
         if (raw == null) {
             return "";
         }
-        return raw.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        // Collapse ASCII and Unicode whitespace (incl. NBSP) first so trim() sees plain spaces at the ends.
+        return raw.toLowerCase(Locale.ROOT).replaceAll("[\\s\\p{Z}]+", " ").trim();
     }
 
     public Set<String> keysForRegion(String regionKey) {
