@@ -1807,3 +1807,100 @@ How it was checked
     recipes". It showed `not-allowed` on the disabled "Previous page" and
     "Clear all", and `text` on the number inputs.
   - Tests: 73/73 still pass, and the build is clean.
+
+
+================================================================================
+ BUG FIX — Like/dislike highlight forgotten after leaving a recipe
+ Branch: fix/remember-comment-reactions
+================================================================================
+
+Symptom
+-------
+You like a comment and the thumb lights up. You open another recipe and
+come back, and the thumb is no longer highlighted, even though the like is
+still saved (the count still includes it).
+
+Root cause
+----------
+The highlight lived only in the component's memory:
+
+  const [mine, setMine] = useState<boolean | null>(null);
+
+React throws component state away when the component leaves the screen
+("unmounts"). Opening another recipe unmounts the comments, so coming back
+started again from null. The original code said why in a comment: the API
+had no way to read "my reaction" back, so the frontend could only remember
+clicks made during the current visit.
+
+The star rating never had this bug, because it has
+GET /api/recipes/{id}/ratings/me. Comment reactions had no equivalent.
+
+The fix, backend
+----------------
+New endpoint:
+
+  GET /api/recipes/{recipeId}/comments/reactions/me
+  -> { "<commentId>": true, "<otherCommentId>": false }
+
+  - true means liked and false means disliked. Comments you haven't
+    reacted to are simply absent.
+  - One call covers every comment on the recipe, so a page of 10 comments
+    costs 1 request, not 10.
+  - It is backed by one JPQL query, which builds a small record
+    (MyCommentReaction) per row:
+
+    SELECT new ...MyCommentReaction(r.comment.id, r.isLike)
+    FROM CommentReaction r
+    WHERE r.comment.recipe.id = :recipeId AND r.user.id = :userId
+
+  - It needs a signed-in user. The @CurrentUserId parameter answers 401
+    to anonymous callers.
+  - SecurityConfig was not touched: the path already falls under the
+    public GET rule, and the 401 comes from the parameter resolver.
+
+The fix, frontend
+-----------------
+  - api/reactions.ts gained getMyReactions(recipeId).
+  - CommentsSection loads it once per recipe with TanStack Query. The cache
+    key includes the user id, so switching accounts never shows someone
+    else's highlights:
+
+      queryKey: ['myReactions', recipeId, profile?.id]
+      enabled:  status === 'ready'      (only when signed in)
+
+  - ReactionButtons no longer keeps its own state. It gets
+    `mine = myReactions.data?.[comment.id] ?? null` from its parent. After
+    a like, dislike or removal succeeds, it updates that cached map
+    directly with queryClient.setQueryData, so the highlight changes at
+    once without waiting for a refetch.
+  - The buttons are disabled for the moment it takes the saved reactions
+    to load. Otherwise a fast click on an already-liked thumb would send
+    "like" again instead of removing the like. The rating stars wait the
+    same way.
+  - The buttons now carry aria-pressed. Screen readers announce
+    "pressed", and tests can check the highlight.
+
+How it was tested
+-----------------
+  - Backend:
+      - CommentControllerTest: the signed-in user gets the map; anonymous
+        gets 401 and the service is never called.
+      - New CommentReactionQueryDbTest (read-only, real Postgres): every
+        stored reaction is found for its own user and recipe, and an
+        unknown user gets nothing.
+  - Frontend: a new test loads a recipe where the server says comment c-1
+    is liked. It checks that the Like button shows as pressed, that
+    clicking it sends DELETE (not PUT), and that the highlight clears. The
+    test failed before the fix.
+  - Totals: 74/74 frontend tests, build clean. On the running backend the
+    new endpoint answers 401 to anonymous callers.
+
+Side note: two DB tests must share one config
+---------------------------------------------
+The first version of the new DB test also set ddl-auto=validate. Because
+its settings differed from RecipeCuisineQueryDbTest, Spring built a second
+test context with its own pool of database connections. Together with the
+running backend, that hit Supabase's session-mode limit of 15 clients
+("EMAXCONNSESSION"). Giving both tests identical settings lets Spring reuse
+one cached context. application.properties already sets validate, so
+nothing was lost.
