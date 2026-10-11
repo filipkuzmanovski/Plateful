@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -39,6 +40,16 @@ public class CommentController {
     @GetMapping("/recipes/{recipeId}/comments")
     public Page<RecipeCommentDisplayDto> list(@PathVariable UUID recipeId, Pageable pageable) {
         return commentService.getForRecipe(recipeId, pageable);
+    }
+
+    /**
+     * Which comments on this recipe the caller has liked (true) or disliked
+     * (false), so the UI can highlight their buttons. Authenticated:
+     * @CurrentUserId answers 401 to anonymous callers.
+     */
+    @GetMapping("/recipes/{recipeId}/comments/reactions/me")
+    public Map<UUID, Boolean> myReactions(@CurrentUserId UUID userId, @PathVariable UUID recipeId) {
+        return commentService.getMyReactions(userId, recipeId);
     }
 
     @PostMapping("/recipes/{recipeId}/comments")
