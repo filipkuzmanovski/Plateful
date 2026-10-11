@@ -1197,3 +1197,557 @@ How it was tested
   - All 66 existing backend tests still pass (68 total).
   - End to end on the running backend: cuisine=italian -> 200 with 40
     recipes, cuisine=mexican -> 200 with 40, cuisine+vegan combined -> 200.
+
+
+
+################################################################################
+################################################################################
+
+ PART 2 — THE "GOLDEN HOUR" REDESIGN
+ Branch: feature/golden-hour
+ Spec: docs/superpowers/specs/2026-10-10-golden-hour-redesign-design.md
+ Plan: docs/superpowers/plans/2026-10-10-golden-hour-redesign.md
+
+################################################################################
+################################################################################
+
+Why this round happened
+-----------------------
+After v1 shipped, four things felt wrong:
+  1. The filters sat in a cramped bar above the recipe grid.
+  2. Cuisines were one long flat list with no way to browse by part of the
+     world (Asia, Mediterranean, ...).
+  3. Max time and min rating were fixed dropdown choices and couldn't be
+     typed.
+  4. The look was plain.
+
+The redesign does four things:
+  - It moves every filter into a slide-in drawer.
+  - It groups cuisines by region, shows a "popular ten", and adds an A-Z
+    page.
+  - It restyles the whole app in a warm palette called "Golden Hour", with
+    no emojis anywhere.
+  - It makes the cuisine list a fixed, curated catalogue that the server
+    checks.
+
+Why a curated list, and not free text? If anyone could type any cuisine
+name, trolls could invent joke cuisines and they would show up as filters
+for everyone. A fixed list of every country plus a few regional styles
+(Cajun, Southern, Nordic, ...) covers real dishes and can't be vandalised.
+
+The order of the work: the backend first (Tasks 1-6), then the visual
+foundation (7-8), then the filter plumbing (9), the recipe-form picker (11),
+and finally the drawer itself (10). Task 11 ran before Task 10 on purpose.
+Task 10 deletes the old FilterBar, and the recipe form still imported a
+piece of it, so the form had to move to its own picker first.
+
+Task 12 (wiping the imported recipes and re-importing about 10 per cuisine
+across 27 cuisines) was put on hold by the user, so it isn't covered here.
+The code for it exists (Task 6) but is switched off by default.
+
+
+================================================================================
+ REDESIGN TASK 1 — The cuisine catalogue (backend)
+ Files: RecipeAppBackend/src/main/resources/cuisines.csv
+        RecipeAppBackend/.../cuisine/{Region, CuisineEntry, CuisineCatalog,
+                                      InvalidCuisineException}.java
+================================================================================
+
+What was done
+-------------
+A spreadsheet-style file, cuisines.csv, lists all 198 allowed cuisines:
+
+  key,label,region,mediterranean
+  albanian,Albanian,europe,true
+  austrian,Austrian,europe,false
+  ...
+
+  - key    the lowercase value stored in the database and used in URLs.
+  - label  what people see.
+  - region one of europe, asia, americas, africa, middle_east, oceania.
+  - mediterranean  a separate true/false flag. "Mediterranean" cuts across
+           regions: Greece is in Europe, Lebanon in the Middle East and
+           Morocco in Africa, and all three are Mediterranean.
+
+How it works
+------------
+CuisineCatalog is a Spring @Component. Its constructor reads the CSV once at
+startup and builds a lookup map from key to entry. It fails loudly (the app
+refuses to start) on:
+  - a missing file,
+  - a row without exactly 4 fields,
+  - an unknown region,
+  - a duplicate key.
+A typo in the list is caught on the first run instead of turning into a
+silent bug.
+
+The important methods:
+
+  normalize(raw)
+      raw.toLowerCase(Locale.ROOT).replaceAll("[\\s\\p{Z}]+", " ").trim()
+    Turns "  ITALIAN " into "italian". [\s\p{Z}] matches every kind of
+    whitespace, including the non-breaking space you get when copy-pasting
+    from a web page (plain \s misses that one; a reviewer caught it).
+    Locale.ROOT avoids the "Turkish i" problem, where lowercasing "I" on a
+    Turkish-locale machine gives a dotless i.
+
+  keysForRegion("asia")
+    Every cuisine key in that region. "mediterranean" is special-cased to
+    use the flag instead of the region column.
+
+  resolveFilter(cuisines, regions) -> Optional<Set<String>>
+    Turns the browse request's ?cuisine= and ?region= values into one set
+    of keys. The return type carries three different meanings:
+      Optional.empty()      no cuisine filter at all (show everything)
+      Optional.of({})       a filter was asked for but nothing valid
+                            matched, e.g. ?cuisine=lol, so show NOTHING
+      Optional.of({a,b,c})  show recipes having any of these keys
+    That middle case is the main reason for the design. A naive version
+    would ignore the unknown value and return every recipe. That would be
+    confusing ("I asked for X and got everything"), so the empty set is
+    kept separate from "no filter".
+
+  normalizeAndValidate(list)
+    Used when saving a recipe. It normalises each entry, removes duplicates
+    while keeping order (a LinkedHashSet), and throws
+    InvalidCuisineException listing every unknown value.
+
+How it was tested
+-----------------
+CuisineCatalogTest covers:
+  - loading,
+  - normalisation (tabs, newlines, the non-breaking space),
+  - region and Mediterranean lookups,
+  - all three resolveFilter outcomes,
+  - de-duplication and the unknown-value error.
+
+
+================================================================================
+ REDESIGN TASK 2 — Multi-value cuisine and region filtering (backend)
+ Files: model/RecipeFilter.java, specification/RecipeSpecifications.java,
+        service/RecipeService.java
+================================================================================
+
+What was done
+-------------
+RecipeFilter's single `String cuisine` became `List<String> cuisine` plus
+`List<String> region`. Spring binds repeated query parameters
+(?cuisine=thai&cuisine=greek) straight into a List.
+
+How it works
+------------
+RecipeService.browse() first asks the catalogue to resolve the filter. If
+the answer is "an empty set", it returns Page.empty() right away and never
+touches the database. Otherwise it builds the query:
+
+  Predicate[] anyOf = keys.stream()
+      .map(key -> cb.isTrue(cb.function(TEXT_ARRAY_CONTAINS, Boolean.class,
+                                        root.get("cuisines"), cb.literal(key))))
+      .toArray(Predicate[]::new);
+  predicates.add(cb.or(anyOf));
+
+In SQL terms that is:
+
+  (cuisines @> '{thai}' OR cuisines @> '{greek}')
+      AND vegan = true AND ...
+
+The cuisine part is an OR (any of the picked cuisines). It is ANDed with the
+diet, time and rating filters. text_array_contains is the custom Hibernate
+function from the earlier bug fix (see "BUG FIX — Cuisine filter returned a
+server error" above). It keeps the query on the GIN index.
+
+A region plus an explicit cuisine together form a union.
+?region=asia&cuisine=italian gives every Asian recipe plus the Italian ones.
+That is what a person ticking both would expect.
+
+How it was tested
+-----------------
+  - Service tests check that the empty-set short-circuit skips the
+    repository.
+  - Controller tests check that repeated parameters bind and that an
+    unknown-only request returns zero results.
+
+
+================================================================================
+ REDESIGN TASK 3 — GET /api/recipes/cuisines (backend)
+ Files: repository/RecipeRepository.java (countCuisines),
+        model/projection/CuisineCount.java, model/displayDTO/CuisineInfoDto.java,
+        service/CuisineService.java, controller/CuisineController.java
+================================================================================
+
+What was done
+-------------
+A new public endpoint returns every catalogue cuisine with how many recipes
+use it:
+
+  [{"key":"italian","label":"Italian","region":"europe",
+    "mediterranean":true,"count":12}, ...]
+
+How it works
+------------
+Counting uses one native SQL query:
+
+  select c as key, count(*) as count
+  from recipes, unnest(cuisines) c
+  group by c
+
+unnest() turns each recipe's array into one row per cuisine, so a simple
+GROUP BY counts them. CuisineCount is a Spring Data "projection": an
+interface with getKey() and getCount() that Spring fills from the result
+columns.
+
+CuisineService then walks the WHOLE catalogue and gives each cuisine its
+count, or 0 if no recipe uses it. It sorts by count (highest first), then by
+label. The frontend relies on that order: the "popular ten" is simply the
+first ten entries with a count above zero.
+
+Routing detail
+--------------
+/api/recipes/{id} already existed. The new mapping is the literal path
+/api/recipes/cuisines, and Spring prefers a literal path over a {variable}
+one, so "cuisines" is never read as a recipe id. The security config keeps
+the endpoint public, so anonymous visitors can browse. A test covers both.
+
+Live check: on the running backend the endpoint returned 200 with 198
+entries and real counts.
+
+
+================================================================================
+ REDESIGN TASK 4 — Validating cuisines when a recipe is saved (backend)
+ Files: service/RecipeService.java, exception/GlobalExceptionHandler.java
+================================================================================
+
+What was done
+-------------
+Creating or editing a recipe now runs its cuisines through
+catalog.normalizeAndValidate(). The rules:
+
+  - "  Italian " and "ITALIAN" both become "italian", and the duplicate is
+    dropped.
+  - More than 10 cuisines after removing duplicates: rejected.
+  - Any unknown value: rejected with HTTP 400. The response names the bad
+    value, in the same shape as the other validation errors:
+
+      { "detail": "Validation failed",
+        "errors": { "cuisines": "Unknown cuisine: klingon" } }
+
+Order of checks on edit
+-----------------------
+The "are you the owner?" check runs BEFORE cuisine validation. If it ran the
+other way round, a stranger could send bad cuisines to someone else's recipe
+and learn from the error message that the recipe exists and what is
+checked. Owner first means a stranger always gets 403.
+
+How it was tested
+-----------------
+Service tests cover:
+  - normalisation on create,
+  - the 10 cap,
+  - an unknown value on create and on update,
+  - owner-before-validation.
+An exception-handler test checks the 400 body shape.
+
+
+================================================================================
+ REDESIGN TASK 5 — A test against the real database (backend)
+ File: src/test/.../repository/RecipeCuisineQueryDbTest.java
+================================================================================
+
+The frontend tests fake the backend, and the earlier cuisine bug slipped
+through exactly because no test ever ran the real Postgres query. This test
+does.
+
+  @Tag("db")
+  @EnabledIfEnvironmentVariable(named = "SUPABASE_DB_PASSWORD", matches = ".+")
+  @DataJpaTest   (Flyway off, pointed at the real database, read-only)
+
+  - It runs only when the database password is in the environment. On
+    machines without it, the test is skipped rather than failed.
+  - It checks that a multi-cuisine plus vegetarian filter returns only
+    matching recipes.
+  - It checks that the native countCuisines() query works against real
+    data.
+  - It never writes anything.
+
+
+================================================================================
+ REDESIGN TASK 6 — Importer: replace mode and catalogue-only tags (backend)
+ Files: importer/SpoonacularImportProperties.java, SpoonacularImportCleaner.java,
+        SpoonacularRecipeTranslator.java, ImportSummary.java,
+        repository/RecipeRepository.java (deleteAllImported),
+        application.properties (spoonacular.* lines only)
+================================================================================
+
+What was done
+-------------
+  1. The translator now keeps only Spoonacular cuisine tags that exist in
+     our catalogue. Spoonacular's tags are messy, and an off-list tag would
+     otherwise sneak into the database. If none of the tags survive, it
+     falls back to the cuisine that was searched for, so every imported
+     recipe still has a cuisine.
+  2. A new switch, spoonacular.import.replace-existing (default false).
+     When it's on, SpoonacularImportCleaner runs
+       delete from recipes where source = 'spoonacular'
+     inside a transaction before importing. It deletes only imported
+     recipes; recipes written by users are never touched.
+  3. The import list now holds 27 cuisines at 10 recipes each, ready for
+     the rebalance.
+
+The import itself still runs only when started with
+--spoonacular.import.enabled=true, so nothing happens on a normal startup.
+
+Note on the commit: application.properties also had the developer's own
+unrelated, uncommitted edits (Swagger paths). Only the spoonacular.* lines
+were staged, by building a trimmed patch and applying it to the index with
+`git apply --cached`.
+
+
+================================================================================
+ REDESIGN TASK 7 — Golden Hour design foundation (frontend)
+ Files: src/index.css, src/components/ui.tsx, AppShell, RecipeCard,
+        StarDisplay, Pagination, src/test/noEmoji.ts
+================================================================================
+
+The palette
+-----------
+Tailwind v4 reads design tokens from a @theme block in index.css. Every
+--color-xyz there becomes classes like bg-xyz and text-xyz:
+
+  cream       #FBF6EE  page background
+  paper       #FFFDF8  cards, drawer
+  olive       #2F3A2B  main text, primary buttons
+  saffron     #E8A33D  highlights, selected chips
+  terracotta  #C65D3B  accents (large elements only)
+  sand        #EADFCD  borders, dividers
+  muted       #8A8A7A  decorative only (icons)
+
+The old token names (ink, accent, hairline) were kept as aliases pointing
+at the new colours. Pages not yet restyled kept working while the rest of
+the redesign landed, and the aliases can be removed once nothing uses them.
+
+Readability ruling
+------------------
+The spec suggested `muted` for secondary text. Measured against the cream
+background it reaches only 3.25:1 contrast, below the 4.5:1 that the WCAG
+AA accessibility standard needs for small text. So real secondary text uses
+text-olive/70 (olive at 70% opacity, about 4.7:1). `muted` stays for
+decoration only. A reviewer caught one leftover (input placeholders), which
+was fixed. Terracotta isn't used for small text for the same reason.
+
+No emojis, enforced by a test
+-----------------------------
+  expect(root.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
+
+\p{Extended_Pictographic} is the Unicode property behind emoji-style
+symbols. It also matches the star character, so star ratings now draw
+lucide's Star icon (an SVG) instead of a text glyph. Page tests call
+expectNoEmoji(), so an emoji added by accident fails the build.
+
+Shared building blocks
+----------------------
+ui.tsx gained the restyled components that every page reuses:
+  - Button (primary, secondary and ghost variants)
+  - Field and TextInput
+  - SectionHeading
+  - Spinner
+  - Chip (a toggle button with aria-pressed, so screen readers announce
+    "pressed")
+  - Pill (a small label)
+
+
+================================================================================
+ REDESIGN TASK 8 — Restyling every page (frontend)
+ Files: RecipeDetailPage, RatingBox, CommentsSection, ConfirmDialog,
+        RecipeFormPage, profile pages, auth pages; new EmptyState, AuthCard,
+        ProfileHeader
+================================================================================
+
+Every remaining page moved to the new tokens and components:
+  - recipe detail
+  - rating box
+  - comments
+  - confirm dialog
+  - recipe form
+  - profile
+  - sign in / sign up
+
+Three small shared components came out of it, so pages stopped repeating
+the same markup:
+  - EmptyState  the "nothing here yet" panel
+  - AuthCard    the centred card used by the sign-in pages
+  - ProfileHeader
+
+The icon-only remove buttons in the recipe form got real accessible names
+("Remove ingredient 2", "Remove step 3"), because a screen reader user hears
+a bare "button" otherwise.
+
+
+================================================================================
+ REDESIGN TASK 9 — Cuisines API and multi-value URL filters (frontend)
+ Files: src/api/cuisines.ts, src/api/recipes.ts,
+        src/features/browse/filterParams.ts
+================================================================================
+
+What was done
+-------------
+  - getCuisines() calls the new endpoint and is cached under the query key
+    ['cuisines'], so the drawer and the recipe form share one download.
+  - browseRecipes() sends repeated parameters for lists:
+    ?cuisine=thai&cuisine=greek.
+
+The URL is the single source of truth for filters
+-------------------------------------------------
+filterParams.ts converts between the address bar and a typed FilterState
+object:
+
+  readFilters(urlParams)   URL   -> FilterState
+  writeFilters(state)      state -> URL params (also removes `page`, so
+                                    changing filters jumps back to page 1)
+  toApiFilter(state)       state -> what the API call needs
+  countActive(state)       number shown on the "Filters (3)" button
+
+Keeping filters in the URL means a filtered page can be bookmarked or
+shared, and the browser's Back button undoes a filter change.
+
+Defensive parsing
+-----------------
+People can type anything into a URL, so the readers validate:
+
+  readMinutes: whole number 1-600, otherwise ignored
+  readRating:  1-5 in 0.5 steps (Number.isInteger(n * 2)), otherwise
+               ignored
+  readList:    drops empty values and duplicates via new Set(...)
+
+
+================================================================================
+ REDESIGN TASK 11 — Searchable cuisine picker in the recipe form (frontend)
+ Files: src/features/authoring/CuisinePicker.tsx, RecipeFormPage.tsx
+================================================================================
+
+What was done
+-------------
+The free-text cuisine field became a "combobox": a text box that filters a
+dropdown of catalogue cuisines as you type. Picked cuisines show as chips
+with a remove button ("Remove Italian"). The limit is 10, matching the
+server.
+
+How it works
+------------
+It follows the WAI-ARIA combobox pattern, the standard recipe that screen
+readers understand:
+  - The input has role="combobox", aria-expanded and
+    aria-activedescendant (which option is highlighted).
+  - The list has role="listbox", and each item has role="option".
+  - Arrow keys move the highlight, Enter picks, and Escape closes.
+  - The highlighted option is scrolled into view (scrollIntoView with
+    block: 'nearest'), so arrowing through a long list never hides it. A
+    reviewer caught this missing.
+  - At 10 picks the input disables and the list closes. Removing a chip
+    re-enables it and puts focus back.
+
+It plugs into react-hook-form with a <Controller>, which is how a custom
+widget that isn't a plain <input> joins the form's state and validation.
+If the server rejects a value, the 400 error from Task 4 is shown under
+the picker.
+
+
+================================================================================
+ REDESIGN TASK 10 — The filter drawer (frontend)
+ Files: src/features/browse/FilterDrawer.tsx, CuisineAZ.tsx,
+        ActiveFilterChips.tsx, regions.ts, BrowsePage.tsx
+        (FilterBar.tsx deleted)
+================================================================================
+
+What the user sees
+------------------
+A "Filters" button opens a panel. It slides in from the right on wide
+screens and rises from the bottom on phones. It contains:
+  - Region chips: Mediterranean, Europe, Asia, Americas, Africa,
+    Middle East, Oceania.
+  - The 10 most-used cuisines, plus a "Browse all cuisines A-Z" link to a
+    second view with a search box and letter groups. Only cuisines that
+    have at least one recipe are listed there.
+  - Dish type: Vegan, Vegetarian, Gluten free, Dairy free.
+  - Max time (minutes): a number you type, with 15/30/60 quick picks.
+  - Min rating: a number you type.
+  - A "Show N recipes" button that previews how many results the current
+    choices give before you apply them.
+Applied filters also appear as removable chips above the grid.
+
+How it works — the draft
+------------------------
+The drawer is a Radix Dialog. Radix handles focus trapping, Escape,
+clicking outside, and the screen-reader dialog role. Inside, the edits live
+in a local "draft", not in the URL:
+
+  function DrawerPanel({ applied, onApply }) {
+    const [draft, setDraft] = useState<FilterState>(applied);
+    ...
+
+DrawerPanel mounts fresh every time the drawer opens, so the draft always
+starts as a copy of the applied filters. Closing with X, Escape or a click
+outside throws the draft away, and the URL never changes. Only "Show N
+recipes" calls onApply, which writes the URL. That is Review Focus item 3,
+and a test ticks Greek, presses Escape, reopens, and checks that Greek is
+unticked.
+
+How it works — the live count
+-----------------------------
+  const countFor = useDebounced(draft, 300);
+  const count = useQuery({
+    queryKey: ['recipeCount', countFor],
+    queryFn: () => browseRecipes(toApiFilter(countFor), 0, 1),
+  });
+
+  - The count asks the normal browse endpoint for a page of size 1 and
+    reads totalElements, so no new backend endpoint was needed.
+  - useDebounced waits 300 ms after the last change, so typing "45" sends
+    one request instead of two.
+  - Until the debounced value catches up with the draft, the button reads
+    "Show recipes" rather than a stale number.
+  - The label is grammatical: "Show 1 recipe", "Show 7 recipes".
+
+Typed inputs that can't break anything
+--------------------------------------
+Max time and min rating are free number fields. Invalid input (900
+minutes, rating 7, or the browser-rejected "1e") shows an alert hint
+under the field. It is also left out of the filter instead of being sent,
+using the same readMinutes and readRating validators from Task 9.
+
+Graceful failure
+----------------
+If the cuisines request fails, the drawer shows "Couldn't load cuisines"
+but the diet, time and rating filters still work. A test covers that.
+
+A bug fixed on the way
+----------------------
+The old grid class was written as `lg:grid-cols-4${...}` with no space.
+Tailwind finds classes by scanning the source text, so it never saw
+lg:grid-cols-4 and the 4-column layout never applied. The rewrite spells
+the classes out in full.
+
+How it was tested
+-----------------
+The browse tests were rewritten (27 tests). They cover:
+  - the draft being discarded on close,
+  - the live count label,
+  - the region parameter,
+  - A-Z search and selection,
+  - invalid typed time being excluded,
+  - removing an active-filter chip,
+  - the cuisines-failure fallback,
+  - no emojis with the drawer open.
+
+
+================================================================================
+ REDESIGN — VERIFICATION
+================================================================================
+
+  - Backend: 101/101 targeted tests pass, including the real-database
+    RecipeCuisineQueryDbTest.
+  - Frontend: 71/71 tests pass (vitest), and `npm run build` is clean.
+  - Live checks on the running backend:
+      /api/recipes/cuisines -> 200 with real counts
+      a multi-cuisine plus region filter -> 200
+      ?cuisine=lol -> 0 results
+  - A final whole-branch code review comes next, before merging to main.
