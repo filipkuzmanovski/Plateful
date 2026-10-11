@@ -32,7 +32,7 @@ export default function SignupPage() {
     >
       {confirmEmail ? (
         <p role="status" className="flex items-start gap-3 rounded-2xl bg-saffron/15 px-4 py-3.5 text-sm text-olive">
-          <MailCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-[#7a4f16]" />
+          <MailCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-saffron-deep" />
           Check your email to confirm your account, then sign in.
         </p>
       ) : (

@@ -44,7 +44,7 @@ export function Field({
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-saffron focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+      className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
       {...props}
     />
   );
@@ -72,10 +72,10 @@ const chipTones = {
     on: 'border-olive bg-olive text-cream shadow-button',
     off: 'border-sand bg-paper text-olive hover:border-olive/40 hover:bg-cream',
   },
-  /* Regions: a warm saffron wash, deep terracotta when on (cream on #9c4329 is about 6:1). */
+  /* Regions: a warm saffron wash, deep terracotta when on (cream on terracotta-deep is about 6:1). */
   saffron: {
-    on: 'border-[#9c4329] bg-[#9c4329] font-semibold text-cream shadow-button',
-    off: 'border-transparent bg-saffron/15 font-semibold text-[#7a4f16] hover:bg-saffron/25',
+    on: 'border-terracotta-deep bg-terracotta-deep font-semibold text-cream shadow-button',
+    off: 'border-transparent bg-saffron/15 font-semibold text-saffron-deep hover:bg-saffron/25',
   },
 } as const;
 
@@ -121,9 +121,9 @@ export function Chip({
 
 const pillTones = {
   sand: 'bg-sand/70 text-olive',
-  saffron: 'bg-saffron/15 text-[#7a4f16]',
+  saffron: 'bg-saffron/15 text-saffron-deep',
   olive: 'bg-olive/10 text-olive',
-  terracotta: 'bg-terracotta/10 text-[#9c4329]',
+  terracotta: 'bg-terracotta/10 text-terracotta-deep',
 } as const;
 
 /** A small, non-interactive label (cuisine tag, macro, badge). */

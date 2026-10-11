@@ -16,16 +16,12 @@
   --color-terracotta: #c65d3b;
   --color-sand: #eadfcd;
   --color-muted: #8a8a7a;
+  /* Deep tones for text and borders on washes: terracotta-deep about 5.6:1, saffron-deep about 6.3:1 on their tints. */
+  --color-terracotta-deep: #9c4329;
+  --color-saffron-deep: #7a4f16;
+  --color-sand-deep: #b8a586;
   /* Semantic: destructive actions. A warm brick that sits in the palette and passes AA on cream. */
   --color-danger: #a63d2a;
-
-  /*
-   * Deprecated aliases for the old "Fresh Editorial" tokens, so pages not yet restyled
-   * (Task 8) keep rendering in the new palette. Remove once nothing uses them.
-   */
-  --color-ink: var(--color-olive);
-  --color-accent: var(--color-terracotta);
-  --color-hairline: var(--color-sand);
 
   /* Soft, olive-tinted depth */
   --shadow-card: 0 1px 2px rgb(47 58 43 / 0.05), 0 4px 16px -4px rgb(47 58 43 / 0.1);
@@ -117,9 +113,9 @@
     color: var(--color-olive);
   }
 
-  /* One consistent saffron focus ring for keyboard users. */
+  /* One consistent olive focus ring for keyboard users (about 11:1 on cream; saffron was about 2:1, below WCAG 1.4.11). */
   :focus-visible {
-    outline: 2px solid var(--color-saffron);
+    outline: 2px solid var(--color-olive);
     outline-offset: 2px;
   }
 

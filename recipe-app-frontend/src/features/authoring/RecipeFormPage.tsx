@@ -70,7 +70,7 @@ function FormSection({ title, children }: { title: string; children: ReactNode }
 
 /** A checkbox dressed as a toggle chip; the native input stays in the tab order (sr-only). */
 const checkChip =
-  'group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-sand bg-paper px-3.5 py-1.5 text-sm font-medium text-olive transition select-none hover:border-olive/40 hover:bg-cream has-checked:border-olive has-checked:bg-olive has-checked:text-cream has-checked:shadow-button has-checked:hover:border-olive has-checked:hover:bg-olive/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-saffron';
+  'group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-sand bg-paper px-3.5 py-1.5 text-sm font-medium text-olive transition select-none hover:border-olive/40 hover:bg-cream has-checked:border-olive has-checked:bg-olive has-checked:text-cream has-checked:shadow-button has-checked:hover:border-olive has-checked:hover:bg-olive/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-olive';
 const inlineError = 'mt-1 block text-xs font-medium text-danger';
 const removeButton = '!size-10 shrink-0 !p-0 !text-olive/70 hover:!bg-danger/10 hover:!text-danger';
 
@@ -278,7 +278,7 @@ export default function RecipeFormPage() {
           <Field label="Free-text instructions" error={errors.instructions?.message}>
             <textarea
               rows={5}
-              className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm leading-relaxed text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-saffron focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+              className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm leading-relaxed text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
               {...register('instructions')}
             />
           </Field>

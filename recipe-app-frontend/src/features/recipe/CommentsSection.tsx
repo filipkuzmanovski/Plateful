@@ -15,7 +15,7 @@ const showError = (e: unknown) =>
   toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
 
 const fieldClass =
-  'min-w-0 flex-1 rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-saffron focus:ring-4 focus:ring-saffron/20 focus:outline-none';
+  'min-w-0 flex-1 rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none';
 
 /** A small round-ended text action under a comment (Edit, Delete). */
 const actionClass =
@@ -69,11 +69,11 @@ function ReactionButtons({ comment }: { comment: CommentDisplay }) {
         aria-label={label}
         disabled={disabled}
         onClick={() => (active ? unreact.mutate() : react.mutate(isLike))}
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors disabled:pointer-events-none ${
+        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
           active
             ? isLike
-              ? 'bg-saffron/15 text-[#7a4f16]'
-              : 'bg-terracotta/10 text-[#9c4329]'
+              ? 'bg-saffron/15 text-saffron-deep'
+              : 'bg-terracotta/10 text-terracotta-deep'
             : 'text-olive/70 hover:bg-sand/60 hover:text-olive'
         }`}
       >

@@ -104,7 +104,7 @@ export function CuisineAZ({
               <section key={letter} id={groupId(letter)} aria-labelledby={`${groupId(letter)}-h`} className="scroll-mt-16 not-first:mt-4">
                 <h4
                   id={`${groupId(letter)}-h`}
-                  className="mb-1 font-serif text-lg leading-none font-semibold text-[#9c4329]"
+                  className="mb-1 font-serif text-lg leading-none font-semibold text-terracotta-deep"
                 >
                   {letter}
                 </h4>
@@ -125,7 +125,7 @@ export function CuisineAZ({
                               checked={checked}
                               onChange={() => onToggle(c.key)}
                               aria-describedby={`${inputId}-n`}
-                              className="peer size-full cursor-pointer appearance-none rounded-[5px] border-[1.5px] border-[#b8a586] bg-paper transition checked:border-olive checked:bg-olive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
+                              className="peer size-full cursor-pointer appearance-none rounded-[5px] border-[1.5px] border-sand-deep bg-paper transition checked:border-olive checked:bg-olive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
                             />
                             <Check
                               aria-hidden="true"
@@ -157,7 +157,7 @@ export function CuisineAZ({
                     <button
                       type="button"
                       onClick={() => jumpTo(letter)}
-                      className="flex h-[1.15rem] w-6 items-center justify-center rounded text-[11px] font-bold text-olive transition hover:bg-sand/70 hover:text-[#9c4329] focus-visible:outline-olive"
+                      className="flex h-[1.15rem] w-6 items-center justify-center rounded text-[11px] font-bold text-olive transition hover:bg-sand/70 hover:text-terracotta-deep focus-visible:outline-olive"
                     >
                       {letter}
                     </button>

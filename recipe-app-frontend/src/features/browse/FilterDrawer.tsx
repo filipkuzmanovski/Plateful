@@ -243,7 +243,7 @@ function DrawerPanel({ applied, onApply }: { applied: FilterState; onApply: (s: 
                       ref={azLinkRef}
                       type="button"
                       onClick={() => setView('az')}
-                      className="group mt-3.5 -ml-1 inline-flex items-center gap-1 rounded-full px-1 py-1 text-sm font-semibold text-[#9c4329] transition focus-visible:outline-olive"
+                      className="group mt-3.5 -ml-1 inline-flex items-center gap-1 rounded-full px-1 py-1 text-sm font-semibold text-terracotta-deep transition focus-visible:outline-olive"
                     >
                       All cuisines A–Z ({withRecipes.length})
                       <ChevronRight aria-hidden="true" className="size-4 transition-transform group-hover:translate-x-0.5" strokeWidth={2.25} />
