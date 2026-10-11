@@ -1751,3 +1751,59 @@ The browse tests were rewritten (27 tests). They cover:
       a multi-cuisine plus region filter -> 200
       ?cuisine=lol -> 0 results
   - A final whole-branch code review comes next, before merging to main.
+
+
+================================================================================
+ POLISH — Pointer cursor on every clickable control (frontend)
+ Branch: fix/pointer-cursors   File: src/index.css
+================================================================================
+
+Symptom
+-------
+Hovering over many clickable things showed the plain arrow cursor, not the
+pointing hand: the rating stars, like/dislike, comment edit/delete, the
+filter chips in the drawer, and pagination.
+
+Cause
+-----
+Tailwind v4's CSS reset ("preflight") deliberately changed buttons back to
+the browser default cursor (an arrow). Tailwind v3 had used the hand. Links
+(<a>) were unaffected, which is why cards and nav links still showed the
+hand. Every control above is a real <button>, so they all lost it at once.
+
+Fix
+---
+One rule in the base layer of index.css, the approach Tailwind's own v4
+upgrade guide recommends:
+
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+
+Why one global rule rather than adding cursor-pointer to each button: there
+are about 30 buttons across the app, and any new one would forget it again.
+
+Disabled buttons show the "not allowed" cursor, for example:
+  - like/dislike when you are signed out,
+  - "Previous page" on page 1,
+  - "Clear all" when no filter is set.
+Number inputs keep the text cursor, because you type in them.
+
+Why it doesn't fight existing classes: @layer base has the lowest priority
+in Tailwind. Any utility class on an element, such as cursor-pointer or
+disabled:cursor-not-allowed, still wins over this rule.
+
+How it was checked
+------------------
+  - In the running app, the browser's computed style showed `pointer` on
+    Filters, the pagination buttons, the drawer close button, every region,
+    cuisine and dish-type chip, the 15/30/60 quick picks and "Show N
+    recipes". It showed `not-allowed` on the disabled "Previous page" and
+    "Clear all", and `text` on the number inputs.
+  - Tests: 73/73 still pass, and the build is clean.
