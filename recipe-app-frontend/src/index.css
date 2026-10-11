@@ -113,6 +113,20 @@
     color: var(--color-olive);
   }
 
+  /*
+   * Tailwind v4's reset gives buttons the default arrow cursor. Restore the pointer for every
+   * clickable control (stars, reactions, edit/delete, filter chips, menus); disabled ones say so.
+   */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+
   /* One consistent olive focus ring for keyboard users (about 11:1 on cream; saffron was about 2:1, below WCAG 1.4.11). */
   :focus-visible {
     outline: 2px solid var(--color-olive);
