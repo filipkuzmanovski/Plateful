@@ -80,7 +80,8 @@ export function CuisinePicker({
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setOpen(true);
-      setActive(Math.min(activeIndex + 1, options.length - 1));
+      // A closed list opens on the first option; an open one moves down.
+      setActive(showList ? Math.min(activeIndex + 1, options.length - 1) : 0);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActive(Math.max(activeIndex - 1, 0));

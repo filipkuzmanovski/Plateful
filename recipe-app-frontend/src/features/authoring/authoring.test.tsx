@@ -231,6 +231,19 @@ test('picker: keyboard selects with Enter, and a chip can be removed', async () 
   expect(screen.queryByRole('button', { name: 'Remove Greek' })).not.toBeInTheDocument();
 });
 
+test('picker: ArrowDown on a closed list opens it on the first option, and Enter adds that one', async () => {
+  stubMe();
+  renderApp('/recipes/new');
+  const input = await cuisineInput();
+  input.focus(); // as if tabbed into the field: focus alone leaves the list closed
+  expect(screen.queryByRole('option', { name: 'Italian' })).not.toBeInTheDocument();
+  await userEvent.keyboard('{ArrowDown}');
+  expect(screen.getByRole('option', { name: 'Italian' })).toHaveAttribute('aria-selected', 'true');
+  await userEvent.keyboard('{Enter}');
+  expect(screen.getByRole('button', { name: 'Remove Italian' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Remove Macedonian' })).not.toBeInTheDocument();
+});
+
 test('pickerCapsAtTen: the input is disabled after ten selections', async () => {
   stubMe();
   const many = Array.from({ length: 12 }, (_, i) => ({
