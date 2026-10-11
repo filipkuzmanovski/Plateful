@@ -25,7 +25,8 @@ import java.util.Set;
  * <p>
  * Two criteria deserve extra explanation:
  * <p>
- * CUISINE — (any-of over several keys, one call per key) recipes.cuisines is a Postgres text[] column, which standard
+ * CUISINE — any-of: one text_array_contains(cuisines, key) call per resolved key, ORed
+ * together. recipes.cuisines is a Postgres text[] column, which standard
  * JPQL/Criteria can't query. We call our own text_array_contains() function
  * (registered by TextArrayFunctions) through cb.function(). It renders
  * {@code cuisines @> cast(array[:cuisine] as text[])}, which can use the GIN
