@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { deleteRecipe, getRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
+import { deletePhotos, pathFromPublicUrl } from '@/api/photos';
 import { useAuth } from '@/auth/AuthProvider';
 import { StarDisplay } from '@/components/StarDisplay';
 import { Button, EmptyState, Pill, SectionHeading, Spinner } from '@/components/ui';
@@ -68,6 +69,9 @@ export default function RecipeDetailPage() {
   const removeRecipe = useMutation({
     mutationFn: (recipeId: string) => deleteRecipe(recipeId),
     onSuccess: (_data, recipeId) => {
+      // The row is gone, so its files are orphans; the helper never throws.
+      const paths = (query.data?.photos ?? []).map(pathFromPublicUrl).filter((p): p is string => p !== null);
+      if (paths.length > 0) void deletePhotos(paths);
       navigate('/'); // leave first, so the removed query isn't refetched by this page
       queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
       void queryClient.invalidateQueries({ queryKey: ['recipes'] });

@@ -5,8 +5,18 @@ import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
+import { deletePhotos, publicPhotoUrl, uploadPhoto } from '@/api/photos';
+import { prepareImage } from '@/lib/resizeImage';
 
 const BASE = 'http://localhost:8080';
+
+// Storage is never reached: uploads and deletes are mocked, the URL helpers stay real.
+vi.mock('@/api/photos', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/photos')>()),
+  uploadPhoto: vi.fn(),
+  deletePhotos: vi.fn(async () => {}),
+}));
+vi.mock('@/lib/resizeImage', () => ({ prepareImage: vi.fn() }));
 
 vi.mock('@/auth/supabaseClient', () => ({
   supabase: {
@@ -27,6 +37,11 @@ const cuisineCatalogue = [
 ];
 
 beforeEach(() => {
+  vi.mocked(deletePhotos).mockReset();
+  vi.mocked(deletePhotos).mockResolvedValue(undefined);
+  vi.mocked(uploadPhoto).mockReset();
+  vi.mocked(prepareImage).mockReset();
+  vi.mocked(prepareImage).mockResolvedValue({ blob: new Blob(['x'], { type: 'image/webp' }), ext: 'webp' });
   server.use(http.get(`${BASE}/api/recipes/cuisines`, () => HttpResponse.json(cuisineCatalogue)));
 });
 
@@ -335,4 +350,135 @@ test('picker: the highlighted option is scrolled into view as the user arrows do
   } finally {
     delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   }
+});
+
+const photoTiles = () => screen.queryAllByRole('img', { name: /^Photo \d+$/ });
+
+test('noSourceOrImageUrlFields: the form has no Source name, Source URL or Image URL inputs', async () => {
+  stubMe();
+  renderApp('/recipes/new');
+  await screen.findByLabelText(/title/i);
+  expect(screen.queryByLabelText(/source name/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/source url/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/image url/i)).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Add photos')).toBeInTheDocument();
+});
+
+test('createBodyCarriesPhotosNotSourceFields: an uploaded photo is POSTed in photos, no source or image keys', async () => {
+  stubMe();
+  vi.mocked(uploadPhoto).mockResolvedValue('u-1/new.webp');
+  let posted: any = null;
+  const created = recipeFixture({ id: 'r-new', title: 'X', user: profileFixture });
+  server.use(
+    http.post(`${BASE}/api/recipes`, async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json(created, { status: 201 });
+    }),
+    http.get(`${BASE}/api/recipes/r-new`, () => HttpResponse.json(created)),
+    http.get(`${BASE}/api/recipes/r-new/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-new/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+  );
+  renderApp('/recipes/new');
+  await fillRequired();
+  await userEvent.setup({ applyAccept: false }).upload(
+    screen.getByLabelText('Add photos'),
+    new File(['x'], 'a.jpg', { type: 'image/jpeg' }),
+  );
+  await waitFor(() => expect(photoTiles()).toHaveLength(1));
+  expect(uploadPhoto).toHaveBeenCalledWith('u-1', expect.any(Blob), 'webp'); // folder is the profile id
+  await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
+  expect(await screen.findByRole('heading', { name: 'X' })).toBeInTheDocument();
+  expect(posted.photos).toEqual(['u-1/new.webp']);
+  for (const key of ['image', 'sourceName', 'sourceUrl']) expect(posted).not.toHaveProperty(key);
+});
+
+function stubEditWithPhotos() {
+  stubMe();
+  let current = recipeFixture({
+    user: profileFixture,
+    photos: [publicPhotoUrl('u-1/a.webp'), 'https://img.spoonacular.com/x.jpg'],
+  });
+  const log: string[] = [];
+  const state = { putBody: null as any, log };
+  server.use(
+    http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json(current)),
+    http.put(`${BASE}/api/recipes/r-1`, async ({ request }) => {
+      state.putBody = await request.json();
+      log.push('put');
+      current = { ...current, photos: (state.putBody.photos as string[]).map(publicPhotoUrl) };
+      return HttpResponse.json(current);
+    }),
+    http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-1/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+  );
+  vi.mocked(deletePhotos).mockImplementation(async () => { log.push('delete'); });
+  return state;
+}
+
+test('editPrefillsBucketPhotosOnly: only bucket photos become tiles', async () => {
+  stubEditWithPhotos();
+  renderApp('/recipes/r-1/edit');
+  await waitFor(() => expect(photoTiles()).toHaveLength(1));
+  expect(photoTiles()[0]).toHaveAttribute('src', publicPhotoUrl('u-1/a.webp'));
+});
+
+test('removingPhotoOnEditDeletesFileAfterSave: the file is deleted only after the PUT resolves', async () => {
+  const state = stubEditWithPhotos();
+  renderApp('/recipes/r-1/edit');
+  await userEvent.click(await screen.findByRole('button', { name: 'Remove photo 1' }));
+  expect(deletePhotos).not.toHaveBeenCalled(); // nothing is deleted before saving
+  await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
+  await waitFor(() => expect(deletePhotos).toHaveBeenCalledWith(['u-1/a.webp']));
+  expect(state.putBody.photos).toEqual([]);
+  expect(state.log).toEqual(['put', 'delete']);
+});
+
+test('keepingPhotosOnEditDeletesNothing', async () => {
+  const state = stubEditWithPhotos();
+  renderApp('/recipes/r-1/edit');
+  await waitFor(() => expect(photoTiles()).toHaveLength(1));
+  await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
+  await waitFor(() => expect(state.log).toContain('put'));
+  expect(state.putBody.photos).toEqual(['u-1/a.webp']);
+  expect(deletePhotos).not.toHaveBeenCalled();
+});
+
+test('saveDisabledWhileUploading: Save is disabled with a hint until the upload finishes', async () => {
+  stubMe();
+  let finish!: (p: string) => void;
+  vi.mocked(uploadPhoto).mockReturnValue(new Promise<string>((r) => (finish = r)));
+  renderApp('/recipes/new');
+  const save = await screen.findByRole('button', { name: /^save recipe$/i });
+  expect(save).toBeEnabled();
+  expect(screen.queryByText('Waiting for photos to finish uploading')).not.toBeInTheDocument();
+  await userEvent.setup({ applyAccept: false }).upload(
+    screen.getByLabelText('Add photos'),
+    new File(['x'], 'a.jpg', { type: 'image/jpeg' }),
+  );
+  await waitFor(() => expect(save).toBeDisabled());
+  expect(screen.getByText('Waiting for photos to finish uploading')).toBeInTheDocument();
+  finish('u-1/new.webp');
+  await waitFor(() => expect(save).toBeEnabled());
+  expect(screen.queryByText('Waiting for photos to finish uploading')).not.toBeInTheDocument();
+  expectNoEmoji();
+});
+
+test('serverPhotosErrorShowsUnderThePicker', async () => {
+  stubMe();
+  server.use(
+    http.post(`${BASE}/api/recipes`, () =>
+      HttpResponse.json(
+        { status: 400, detail: 'Validation failed', errors: { photos: 'Invalid photo path' } },
+        { status: 400 },
+      ),
+    ),
+  );
+  renderApp('/recipes/new');
+  await fillRequired();
+  await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
+  expect(await screen.findByText('Invalid photo path')).toBeInTheDocument();
 });

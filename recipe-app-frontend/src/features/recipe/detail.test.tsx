@@ -5,8 +5,14 @@ import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
+import { deletePhotos, publicPhotoUrl } from '@/api/photos';
 
 const BASE = 'http://localhost:8080';
+
+vi.mock('@/api/photos', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/photos')>()),
+  deletePhotos: vi.fn(async () => {}),
+}));
 
 vi.mock('@/auth/supabaseClient', () => ({
   supabase: {
@@ -107,4 +113,55 @@ test('an imported recipe without a source URL shows its source as plain text', a
   renderApp('/recipes/r-1');
   expect(await screen.findByText(/from pink when/i)).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: /from pink when/i })).not.toBeInTheDocument();
+});
+
+test('deletingRecipeDeletesItsPhotos: after the delete resolves, the bucket photos are removed from storage', async () => {
+  vi.mocked(deletePhotos).mockClear();
+  const log: string[] = [];
+  vi.mocked(deletePhotos).mockImplementation(async () => { log.push('photos'); });
+  server.use(
+    http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profileFixture)),
+    http.get(`${BASE}/api/recipes/r-1`, () =>
+      HttpResponse.json(
+        recipeFixture({
+          user: profileFixture,
+          photos: [publicPhotoUrl('u-1/a.webp'), 'https://img.spoonacular.com/x.jpg', publicPhotoUrl('u-1/b.png')],
+        }),
+      ),
+    ),
+    http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-1/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+    http.delete(`${BASE}/api/recipes/r-1`, () => {
+      log.push('api');
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))),
+  );
+  renderApp('/recipes/r-1');
+  await userEvent.click(await screen.findByRole('button', { name: /delete recipe/i }));
+  await userEvent.click(await screen.findByRole('button', { name: /confirm/i }));
+  await vi.waitFor(() => expect(deletePhotos).toHaveBeenCalledWith(['u-1/a.webp', 'u-1/b.png']));
+  expect(log).toEqual(['api', 'photos']);
+});
+
+test('a failed recipe delete leaves its photos alone', async () => {
+  vi.mocked(deletePhotos).mockClear();
+  server.use(
+    http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profileFixture)),
+    http.get(`${BASE}/api/recipes/r-1`, () =>
+      HttpResponse.json(recipeFixture({ user: profileFixture, photos: [publicPhotoUrl('u-1/a.webp')] })),
+    ),
+    http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-1/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+    http.delete(`${BASE}/api/recipes/r-1`, () => HttpResponse.json({ status: 500, detail: 'boom' }, { status: 500 })),
+  );
+  renderApp('/recipes/r-1');
+  await userEvent.click(await screen.findByRole('button', { name: /delete recipe/i }));
+  await userEvent.click(await screen.findByRole('button', { name: /confirm/i }));
+  expect(await screen.findByText('boom')).toBeInTheDocument();
+  expect(deletePhotos).not.toHaveBeenCalled();
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
@@ -10,7 +10,9 @@ import { createRecipe, getRecipe, updateRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { Button, EmptyState, Field, Spinner, TextInput } from '@/components/ui';
+import { deletePhotos, pathFromPublicUrl } from '@/api/photos';
 import { CuisinePicker } from './CuisinePicker';
+import { PhotoPicker } from './PhotoPicker';
 import type { RecipeCreate } from '@/lib/types';
 
 // Mirrors the backend's @PositiveOrZero Integer; empty = not set.
@@ -18,13 +20,11 @@ const wholeNumber = z.string().regex(/^\d*$/, 'Whole number ≥ 0');
 
 const schema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(255),
-  image: z.string().max(2048),
   servings: wholeNumber,
   readyInMinutes: wholeNumber,
   cookingMinutes: wholeNumber,
   preparationMinutes: wholeNumber,
-  sourceName: z.string().max(255),
-  sourceUrl: z.string().max(2048),
+  photos: z.array(z.string()).max(6),
   instructions: z.string().max(50000),
   steps: z.array(z.object({ text: z.string().min(1, 'Step text required').max(5000) })).max(100),
   dairyFree: z.boolean(),
@@ -45,8 +45,8 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const emptyValues: FormValues = {
-  title: '', image: '', servings: '', readyInMinutes: '', cookingMinutes: '',
-  preparationMinutes: '', sourceName: '', sourceUrl: '', instructions: '',
+  title: '', servings: '', readyInMinutes: '', cookingMinutes: '',
+  preparationMinutes: '', photos: [], instructions: '',
   steps: [], dairyFree: false, glutenFree: false, vegan: false, vegetarian: false,
   cuisines: [], ingredients: [{ ingredientName: '', originalText: '' }],
 };
@@ -76,6 +76,9 @@ const removeButton = '!size-10 shrink-0 !p-0 !text-olive/70 hover:!bg-danger/10 
 
 const toInt = (s: string) => (s.trim() === '' ? null : Number(s));
 const toNull = (s: string) => (s.trim() === '' ? null : s);
+const isPath = (p: string | null): p is string => p !== null;
+/** Storage paths of a recipe's photos; imported (non-bucket) URLs have none and are dropped. */
+const bucketPaths = (urls: string[]) => urls.map(pathFromPublicUrl).filter(isPath);
 
 function toDto(v: FormValues): RecipeCreate {
   return {
@@ -84,7 +87,7 @@ function toDto(v: FormValues): RecipeCreate {
     readyInMinutes: toInt(v.readyInMinutes),
     cookingMinutes: toInt(v.cookingMinutes),
     preparationMinutes: toInt(v.preparationMinutes),
-    photos: [], // temporary: Task 6 wires the photo collage
+    photos: v.photos,
     instructions: toNull(v.instructions),
     instructionsSteps: v.steps.map((s, i) => ({ number: i + 1, step: s.text, ingredients: [], equipment: [] })),
     dairyFree: v.dairyFree, glutenFree: v.glutenFree, vegan: v.vegan, vegetarian: v.vegetarian,
@@ -99,6 +102,8 @@ export default function RecipeFormPage() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const hydratedFor = useRef<string | null>(null); // recipe id the form was last filled from
+  const initialPaths = useRef<string[]>([]); // bucket photos the recipe had when the form was filled
+  const [photosBusy, setPhotosBusy] = useState(false);
 
   const existing = useQuery({
     queryKey: ['recipe', id],
@@ -107,20 +112,20 @@ export default function RecipeFormPage() {
   });
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: emptyValues });
-  const { register, handleSubmit, control, reset, setError, watch, formState: { errors, isSubmitting } } = form;
+  const { register, handleSubmit, control, reset, setError, formState: { errors, isSubmitting } } = form;
   const ingredients = useFieldArray({ control, name: 'ingredients' });
   const steps = useFieldArray({ control, name: 'steps' });
-  const imageUrl = watch('image');
 
   useEffect(() => {
     if (existing.data && hydratedFor.current !== existing.data.id) {
       hydratedFor.current = existing.data.id;
       const r = existing.data;
+      initialPaths.current = bucketPaths(r.photos);
       reset({
-        title: r.title, image: r.image ?? '', servings: r.servings?.toString() ?? '',
+        title: r.title, servings: r.servings?.toString() ?? '',
         readyInMinutes: r.readyInMinutes?.toString() ?? '', cookingMinutes: r.cookingMinutes?.toString() ?? '',
-        preparationMinutes: r.preparationMinutes?.toString() ?? '', sourceName: r.sourceName ?? '',
-        sourceUrl: r.sourceUrl ?? '', instructions: r.instructions ?? '',
+        preparationMinutes: r.preparationMinutes?.toString() ?? '',
+        photos: initialPaths.current, instructions: r.instructions ?? '',
         steps: r.instructionsSteps.map((s) => ({ text: s.step })),
         dairyFree: r.dairyFree, glutenFree: r.glutenFree, vegan: r.vegan, vegetarian: r.vegetarian,
         cuisines: r.cuisines,
@@ -139,6 +144,9 @@ export default function RecipeFormPage() {
       queryClient.setQueryData(['recipe', saved.id], saved);
       void queryClient.invalidateQueries({ queryKey: ['recipes'] });
       void queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
+      // Files the user took off the recipe go only once the update has succeeded; best-effort.
+      const removed = id ? initialPaths.current.filter((p) => !values.photos.includes(p)) : [];
+      if (removed.length > 0) void deletePhotos(removed);
       navigate(`/recipes/${saved.id}`);
     } catch (e) {
       if (e instanceof ApiError && e.errors) {
@@ -183,21 +191,28 @@ export default function RecipeFormPage() {
             <Field label="Title" error={errors.title?.message}>
               <TextInput aria-label="Title" {...register('title')} />
             </Field>
-            <Field label="Image URL" error={errors.image?.message}>
-              <TextInput aria-label="Image URL" {...register('image')} />
-            </Field>
-            {imageUrl && (
-              <img src={imageUrl} alt="Preview" className="aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-sand" />
-            )}
+            <div>
+              <Controller
+                control={control}
+                name="photos"
+                render={({ field }) => (
+                  <PhotoPicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    userId={profile?.id ?? ''}
+                    onBusyChange={setPhotosBusy}
+                  />
+                )}
+              />
+              {errors.photos?.message && (
+                <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{errors.photos.message}</p>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label="Servings" error={errors.servings?.message}><TextInput type="number" min={0} {...register('servings')} /></Field>
               <Field label="Ready (min)" error={errors.readyInMinutes?.message}><TextInput type="number" min={0} {...register('readyInMinutes')} /></Field>
               <Field label="Cook (min)" error={errors.cookingMinutes?.message}><TextInput type="number" min={0} {...register('cookingMinutes')} /></Field>
               <Field label="Prep (min)" error={errors.preparationMinutes?.message}><TextInput type="number" min={0} {...register('preparationMinutes')} /></Field>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Source name" error={errors.sourceName?.message}><TextInput {...register('sourceName')} /></Field>
-              <Field label="Source URL" error={errors.sourceUrl?.message}><TextInput {...register('sourceUrl')} /></Field>
             </div>
           </div>
         </FormSection>
@@ -320,9 +335,10 @@ export default function RecipeFormPage() {
       </div>
 
       {/* Save stays within reach on long forms. */}
-      <div className="sticky bottom-4 z-10 mt-8 flex justify-end">
+      <div className="sticky bottom-4 z-10 mt-8 flex items-center justify-end gap-3">
+        {photosBusy && <p className="rounded-full bg-paper/90 px-3 py-1.5 text-xs text-olive/70 ring-1 ring-sand">Waiting for photos to finish uploading</p>}
         <div className="rounded-full bg-paper/90 p-1.5 shadow-lift ring-1 ring-sand backdrop-blur-md">
-          <Button type="submit" disabled={isSubmitting}>Save recipe</Button>
+          <Button type="submit" disabled={isSubmitting || photosBusy}>Save recipe</Button>
         </div>
       </div>
     </form>
