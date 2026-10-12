@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const upload = vi.fn();
 const remove = vi.fn();
@@ -33,6 +33,22 @@ describe('public URLs', () => {
   });
   it('returns null for URLs outside the bucket', () => {
     expect(pathFromPublicUrl('https://img.spoonacular.com/a.jpg')).toBeNull();
+    expect(pathFromPublicUrl('https://img.spoonacular.com/x.jpg')).toBeNull();
+  });
+  it('parses the path from any host', () => {
+    expect(pathFromPublicUrl('https://other.host/storage/v1/object/public/recipe-photos/u/a.webp')).toBe('u/a.webp');
+  });
+});
+
+describe('public URLs with a trailing-slash base', () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+  it('still round-trips', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://proj.supabase.co//');
+    vi.resetModules();
+    const mod = await import('./photos');
+    const url = mod.publicPhotoUrl('u/x.webp');
+    expect(url).toBe('https://proj.supabase.co/storage/v1/object/public/recipe-photos/u/x.webp');
+    expect(mod.pathFromPublicUrl(url)).toBe('u/x.webp');
   });
 });
 
@@ -58,9 +74,16 @@ describe('deletePhotos', () => {
     expect(remove).not.toHaveBeenCalled();
   });
   it('removes the given paths', async () => {
-    remove.mockResolvedValue({ data: [], error: null });
+    remove.mockResolvedValue({ data: [{ name: 'u/a.webp' }], error: null });
     await deletePhotos(['u/a.webp']);
     expect(remove).toHaveBeenCalledWith(['u/a.webp']);
+  });
+  it('warns when storage removed fewer files than requested', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    remove.mockResolvedValue({ data: [], error: null });
+    await expect(deletePhotos(['u/a.webp', 'u/b.webp'])).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
   it('warns and never throws on failure', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

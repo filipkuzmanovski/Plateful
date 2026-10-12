@@ -6,13 +6,16 @@ export const MAX_PHOTO_BYTES = 5_242_880;
 export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // Same fallback as supabaseClient.ts, so build and parse always round-trip.
-const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? 'http://localhost:54321';
-const PUBLIC_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/`;
+const SUPABASE_URL: string = (import.meta.env.VITE_SUPABASE_URL ?? 'http://localhost:54321').replace(/\/+$/, '');
+const PUBLIC_MARKER = `/storage/v1/object/public/${PHOTO_BUCKET}/`;
 
-export const publicPhotoUrl = (path: string): string => `${PUBLIC_PREFIX}${path}`;
+export const publicPhotoUrl = (path: string): string => `${SUPABASE_URL}${PUBLIC_MARKER}${path}`;
 
+// Host-independent on purpose: the backend builds URLs from its own base-url property, which may
+// differ from VITE_SUPABASE_URL (custom domain, staging). A mismatch must not hide a recipe's photos.
 export function pathFromPublicUrl(url: string): string | null {
-  return url.startsWith(PUBLIC_PREFIX) ? url.slice(PUBLIC_PREFIX.length) : null;
+  const i = url.indexOf(PUBLIC_MARKER);
+  return i === -1 ? null : url.slice(i + PUBLIC_MARKER.length);
 }
 
 export async function uploadPhoto(userId: string, blob: Blob, ext: 'jpg' | 'png' | 'webp'): Promise<string> {
@@ -28,8 +31,12 @@ export async function uploadPhoto(userId: string, blob: Blob, ext: 'jpg' | 'png'
 export async function deletePhotos(paths: string[]): Promise<void> {
   if (paths.length === 0) return;
   try {
-    const { error } = await supabase.storage.from(PHOTO_BUCKET).remove(paths);
+    const { data, error } = await supabase.storage.from(PHOTO_BUCKET).remove(paths);
     if (error) console.warn('Could not delete photos', error.message);
+    // Storage answers { data: [] } with no error when a policy hides the rows (e.g. a missing SELECT policy).
+    else if (!data || data.length !== paths.length) {
+      console.warn(`Storage removed ${data?.length ?? 0} of ${paths.length} photos`);
+    }
   } catch (e) {
     console.warn('Could not delete photos', e);
   }
