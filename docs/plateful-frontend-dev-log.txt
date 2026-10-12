@@ -1807,3 +1807,502 @@ How it was checked
     recipes". It showed `not-allowed` on the disabled "Previous page" and
     "Clear all", and `text` on the number inputs.
   - Tests: 73/73 still pass, and the build is clean.
+
+
+
+################################################################################
+################################################################################
+
+ PART 3 — PHOTO COLLAGE
+ Branch: feature/photo-collage
+ Spec: docs/superpowers/specs/2026-10-12-recipe-photo-collage-design.md
+ Plan: docs/superpowers/plans/2026-10-12-recipe-photo-collage.md
+
+################################################################################
+################################################################################
+
+Why this round happened
+-----------------------
+Two things felt wrong with recipe images:
+  1. A recipe could only have one picture, and it was a pasted web link.
+     People wanted several photos of a dish, shown together as a collage.
+  2. The recipe form asked for "Source name" and "Source URL". Those make
+     sense for recipes imported from elsewhere, but not for a recipe somebody
+     writes on Plateful, so they confused people.
+
+The decisions taken before any code was written:
+  - Photos come from the user's own device. There is no "paste an image
+    link" any more (uploads only).
+  - At most 6 photos per recipe.
+  - The first photo is the cover. It is what the recipe cards and the top of
+    the recipe page show. Reordering the photos changes the cover.
+  - The browser uploads straight to Supabase Storage, not through our
+    backend. The backend never handles image bytes. It only stores and checks
+    the file paths.
+  - The form no longer has Image URL, Source name or Source URL. The server
+    also stops reading those three fields from a request, so an old client
+    that still sends them is harmlessly ignored.
+
+The order of the work: the database and storage rules (Task 1), the backend
+path checking (2), the backend create/update/read (3), the frontend upload
+helpers (4), the picker (5), the recipe form (6), and finally the collage on
+the recipe page (7). Task 8 is this write-up plus the final check.
+
+
+================================================================================
+ PHOTO TASK 1 — Table, storage rules, entity (backend)
+ Files: RecipeAppBackend/src/main/resources/db/migration/V3__recipe_photos.sql
+        docs/supabase/recipe-photos-storage.sql
+        .../model/entities/RecipePhoto.java
+        .../repository/RecipePhotoRepository.java
+================================================================================
+
+What was done
+-------------
+A new table, recipe_photos, holds one row per photo: the recipe it belongs
+to, the storage path, and a position (0 is the cover). A UNIQUE constraint on
+(recipe_id, position) means two photos can never claim the same slot.
+
+The Flyway migration V3 creates this table. The storage bucket is not part of
+Flyway (Flyway only owns the public schema), so it lives in a separate script,
+docs/supabase/recipe-photos-storage.sql, that is run once by hand in the
+Supabase dashboard.
+
+How the storage rules work
+--------------------------
+The script creates a public bucket called recipe-photos (anyone can view the
+images, so no read rule is needed) limited to 5 MB per file and to JPEG, PNG
+and WebP. Then it adds two rules on storage.objects, both for signed-in
+users only:
+
+  with check (
+      bucket_id = 'recipe-photos'
+      and (storage.foldername(name))[1] = auth.uid()::text
+  )
+
+  - A user may upload (insert) a file only if the first folder in the path is
+    their own user id. Path: {userId}/{uuid}.{ext}.
+  - A user may delete a file only from their own folder, by the same test.
+  - There is deliberately no UPDATE rule. Files are never overwritten: a
+    changed photo is a new file with a new random name.
+The script can be run twice safely: the bucket insert does nothing if the
+bucket exists, and each rule is dropped before it is created again.
+
+The entity and the SMALLINT mapping
+-----------------------------------
+The position column is SMALLINT (it only ever holds 0 to 5). But the Java
+field is an Integer, and the backend runs Hibernate with
+ddl-auto=validate, which compares the Java type with the real column type at
+startup. Integer against SMALLINT fails with "found smallint, expected
+integer" (the same trouble V2 had to fix for older columns). The fix is one
+annotation on the field:
+
+  @JdbcTypeCode(SqlTypes.SMALLINT)
+  private Integer position;
+
+It tells Hibernate "this Integer is stored as a smallint", and validation
+passes.
+
+Why there is a bulk delete
+--------------------------
+When a recipe's photos are replaced, the old rows must go before the new ones
+go in. The obvious way, deleting the old entities with a derived delete and
+then saving new ones, breaks. Hibernate flushes inserts before deletes. So
+the new row at position 0 would be written while the old row at position 0
+still exists, and the UNIQUE (recipe_id, position) constraint rejects it.
+The repository therefore uses one explicit JPQL delete query:
+
+  @Modifying(flushAutomatically = true)
+  @Query("delete from RecipePhoto p where p.recipe.id = :recipeId")
+  void deleteAllByRecipeId(UUID recipeId);
+
+It runs immediately as a single SQL DELETE, so the table is empty for that
+recipe before the inserts. (flushAutomatically makes Hibernate write any
+pending changes first. Task 3 deliberately does NOT clear the persistence
+context after the delete: clearing would detach the recipe in the middle of
+an update and break the rest of it.)
+
+The repository also has two read methods: photos of one recipe in position
+order, and photos of many recipes at once (used by the list pages, Task 3).
+
+How it was tested
+-----------------
+RecipePhotoRepositoryDbTest runs against the real database inside a
+transaction that is rolled back, so no rows are left behind. One test does a
+replace (bulk delete, then insert at the same positions) and checks the order
+and that nothing violates the UNIQUE constraint. The other checks that the
+batched read groups photos by recipe. 2 tests.
+
+
+================================================================================
+ PHOTO TASK 2 — Checking photo paths (backend)
+ Files: .../photo/RecipePhotoPaths.java, InvalidPhotoException.java,
+        .../exception/GlobalExceptionHandler.java (handleInvalidPhoto)
+        application.properties (one line)
+================================================================================
+
+What was done
+-------------
+The server never sees the image. It receives a list of storage paths in the
+recipe request, so it has to make sure those paths are legitimate. A user must
+not be able to attach somebody else's file to their recipe, or point a recipe
+at some outside web address.
+
+How it works
+------------
+RecipePhotoPaths.validate(callerId, paths) applies these rules, in order:
+  - null counts as an empty list;
+  - more than 6 paths: "At most 6 photos";
+  - every path must match this pattern, built fresh for the caller:
+
+      ^{callerId}/[0-9a-fA-F-]{36}\.(jpg|png|webp)$
+
+    otherwise "Invalid photo: <path>";
+  - the same path twice: "Duplicate photo: <path>".
+
+Why the pattern blocks what it should:
+  - The caller's own id is the literal start of the pattern, so
+    {someoneElse}/... never matches. That blocks other users' files. This
+    mirrors the storage rule: you can only add to your own folder.
+  - The path must be exactly id, slash, 36 characters of hex and dashes (a
+    UUID's shape), a dot, and one of three extensions, all anchored from start
+    to end. A full web address (https://...) starts with the wrong characters,
+    so it can't match. "../" tricks and extra folders can't match either.
+  - The caller's id is wrapped in Pattern.quote so it is matched as plain text.
+
+A failure becomes an HTTP 400 with the same shape as the cuisine errors:
+detail "Validation failed" and errors = {"photos": "<message>"}.
+
+The public base URL of the bucket comes from one property in
+application.properties (app.storage.photos-public-base-url).
+publicUrl(path) is that base, a slash, and the path. One line moved from the
+next task to this one, because the validation class needs the property and the
+auto-restarting backend would otherwise have failed to start in between.
+
+How it was tested
+-----------------
+RecipePhotoPathsTest (10 tests): good paths kept in order, null, another user's
+folder, "../" tricks, full URLs, wrong extensions, a missing UUID-style name,
+duplicates, seven paths, and the URL builder. A test in
+GlobalExceptionHandlerTest checks the 400 body.
+
+
+================================================================================
+ PHOTO TASK 3 — Photos in create, update and read (backend)
+ Files: .../service/RecipeService.java, .../model/createDTO/RecipeCreateDto.java,
+        .../model/displayDTO/RecipeDisplayDto.java
+================================================================================
+
+What was done
+-------------
+  - RecipeCreateDto lost image, sourceName and sourceUrl, and gained
+    photos (a list of at most 6 paths). Because Jackson ignores unknown JSON
+    properties, a client that still sends the old fields is silently ignored.
+    Nothing a user sends can set those three fields any more.
+  - RecipeDisplayDto gained photos, a list of full public URLs in order.
+
+Create
+------
+The photos are validated first. The recipe's own "image" column is set to the
+cover's URL (or left empty with no photos), the recipe is saved, and one
+recipe_photos row is written per path at positions 0, 1, 2, ... Keeping image
+filled means every older place that reads "image" (recipe cards, imports)
+keeps working without knowing about the new table.
+
+Update
+------
+  1. Owner check first. Somebody else's recipe gives the normal "not yours"
+     answer before any photo is looked at.
+  2. Cuisines and photos are validated. A rejected photo list changes
+     nothing.
+  3. The old rows are removed with the bulk delete, the new rows saved, and
+     image set to the new cover (or cleared).
+
+The legacy linked-image rule: recipes made before this feature, and the
+imported Spoonacular ones, have an image link but no photo rows. If an edit
+arrives with an empty photo list and the recipe has no photo rows, the update
+does nothing to the image. It would otherwise wipe the old picture just because
+the person fixed a typo in the title. Once the person adds a photo, the rows
+and the new cover replace it. In code:
+
+  if (photos.isEmpty() && !photoRepository.existsByRecipeId(recipeId)) {
+      // legacy recipe: leave the image alone
+  } else {
+      photoRepository.deleteAllByRecipeId(recipeId);
+      ... save new rows, set image to the cover or null
+  }
+
+Read
+----
+A recipe with photo rows returns their URLs in position order. A recipe with
+no rows but an image link (a legacy or imported one) returns that link as a
+one-item list, and a recipe with neither returns an empty list. So the
+frontend only ever reads "photos".
+
+The one batched photo query per page: the browse and search pages show up to
+dozens of recipes. Asking the database for each recipe's photos separately
+would be one query per card. The page assembly instead collects all recipe ids
+and makes ONE query, findByRecipeIdInOrderByPositionAsc(ids), then groups the
+rows by recipe in memory. That is one extra query per page, no matter how many
+recipes are on it (the same approach already used for ingredients, ratings and
+comment counts).
+
+How it was tested
+-----------------
+RecipeServicePhotosTest (9 tests) covers create (cover and order, source fields left
+empty, a foreign path rejected), update (replace, clearing, the legacy rule,
+a non-owner refused before photos are checked), the fallback to the image link
+for imported recipes, and the one-batch browse query. The existing
+controller and service tests were updated for the new constructor and DTO
+shapes. Controller test checks $.photos in the response. 118 targeted backend
+tests plus the 5 real-database tests pass.
+
+
+================================================================================
+ PHOTO TASK 4 — Upload helpers and in-browser shrinking (frontend)
+ Files: src/api/photos.ts, src/lib/resizeImage.ts, src/lib/types.ts
+================================================================================
+
+What was done
+-------------
+Two small modules, plus type changes (RecipeDisplay gets photos; RecipeCreate
+loses image/sourceName/sourceUrl and gets photos).
+
+src/api/photos.ts has the constants (bucket name, 6 photos, 5 MB, the three
+accepted types) and four functions:
+  - uploadPhoto(userId, blob, ext) sends the file straight to Supabase
+    Storage at {userId}/{random uuid}.{ext}, with upsert false, so a name can
+    never overwrite an existing file. It returns the path.
+  - deletePhotos(paths) removes files. It is best effort: a failure is only
+    logged, and it never breaks what the user was doing.
+  - publicPhotoUrl(path) and pathFromPublicUrl(url) convert both ways. Both
+    use one shared base, so they always round-trip. pathFromPublicUrl returns
+    null for any address that is not in our bucket, which is how the form
+    tells our photos from old linked images.
+
+In-browser shrinking
+--------------------
+A phone photo is often 4000 pixels wide and several MB. Shrinking happens in
+the browser before upload (src/lib/resizeImage.ts, prepareImage):
+  - The longest side is scaled down to at most 2000 px (smaller images are not
+    enlarged). The aspect ratio is kept.
+  - It is re-encoded as WebP at quality 0.85.
+  - Some browsers answer a WebP request with a PNG without saying so, so the
+    code checks the type of the result. If it is not WebP (or is empty), it
+    encodes again as JPEG at 0.85 and uses the .jpg extension.
+  - If the image can't be read: "Couldn't read this image". If it is still
+    over 5 MB after shrinking: "Photo is too large even after resizing".
+This keeps uploads fast and well under the bucket's 5 MB limit.
+
+How it was tested
+-----------------
+17 tests across resizeImage.test.ts and photos.test.ts (sizes, the WebP then
+JPEG fallback, the error messages, URL round-trips, upload and delete calls).
+The decoding and drawing functions are injected in tests, because the test
+environment (jsdom) has no real canvas; the real canvas path is therefore not
+covered by the automated tests. Whole frontend suite then: 90 tests.
+
+
+================================================================================
+ PHOTO TASK 5 — The photo picker (frontend)
+ Files: src/features/authoring/PhotoPicker.tsx (+ test)
+================================================================================
+
+What the user sees
+------------------
+A "Photos" section in the recipe form with an "Add photos" button (it accepts
+several files at once) and a grid of tiles. Each finished tile has:
+  - "Move photo N left" and "Move photo N right" arrows (disabled at the
+    ends),
+  - a remove button,
+  - a "Cover" label on the first tile.
+Photos that are still uploading show a dimmed preview and a spinner. A failed
+photo shows its error with Retry and Remove buttons. Picking a wrong file type
+or more than 6 photos shows a short message and takes the valid files only.
+The button is disabled once 6 slots are used.
+
+How it works
+------------
+Files are processed one at a time (shrink, then upload), so photos land in the
+order they were chosen. As soon as a file is uploaded, its path is handed to
+the form through onChange; the picker itself keeps only temporary tiles.
+
+The busy state: the picker tells the form whether anything is uploading or
+failed:
+
+  onBusyChange(tiles.length > 0)
+
+while a tile is pending or in an error state, the form's Save button stays
+disabled (Task 6). So a recipe can't be saved with a photo missing because it
+was still on its way up, or silently dropped after an error. Removing the
+tile (or retrying successfully) clears the state.
+
+Preview images use temporary browser URLs. They are released when a tile
+finishes, is removed, or the picker closes, so memory isn't leaked. Removing
+a pending tile makes the picker ignore its late result.
+
+How it was tested
+-----------------
+11 tests: uploads in selection order, the 6-photo limit, wrong types, a mixed
+selection, remove and move, the Cover label, the busy state, retry,
+removing a pending upload, releasing preview URLs, and the disabled button.
+An emoji check is included. Whole frontend suite then: 101 tests.
+
+
+================================================================================
+ PHOTO TASK 6 — The recipe form and cleanup (frontend)
+ Files: src/features/authoring/RecipeFormPage.tsx,
+        src/features/recipe/RecipeDetailPage.tsx (+ tests)
+================================================================================
+
+What was done
+-------------
+  - The Image URL, Source name and Source URL fields, and the image preview,
+    are gone from the form.
+  - The PhotoPicker is wired in through a react-hook-form Controller, the same
+    way the cuisine picker is. The request now carries photos (a list of
+    paths) instead of the three old fields.
+  - Save is disabled while the picker is busy, and a short hint "Waiting for
+    photos to finish uploading" appears next to it.
+  - If the server rejects the photos, its message is shown under the picker.
+  - Editing a recipe prefills the picker from recipe.photos, keeping only
+    addresses that belong to our bucket (pathFromPublicUrl). Linked images
+    from before this feature are not turned into tiles.
+
+Storage cleanup after a successful save or delete
+-------------------------------------------------
+Files that are no longer used should not pile up in storage. The cleanup runs
+only after the server has accepted the change:
+
+  - Edit: when the page loads, the starting list of paths is remembered. After
+    the PUT request succeeds, any path that was in the starting list but not
+    in the saved list is deleted from storage with deletePhotos. It is not
+    awaited, so the user isn't kept waiting. If the save fails, nothing is
+    deleted, because the recipe still points at those files.
+  - Delete a recipe: after the DELETE succeeds, the recipe's photos that are
+    in our bucket are deleted from storage. If the delete fails, the photos
+    stay.
+  - deletePhotos is only called when there is something to delete.
+Storage allows a user to delete only from their own folder, so a user can
+only ever clean up their own files.
+
+How it was tested
+-----------------
+7 new tests in the authoring tests (no old fields, the request body carries
+photos, prefill keeps bucket photos only, a removed photo is deleted after the
+save and not before, nothing deleted when all photos are kept, Save disabled
+while uploading, the server error under the picker) and 2 in the detail tests
+(photos deleted after the recipe delete; a failed recipe delete leaves the
+photos). Whole frontend suite then: 110 tests.
+
+
+================================================================================
+ PHOTO TASK 7 — The collage and the full-screen viewer (frontend)
+ Files: src/features/recipe/PhotoCollage.tsx (+ test),
+        src/features/recipe/RecipeDetailPage.tsx
+================================================================================
+
+What the user sees
+------------------
+At the top of the recipe page, the photos form a collage. The layout depends
+on the screen and on how many photos there are.
+
+  Phone:    the cover at full width (4:3), then a row of square thumbnails
+            for the rest (at most 5).
+  Desktop:  one 4:3 frame.
+              1 photo   one big tile
+              2 photos  two equal columns
+              3 or more the cover is a large tile on the left, and photos 2
+                        and 3 are stacked on the right
+            With more than 3 photos, the third tile is darkened and shows
+            "+N", with N the number of photos not shown. Example: with 6
+            photos it reads "+3".
+  No photos: the same sand-coloured placeholder as before.
+
+Every tile is a real button. Clicking one opens the viewer on that photo. All
+images except the cover load lazily, so the page starts fast.
+
+The viewer
+----------
+A full-screen dialog built with Radix Dialog (it gives focus trapping, Escape
+to close, and the dialog role for screen readers). It shows the photo at its
+natural proportions on a dark olive overlay, with Previous and Next buttons, a
+Close button, and a counter like "2 / 6". The arrow keys also move between
+photos, and they wrap around: Right on the last photo goes to the first, Left
+on the first goes to the last. Escape or a click on the empty area around the
+photo closes it, and focus returns to the tile that was clicked. With a
+single photo there are no arrows and no counter ("1 / 1" would only be noise).
+
+The page just passes recipe.photos and the title to PhotoCollage; both
+layouts are in the page, and CSS shows one of them.
+
+How it was tested
+-----------------
+13 tests: the tile count for 1, 2, 3 and 6 photos, the "+3" overlay (and none
+with exactly 3 photos), alt texts, the placeholder, opening on the clicked
+photo, Next, arrow keys, wrap-around, Escape, focus returning, the Close
+button, the single-photo case, and the phone layout opening the same viewer.
+The look itself (spacing, the focus ring, how large the viewer image is on
+very small screens) was not checked in a browser by the automated work; that
+is left to the user.
+
+
+================================================================================
+ PHOTO COLLAGE — VERIFICATION
+================================================================================
+
+  - Backend: the 20 targeted test classes, 118 tests, 0 failures. The
+    real-database tests (*DbTest), 2 classes, 5 tests (RecipeCuisineQueryDbTest
+    3, RecipePhotoRepositoryDbTest 2), 0 failures.
+  - Frontend: 16 test files, 123 tests pass (vitest), and `npm run build` is
+    clean (only the usual chunk-size warning).
+  - Not covered by automated work: the live check on the running backend
+    (GET a recipe returns a photos array; a POST with someone else's path
+    gets a 400 with errors.photos) and a look at the collage in a browser.
+    Both need a signed-in user, so the user does them.
+
+
+Known gaps
+----------
+  - Photos uploaded on a form that is then abandoned (the tab is closed, or
+    "Create recipe" is never pressed) stay in storage. Nothing cleans them up.
+    The same goes for a photo whose tile is removed while it is still
+    uploading: the file lands in storage and stays.
+  - Files that the picker is still waiting to upload are not skipped when
+    their tile is removed before their turn; they are still uploaded and then
+    ignored, leaving an unused file.
+  - Storage cleanup after a save or a delete is best effort. If the request
+    fails, the file stays.
+  - Shrinking: the decoded image is not explicitly released, so six large
+    phone photos in a row could use a lot of memory on a small phone. Photo
+    rotation relies on the browser's default handling. A transparent PNG that
+    falls back to JPEG gets a black background.
+  - If the picker's "Cover" label is drawn with a translucent background in
+    some browser, the photo behind it shows through. It was not checked
+    visually.
+  - While photos are uploading, the numbers in the tile labels ("Remove photo
+    N") can shift as earlier uploads finish.
+  - Editing a recipe that had a linked (non-bucket) image shows no tile for
+    it. The old picture stays as long as no photo is added, but the form
+    cannot show or remove it.
+  - If the server's photo validation fails on a single list item (an empty or
+    over-long path), the error is keyed "photos[0]", not "photos", so the
+    message would not appear under the picker. The picker only sends
+    generated paths, so a user shouldn't see this.
+  - The full-screen viewer does not clamp its position if the photo list
+    shrinks while it is open.
+
+
+Rollout
+-------
+  1. Run docs/supabase/recipe-photos-storage.sql ONCE in the Supabase
+     dashboard (SQL Editor). It creates the recipe-photos bucket and the two
+     folder rules. Until then, uploads fail. It is safe to run twice.
+  2. The V3 migration (the recipe_photos table) was already applied to the
+     live database, automatically, when the backend restarted after Task 1.
+     Nothing else to run for it.
+  3. app.storage.photos-public-base-url in application.properties points at
+     the project's public bucket address. Another environment needs its own
+     value.
+  4. The frontend needs VITE_SUPABASE_URL set to the same project (it is
+     already used for sign-in).
