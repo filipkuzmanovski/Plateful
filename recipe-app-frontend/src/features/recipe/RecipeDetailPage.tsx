@@ -13,7 +13,6 @@ import {
   SearchX,
   Trash2,
   Users,
-  UtensilsCrossed,
   type LucideIcon,
 } from 'lucide-react';
 import { deleteRecipe, getRecipe } from '@/api/recipes';
@@ -26,6 +25,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { RecipeDisplay } from '@/lib/types';
 import { RatingBox } from './RatingBox';
 import { CommentsSection } from './CommentsSection';
+import { PhotoCollage } from './PhotoCollage';
 
 /** One time/servings fact in the photo card: a terracotta icon, a value and a small label. */
 function Fact({ icon: Icon, value, label }: { icon: LucideIcon; value: ReactNode; label: string }) {
@@ -105,13 +105,7 @@ export default function RecipeDetailPage() {
       {/* Left: sticky photo and facts card */}
       <aside>
         <div className="overflow-hidden rounded-card bg-paper shadow-card ring-1 ring-sand/70 lg:sticky lg:top-24">
-          {recipe.image ? (
-            <img src={recipe.image} alt={recipe.title} className="aspect-[4/3] w-full object-cover" />
-          ) : (
-            <div className="flex aspect-[4/3] items-center justify-center bg-sand text-olive/30">
-              <UtensilsCrossed aria-hidden="true" className="size-14" strokeWidth={1.25} />
-            </div>
-          )}
+          <PhotoCollage photos={recipe.photos} title={recipe.title} />
           <div className="space-y-5 p-5 sm:p-6">
             {hasFacts && (
               <dl className="flex gap-2">
