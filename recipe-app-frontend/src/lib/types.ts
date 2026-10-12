@@ -13,6 +13,7 @@ export interface RecipeDisplay {
   carbsGrams: number | null; nutrition: Record<string, unknown> | null;
   ingredients: IngredientDisplay[]; averageRating: number | null;
   ratingCount: number; commentCount: number; createdAt: string | null;
+  photos: string[];
 }
 
 export interface CommentDisplay { id: string; user: UserDisplay; body: string; likeCount: number; dislikeCount: number; createdAt: string | null; }
@@ -28,9 +29,10 @@ export interface RecipeFilter {
 
 export interface IngredientCreate { ingredientName: string; originalText: string; }
 export interface RecipeCreate {
-  title: string; image: string | null; servings: number | null; readyInMinutes: number | null;
+  title: string; servings: number | null; readyInMinutes: number | null;
   cookingMinutes: number | null; preparationMinutes: number | null;
-  sourceName: string | null; sourceUrl: string | null; instructions: string | null;
+  instructions: string | null;
   instructionsSteps: InstructionStep[]; dairyFree: boolean; glutenFree: boolean;
   vegan: boolean; vegetarian: boolean; cuisines: string[]; ingredients: IngredientCreate[];
+  photos: string[];
 }

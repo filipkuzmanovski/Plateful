@@ -80,13 +80,11 @@ const toNull = (s: string) => (s.trim() === '' ? null : s);
 function toDto(v: FormValues): RecipeCreate {
   return {
     title: v.title,
-    image: toNull(v.image),
     servings: toInt(v.servings),
     readyInMinutes: toInt(v.readyInMinutes),
     cookingMinutes: toInt(v.cookingMinutes),
     preparationMinutes: toInt(v.preparationMinutes),
-    sourceName: toNull(v.sourceName),
-    sourceUrl: toNull(v.sourceUrl),
+    photos: [], // temporary: Task 6 wires the photo collage
     instructions: toNull(v.instructions),
     instructionsSteps: v.steps.map((s, i) => ({ number: i + 1, step: s.text, ingredients: [], equipment: [] })),
     dairyFree: v.dairyFree, glutenFree: v.glutenFree, vegan: v.vegan, vegetarian: v.vegetarian,
