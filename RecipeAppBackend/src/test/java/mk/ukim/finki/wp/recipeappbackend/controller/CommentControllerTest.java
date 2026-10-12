@@ -18,11 +18,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -143,5 +145,22 @@ class CommentControllerTest {
 
         mockMvc.perform(delete("/api/comments/" + COMMENT_ID).with(authed()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void myReactions_authed_returnsCommentIdToIsLike() throws Exception {
+        when(commentService.getMyReactions(USER_ID, RECIPE_ID)).thenReturn(Map.of(COMMENT_ID, true));
+
+        mockMvc.perform(get("/api/recipes/" + RECIPE_ID + "/comments/reactions/me").with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['" + COMMENT_ID + "']").value(true));
+    }
+
+    @Test
+    void myReactions_anonymous_is401() throws Exception {
+        mockMvc.perform(get("/api/recipes/" + RECIPE_ID + "/comments/reactions/me"))
+                .andExpect(status().isUnauthorized());
+
+        verify(commentService, never()).getMyReactions(any(), any());
     }
 }

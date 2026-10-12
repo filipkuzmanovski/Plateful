@@ -22,7 +22,11 @@ vi.mock('@/auth/supabaseClient', () => ({
 
 const otherUser = { id: 'u-2', firstName: 'Bob', lastName: 'Smith' };
 
-function stubPage({ comments = [commentFixture()], recipeUser = null as typeof otherUser | null } = {}) {
+function stubPage({
+  comments = [commentFixture()],
+  recipeUser = null as typeof otherUser | null,
+  myReactions = {} as Record<string, boolean>,
+} = {}) {
   server.use(
     http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profileFixture)),
     http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json(recipeFixture({ user: recipeUser }))),
@@ -30,6 +34,7 @@ function stubPage({ comments = [commentFixture()], recipeUser = null as typeof o
       HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
     ),
     http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf(comments))),
+    http.get(`${BASE}/api/recipes/r-1/comments/reactions/me`, () => HttpResponse.json(myReactions)),
   );
 }
 
@@ -68,6 +73,28 @@ test('reaction thumb PUTs then toggles off with DELETE', async () => {
   await vi.waitFor(() => expect(calls).toEqual(['put']));
   await userEvent.click(likeBtn);
   await vi.waitFor(() => expect(calls).toEqual(['put', 'delete']));
+});
+
+test('a reaction saved earlier is highlighted on return, and clicking it removes it', async () => {
+  stubPage({ myReactions: { 'c-1': true } });
+  const calls: string[] = [];
+  server.use(
+    http.put(`${BASE}/api/comments/c-1/reactions/me`, () => {
+      calls.push('put');
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.delete(`${BASE}/api/comments/c-1/reactions/me`, () => {
+      calls.push('delete');
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  renderApp('/recipes/r-1');
+  const likeBtn = await screen.findByRole('button', { name: /^like comment$/i });
+  await vi.waitFor(() => expect(likeBtn).toHaveAttribute('aria-pressed', 'true'));
+  expect(screen.getByRole('button', { name: /^dislike comment$/i })).toHaveAttribute('aria-pressed', 'false');
+  await userEvent.click(likeBtn);
+  await vi.waitFor(() => expect(calls).toEqual(['delete']));
+  await vi.waitFor(() => expect(likeBtn).toHaveAttribute('aria-pressed', 'false'));
 });
 
 test('own comment shows Edit and Delete; delete goes through the confirm dialog', async () => {

@@ -8,6 +8,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeComment;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.CommentReactionSummary;
+import mk.ukim.finki.wp.recipeappbackend.model.projection.MyCommentReaction;
 import mk.ukim.finki.wp.recipeappbackend.repository.CommentReactionRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
@@ -118,5 +119,15 @@ public class CommentService {
                     s != null ? s.likeCount() : 0L,
                     s != null ? s.dislikeCount() : 0L);
         });
+    }
+
+    /**
+     * The current user's reactions on this recipe's comments, as
+     * commentId -> isLike. Comments they haven't reacted to are absent.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Boolean> getMyReactions(UUID userId, UUID recipeId) {
+        return reactionRepository.findMyReactionsForRecipe(recipeId, userId).stream()
+                .collect(Collectors.toMap(MyCommentReaction::commentId, MyCommentReaction::isLike));
     }
 }

@@ -3,7 +3,7 @@ import { MessageCircle, Pencil, ThumbsDown, ThumbsUp, Trash2, type LucideIcon } 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { addComment, deleteComment, editComment, getComments } from '@/api/comments';
-import { deleteMyReaction, putMyReaction } from '@/api/reactions';
+import { deleteMyReaction, getMyReactions, putMyReaction } from '@/api/reactions';
 import { useAuth } from '@/auth/AuthProvider';
 import { ApiError } from '@/api/client';
 import { Button, Spinner } from '@/components/ui';
@@ -42,12 +42,30 @@ function formatDate(iso: string | null) {
     : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function ReactionButtons({ comment }: { comment: CommentDisplay }) {
-  const { status } = useAuth();
-  // The API has no "my reaction" read endpoint; we track the reaction made
-  // in THIS session locally. Unknown initial state: first click always PUTs.
-  const [mine, setMine] = useState<boolean | null>(null);
+/** Query key for the signed-in user's reactions on one recipe's comments (commentId -> isLike). */
+const myReactionsKey = (recipeId: string, userId: string | undefined) => ['myReactions', recipeId, userId];
+
+function ReactionButtons({
+  comment,
+  recipeId,
+  mine,
+  loading,
+}: {
+  comment: CommentDisplay;
+  recipeId: string;
+  /** The user's saved reaction from the server: true = liked, false = disliked, null = none. */
+  mine: boolean | null;
+  loading: boolean;
+}) {
+  const { status, profile } = useAuth();
   const queryClient = useQueryClient();
+  const setMine = (value: boolean | null) =>
+    queryClient.setQueryData<Record<string, boolean>>(myReactionsKey(recipeId, profile?.id), (old) => {
+      const next = { ...old };
+      if (value === null) delete next[comment.id];
+      else next[comment.id] = value;
+      return next;
+    });
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['comments'] });
 
   const react = useMutation({
@@ -61,12 +79,14 @@ function ReactionButtons({ comment }: { comment: CommentDisplay }) {
     onError: showError,
   });
 
-  const disabled = status !== 'ready';
+  // Wait for the saved reactions, so clicking an already-liked thumb removes it rather than re-liking.
+  const disabled = status !== 'ready' || loading;
   const btn = (isLike: boolean, count: number, label: string, Icon: LucideIcon) => {
     const active = mine === isLike;
     return (
       <button
         aria-label={label}
+        aria-pressed={active}
         disabled={disabled}
         onClick={() => (active ? unreact.mutate() : react.mutate(isLike))}
         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -109,6 +129,13 @@ export function CommentsSection({
     queryKey: ['comments', recipeId, page],
     queryFn: () => getComments(recipeId, page),
     placeholderData: keepPreviousData,
+  });
+  // Which comments the signed-in user already liked or disliked, so their thumbs stay highlighted
+  // when they come back to this recipe.
+  const myReactions = useQuery({
+    queryKey: myReactionsKey(recipeId, profile?.id),
+    queryFn: () => getMyReactions(recipeId),
+    enabled: status === 'ready',
   });
 
   const invalidate = () => {
@@ -209,7 +236,12 @@ export function CommentsSection({
                   )}
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-1">
-                  <ReactionButtons comment={comment} />
+                  <ReactionButtons
+                    comment={comment}
+                    recipeId={recipeId}
+                    mine={myReactions.data?.[comment.id] ?? null}
+                    loading={myReactions.isLoading}
+                  />
                   {isAuthor && editingId !== comment.id && (
                     <button
                       aria-label={`Edit comment by ${comment.user.firstName} ${comment.user.lastName}`}

@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.repository;
 
 import mk.ukim.finki.wp.recipeappbackend.model.entities.CommentReaction;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.CommentReactionSummary;
+import mk.ukim.finki.wp.recipeappbackend.model.projection.MyCommentReaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -61,6 +62,18 @@ public interface CommentReactionRepository extends JpaRepository<CommentReaction
             GROUP BY r.comment.id
             """)
     List<CommentReactionSummary> findReactionSummaries(@Param("commentIds") Collection<UUID> commentIds);
+
+    // "Which comments on this recipe have I reacted to, and how?" — one query
+    // for the whole recipe, so the UI can highlight the buttons the user
+    // already pressed (one user's reactions on one recipe is a small set).
+    @Query("""
+            SELECT new mk.ukim.finki.wp.recipeappbackend.model.projection.MyCommentReaction(
+                r.comment.id, r.isLike)
+            FROM CommentReaction r
+            WHERE r.comment.recipe.id = :recipeId AND r.user.id = :userId
+            """)
+    List<MyCommentReaction> findMyReactionsForRecipe(@Param("recipeId") UUID recipeId,
+                                                     @Param("userId") UUID userId);
 
     // BUGFIX (review issue #4, upsert race): same reasoning as
     // RecipeRatingRepository.upsertRating() — look-up-then-insert in the
