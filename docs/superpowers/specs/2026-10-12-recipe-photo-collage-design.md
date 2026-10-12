@@ -42,8 +42,8 @@ The file:
   - **INSERT**, for role `authenticated`, only when `(storage.foldername(name))[1] = auth.uid()::text`.
   - **DELETE**, for role `authenticated`, with the same folder condition.
   - **No UPDATE policy.** Files are never overwritten; a changed photo is a new file.
-  - Reads need no policy, because the bucket is public.
-- Is idempotent: it uses `on conflict do nothing` for the bucket and `drop policy if exists` before each `create policy`, so running it twice is safe.
+  - **SELECT**, for role `authenticated`, with the same folder condition. Public URL reads need no policy (the bucket is public), but Storage `remove()` checks SELECT as well as DELETE, so without this policy cleanup silently deletes nothing.
+- Is idempotent: it uses `on conflict (id) do update` for the bucket settings and `drop policy if exists` before each `create policy`, so running it twice is safe.
 
 Object path format: `{userId}/{uuid}.{ext}`, where `ext` is `jpg`, `png` or `webp`.
 

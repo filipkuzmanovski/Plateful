@@ -3,13 +3,16 @@
 -- =========================================================
 -- Run this ONCE in the Supabase SQL editor (Dashboard > SQL Editor).
 -- It is NOT a Flyway migration: Flyway owns the public schema only.
--- Safe to run twice: the bucket insert is a no-op if the bucket exists,
--- and every policy is dropped before it is recreated.
+-- Safe to run twice: the bucket insert updates the bucket settings if it
+-- exists, and every policy is dropped before it is recreated.
 --
 -- Object path format: {userId}/{uuid}.{ext}, ext = jpg | png | webp.
--- The bucket is public, so reads need no policy. There is deliberately
--- no UPDATE policy: files are never overwritten, a changed photo is a
--- new file.
+-- The bucket is public, so reading photos through their public URLs needs
+-- no policy. The SELECT policy below is still REQUIRED for deletes: Storage
+-- remove() needs both SELECT and DELETE on storage.objects, and without
+-- SELECT it matches zero rows and silently deletes nothing. There is
+-- deliberately no UPDATE policy: files are never overwritten, a changed
+-- photo is a new file.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -19,7 +22,10 @@ values (
     5242880,  -- 5 MB
     array['image/jpeg', 'image/png', 'image/webp']
 )
-on conflict (id) do nothing;
+on conflict (id) do update set
+    public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists "recipe-photos insert own folder" on storage.objects;
 create policy "recipe-photos insert own folder"
@@ -27,6 +33,16 @@ create policy "recipe-photos insert own folder"
     for insert
     to authenticated
     with check (
+        bucket_id = 'recipe-photos'
+        and (storage.foldername(name))[1] = auth.uid()::text
+    );
+
+drop policy if exists "recipe-photos select own folder" on storage.objects;
+create policy "recipe-photos select own folder"
+    on storage.objects
+    for select
+    to authenticated
+    using (
         bucket_id = 'recipe-photos'
         and (storage.foldername(name))[1] = auth.uid()::text
     );
