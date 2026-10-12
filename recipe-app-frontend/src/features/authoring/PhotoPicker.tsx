@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, ImagePlus, LoaderCircle, X } from 'lucide-react';
-import { ACCEPTED_TYPES, MAX_PHOTOS, publicPhotoUrl, uploadPhoto } from '@/api/photos';
+import { ACCEPTED_TYPES, MAX_PHOTOS, deletePhotos, publicPhotoUrl, uploadPhoto } from '@/api/photos';
 import { prepareImage } from '@/lib/resizeImage';
 import { Button, Pill } from '@/components/ui';
 
@@ -90,11 +90,17 @@ export function PhotoPicker({
   }
 
   async function process(id: number, file: File) {
+    // Removed while queued, or the form is gone: don't spend mobile data on it.
+    if (!tilesRef.current.some((t) => t.id === id)) return;
     try {
       const { blob, ext } = await prepareImage(file);
       const path = await uploadPhoto(userId, blob, ext);
       const tile = tilesRef.current.find((t) => t.id === id);
-      if (!tile) return; // removed (or unmounted) while uploading: drop the result
+      if (!tile) {
+        // Removed (or unmounted) while uploading: drop the result and don't leave an orphan file.
+        void deletePhotos([path]);
+        return;
+      }
       revokePreviewUrl(tile.previewUrl);
       updateTiles((all) => all.filter((t) => t.id !== id));
       emit([...valueRef.current, path]);

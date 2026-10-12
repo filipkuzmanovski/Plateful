@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expectNoEmoji } from '@/test/noEmoji';
 import { PhotoPicker } from './PhotoPicker';
-import { uploadPhoto } from '@/api/photos';
+import { deletePhotos, uploadPhoto } from '@/api/photos';
 import { prepareImage } from '@/lib/resizeImage';
 
 vi.mock('@/api/photos', () => ({
@@ -11,10 +11,12 @@ vi.mock('@/api/photos', () => ({
   ACCEPTED_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
   publicPhotoUrl: (p: string) => `https://img.test/${p}`,
   uploadPhoto: vi.fn(),
+  deletePhotos: vi.fn(),
 }));
 vi.mock('@/lib/resizeImage', () => ({ prepareImage: vi.fn() }));
 
 const uploadMock = vi.mocked(uploadPhoto);
+const deleteMock = vi.mocked(deletePhotos);
 const prepareMock = vi.mocked(prepareImage);
 
 // jsdom has no createObjectURL; assign stubs so the component can create and revoke previews.
@@ -23,6 +25,7 @@ const revokeUrl = vi.fn();
 
 beforeEach(() => {
   uploadMock.mockReset();
+  deleteMock.mockReset();
   prepareMock.mockReset();
   prepareMock.mockResolvedValue({ blob: new Blob(['x'], { type: 'image/webp' }), ext: 'webp' });
   createUrl.mockClear();
@@ -194,6 +197,51 @@ test('removingAPendingTileIgnoresItsLateUpload', async () => {
   await new Promise((r) => setTimeout(r, 0));
   expect(onChange).not.toHaveBeenCalled();
   expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+});
+
+test('doesNotUploadQueuedTilesRemovedBeforeTheirTurn', async () => {
+  const first = deferred();
+  uploadMock.mockReturnValueOnce(first.promise).mockResolvedValueOnce('u/2.webp');
+  const onChange = vi.fn();
+  render(<Harness onChange={onChange} />);
+  const user = setup();
+
+  await user.upload(screen.getByLabelText('Add photos'), [jpeg('a.jpg'), jpeg('b.jpg'), jpeg('c.jpg')]);
+  await user.click(await screen.findByRole('button', { name: 'Remove photo 3' }));
+
+  first.resolve('u/1.webp');
+  await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(['u/1.webp', 'u/2.webp']));
+  expect(uploadMock).toHaveBeenCalledTimes(2);
+  expect(prepareMock).toHaveBeenCalledTimes(2);
+  expect(deleteMock).not.toHaveBeenCalled();
+});
+
+test('deletesTheFileOfATileRemovedMidUpload', async () => {
+  const late = deferred();
+  uploadMock.mockReturnValueOnce(late.promise);
+  const onChange = vi.fn();
+  render(<Harness onChange={onChange} />);
+  const user = setup();
+
+  await user.upload(screen.getByLabelText('Add photos'), jpeg('a.jpg'));
+  await user.click(await screen.findByRole('button', { name: 'Remove photo 1' }));
+
+  late.resolve('u/late.webp');
+  await waitFor(() => expect(deleteMock).toHaveBeenCalledWith(['u/late.webp']));
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+test('stopsUploadingQueuedFilesAfterUnmount', async () => {
+  const first = deferred();
+  uploadMock.mockReturnValueOnce(first.promise);
+  const { unmount } = render(<Harness />);
+
+  await setup().upload(screen.getByLabelText('Add photos'), [jpeg('a.jpg'), jpeg('b.jpg')]);
+  unmount();
+
+  first.resolve('u/1.webp');
+  await waitFor(() => expect(deleteMock).toHaveBeenCalledWith(['u/1.webp']));
+  expect(uploadMock).toHaveBeenCalledTimes(1);
 });
 
 test('revokesPreviewUrlsWhenDoneRemovedOrUnmounted', async () => {
