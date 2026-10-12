@@ -24,9 +24,11 @@ public interface RecipePhotoRepository extends JpaRepository<RecipePhoto, UUID> 
     // Backs "replace photos" on update: delete all rows, then insert the new list. This must be a
     // bulk DELETE, not a derived delete. A derived delete loads the entities and removes them at
     // flush time, after the new inserts, which would violate UNIQUE (recipe_id, position). The bulk
-    // query runs immediately; flush first so pending changes are not lost, and clear afterwards so
-    // the persistence context holds no stale rows. The calling service method is @Transactional.
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    // query runs immediately; flush first so pending changes are not lost. The context is deliberately
+    // NOT cleared: clearing would detach the Recipe the caller is still updating (lazy user proxy,
+    // lost field changes). Nothing loads RecipePhoto entities in the same transaction before the
+    // delete, so no stale photo rows remain in the context. The caller is @Transactional.
+    @Modifying(flushAutomatically = true)
     @Query("DELETE FROM RecipePhoto p WHERE p.recipe.id = :recipeId")
     void deleteAllByRecipeId(@Param("recipeId") UUID recipeId);
 }

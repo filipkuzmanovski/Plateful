@@ -29,10 +29,13 @@ import java.util.List;
  * the ingredient rows afterward, once the saved Recipe actually has an id
  * for them to reference.
  * <p>
+ * image, sourceName and sourceUrl are NOT client-settable: the cover image is derived from
+ * photos[0] by the service, and the source fields stay null for user recipes.
+ * <p>
  * BUGFIXES (review issues #1 and #3):
  * - instructionsSteps was List&lt;String&gt; while the entity/DB store structured
  *   step objects — now List&lt;InstructionStep&gt;, same shape end to end.
- * - Every previously UNBOUNDED string field (image, sourceUrl, instructions,
+ * - Every previously UNBOUNDED string field (instructions,
  *   cuisines elements) now has a @Size cap. Without caps, a client could POST
  *   a multi-megabyte "instructions" string straight into a TEXT column.
  * - @NotNull removed from ingredients: @NotEmpty already rejects null AND
@@ -43,13 +46,10 @@ import java.util.List;
  */
 public record RecipeCreateDto(
         @NotBlank @Size(max = 255) String title,
-        @Size(max = 2_048) String image,
         @PositiveOrZero Integer servings,
         @PositiveOrZero Integer readyInMinutes,
         @PositiveOrZero Integer cookingMinutes,
         @PositiveOrZero Integer preparationMinutes,
-        @Size(max = 255) String sourceName,
-        @Size(max = 2_048) String sourceUrl,
         @Size(max = 50_000) String instructions,
         @Size(max = 100) List<@Valid InstructionStep> instructionsSteps,
         boolean dairyFree,
@@ -57,19 +57,19 @@ public record RecipeCreateDto(
         boolean vegan,
         boolean vegetarian,
         @Size(max = 10) List<@NotBlank @Size(max = 50) String> cuisines,
+        // Storage paths ({userId}/{uuid}.{ext}) of photos already uploaded to Supabase Storage;
+        // position 0 is the cover. Ownership/format is checked by RecipePhotoPaths in the service.
+        @Size(max = 6) List<@NotBlank @Size(max = 200) String> photos,
         @NotEmpty @Size(max = 100) @Valid List<RecipeIngredientCreateDto> ingredients
 ) {
     public Recipe toEntity(User owner) {
         return Recipe.builder()
                 .user(owner)
                 .title(title)
-                .image(image)
                 .servings(servings)
                 .readyInMinutes(readyInMinutes)
                 .cookingMinutes(cookingMinutes)
                 .preparationMinutes(preparationMinutes)
-                .sourceName(sourceName)
-                .sourceUrl(sourceUrl)
                 .instructions(instructions)
                 .instructionsSteps(instructionsSteps != null ? instructionsSteps : List.of())
                 .dairyFree(dairyFree)

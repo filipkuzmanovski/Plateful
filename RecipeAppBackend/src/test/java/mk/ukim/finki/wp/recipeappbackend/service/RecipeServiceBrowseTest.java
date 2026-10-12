@@ -4,7 +4,9 @@ import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
+import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
+import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRatingRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
@@ -42,7 +44,9 @@ class RecipeServiceBrowseTest {
                 mock(RecipeRatingRepository.class),
                 mock(RecipeCommentRepository.class),
                 mock(UserRepository.class),
-                new CuisineCatalog());
+                new CuisineCatalog(),
+                mock(RecipePhotoRepository.class),
+                new RecipePhotoPaths("https://x/recipe-photos"));
     }
 
     private static RecipeFilter cuisineFilter(String... cuisines) {

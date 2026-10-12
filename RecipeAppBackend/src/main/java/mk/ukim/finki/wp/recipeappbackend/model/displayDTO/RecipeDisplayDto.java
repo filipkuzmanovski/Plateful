@@ -30,6 +30,8 @@ public record RecipeDisplayDto(
         UserDisplayDto user,
         String title,
         String image,
+        // Public URLs in position order; position 0 is the cover.
+        List<String> photos,
         Integer servings,
         Integer readyInMinutes,
         Integer cookingMinutes,
@@ -59,6 +61,7 @@ public record RecipeDisplayDto(
     public static RecipeDisplayDto fromEntity(
             Recipe recipe,
             List<RecipeIngredientDisplayDto> ingredients,
+            List<String> photos,
             Double averageRating,
             long ratingCount,
             long commentCount
@@ -69,6 +72,7 @@ public record RecipeDisplayDto(
                 recipe.getUser() != null ? UserDisplayDto.fromEntity(recipe.getUser()) : null, //can be null because it may only be a spoonacular recipe
                 recipe.getTitle(),
                 recipe.getImage(),
+                photos,
                 recipe.getServings(),
                 recipe.getReadyInMinutes(),
                 recipe.getCookingMinutes(),

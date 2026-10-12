@@ -6,7 +6,9 @@ import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeIngredientCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
+import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
+import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRatingRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
@@ -48,7 +50,9 @@ class RecipeServiceCuisineValidationTest {
                 mock(RecipeRatingRepository.class),
                 mock(RecipeCommentRepository.class),
                 userRepository,
-                catalog);
+                catalog,
+                mock(RecipePhotoRepository.class),
+                new RecipePhotoPaths("https://x/recipe-photos"));
         owner = User.builder().id(userId).build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(owner));
         when(recipeRepository.save(any(Recipe.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -56,8 +60,8 @@ class RecipeServiceCuisineValidationTest {
     }
 
     private static RecipeCreateDto dto(List<String> cuisines) {
-        return new RecipeCreateDto("Title", null, 2, null, null, null, null, null, null, null,
-                false, false, false, false, cuisines,
+        return new RecipeCreateDto("Title", 2, null, null, null, null, null,
+                false, false, false, false, cuisines, null,
                 List.of(new RecipeIngredientCreateDto("salt", "1 tsp salt")));
     }
 

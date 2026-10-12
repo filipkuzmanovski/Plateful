@@ -60,9 +60,9 @@ class RecipeControllerTest {
              "ingredients":[{"ingredientName":"Flour","originalText":"2 cups flour"}]}
             """;
 
-    /** RecipeDisplayDto has 28 components; tests only care about id/title. */
+    /** RecipeDisplayDto has 29 components; tests only care about id/title/photos. */
     private static RecipeDisplayDto sampleRecipe(UUID id) {
-        return new RecipeDisplayDto(id, "user", null, "Pancakes", null, null, null, null, null,
+        return new RecipeDisplayDto(id, "user", null, "Pancakes", null, List.of("https://x/recipe-photos/u/p.webp"), null, null, null, null,
                 null, null, null, List.of(), false, false, false, false, List.of(),
                 null, null, null, null, null, List.of(), null, 0L, 0L, null);
     }
@@ -171,7 +171,8 @@ class RecipeControllerTest {
 
         mockMvc.perform(get("/api/recipes/" + recipeId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(recipeId.toString()));
+                .andExpect(jsonPath("$.id").value(recipeId.toString()))
+                .andExpect(jsonPath("$.photos[0]").value("https://x/recipe-photos/u/p.webp"));
     }
 
     @Test
