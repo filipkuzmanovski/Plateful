@@ -71,4 +71,15 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getProperties())
                 .containsEntry("errors", Map.of("cuisines", "Unknown cuisine: lol"));
     }
+
+    @Test
+    void invalidPhotoMapsTo400WithPhotosFieldError() {
+        ProblemDetail problem = handler.handleInvalidPhoto(
+                new mk.ukim.finki.wp.recipeappbackend.photo.InvalidPhotoException("At most 6 photos"));
+
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getDetail()).isEqualTo("Validation failed");
+        assertThat(problem.getProperties())
+                .containsEntry("errors", Map.of("photos", "At most 6 photos"));
+    }
 }

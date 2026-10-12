@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.exception;
 
 import mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException;
+import mk.ukim.finki.wp.recipeappbackend.photo.InvalidPhotoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -53,6 +54,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail handleInvalidCuisine(InvalidCuisineException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
         problem.setProperty("errors", Map.of("cuisines", ex.getMessage()));
+        return problem;
+    }
+
+    /** Bad photo paths (foreign folder, duplicates, too many) -> 400 in the bean-validation shape. */
+    @ExceptionHandler(InvalidPhotoException.class)
+    ProblemDetail handleInvalidPhoto(InvalidPhotoException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        problem.setProperty("errors", Map.of("photos", ex.getMessage()));
         return problem;
     }
 
