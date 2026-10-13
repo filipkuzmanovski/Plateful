@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
 import { ChevronDown, LogOut, Plus, UserRound } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
+import { IdleSessionGuard } from '@/auth/IdleSessionGuard';
 import { ErrorBoundary } from './ErrorBoundary';
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
@@ -135,6 +136,7 @@ export default function AppShell() {
           )}
         </ErrorBoundary>
       </main>
+      <IdleSessionGuard />
       <Toaster
         position="bottom-right"
         toastOptions={{
