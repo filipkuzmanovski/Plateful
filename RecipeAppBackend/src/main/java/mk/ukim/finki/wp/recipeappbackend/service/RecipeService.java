@@ -130,7 +130,7 @@ public class RecipeService {
                 ? Optional.empty()
                 : cuisineCatalog.resolveFilter(effective.cuisine(), effective.region(), effective.sea());
         if (cuisineKeys.isPresent() && cuisineKeys.get().isEmpty()) {
-            // Cuisines/regions were requested but none are known: nothing can match.
+            // Cuisines/regions/seas were requested but none are known: nothing can match.
             return Page.empty(pageable);
         }
         // The order lives in the Specification (see RecipeSpecifications.withSort), so the page
