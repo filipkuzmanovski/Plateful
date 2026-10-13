@@ -36,7 +36,7 @@ class CuisineControllerTest {
 
     private void stubCatalogue() {
         when(cuisineService.listWithCounts()).thenReturn(List.of(
-                new CuisineInfoDto("italian", "Italian", "europe", true, 12)));
+                new CuisineInfoDto("italian", "Italian", "europe", List.of("mediterranean"), 12)));
     }
 
     @Test
@@ -48,7 +48,7 @@ class CuisineControllerTest {
                 .andExpect(jsonPath("$[0].key").value("italian"))
                 .andExpect(jsonPath("$[0].label").value("Italian"))
                 .andExpect(jsonPath("$[0].region").value("europe"))
-                .andExpect(jsonPath("$[0].mediterranean").value(true))
+                .andExpect(jsonPath("$[0].seas[0]").value("mediterranean"))
                 .andExpect(jsonPath("$[0].count").value(12));
     }
 

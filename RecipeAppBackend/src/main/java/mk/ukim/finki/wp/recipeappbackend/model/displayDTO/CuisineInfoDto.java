@@ -1,4 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.model.displayDTO;
 
-public record CuisineInfoDto(String key, String label, String region, boolean mediterranean, long count) {
+import java.util.List;
+
+public record CuisineInfoDto(String key, String label, String region, List<String> seas, long count) {
 }

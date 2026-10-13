@@ -1,0 +1,37 @@
+[
+  {
+    "key": "mediterranean",
+    "label": "Mediterranean",
+    "vibe": "Fresh, olive-oil drenched, citrusy, and simple.",
+    "starIngredients": "Branzino, octopus, sardines, squid, mussels.",
+    "iconDishes": "Spanish Paella, Grilled Branzino, Calamari."
+  },
+  {
+    "key": "caribbean",
+    "label": "Caribbean",
+    "vibe": "Citrus-marinated, spicy, fried, and robust.",
+    "starIngredients": "Spiny lobster, snapper, conch, mahi-mahi.",
+    "iconDishes": "Conch Fritters, Jamaican Escovitch Fish."
+  },
+  {
+    "key": "north_sea",
+    "label": "North Sea",
+    "vibe": "Comforting, smoky, pickled, and hearty.",
+    "starIngredients": "Cod, haddock, herring, langoustines.",
+    "iconDishes": "British Fish & Chips, Scandinavian Pickled Herring."
+  },
+  {
+    "key": "pacific",
+    "label": "Sea of Japan & Pacific",
+    "vibe": "Umami-rich, clean, precise, often raw or lightly seared.",
+    "starIngredients": "Salmon, mackerel, king crab, sea urchin (uni).",
+    "iconDishes": "Sashimi, Miso-Glazed Salmon, Crab Hot Pot."
+  },
+  {
+    "key": "gulf_of_mexico",
+    "label": "Gulf of Mexico",
+    "vibe": "Cajun/Creole spiced, buttery, and deeply comforting.",
+    "starIngredients": "Gulf shrimp, blue crab, oysters, redfish.",
+    "iconDishes": "Shrimp Po' Boys, Seafood Gumbo, Oysters Rockefeller."
+  }
+]

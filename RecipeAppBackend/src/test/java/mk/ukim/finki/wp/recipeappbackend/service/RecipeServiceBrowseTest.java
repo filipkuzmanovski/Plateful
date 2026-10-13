@@ -50,7 +50,7 @@ class RecipeServiceBrowseTest {
     }
 
     private static RecipeFilter cuisineFilter(String... cuisines) {
-        return new RecipeFilter(List.of(cuisines), null, null, null, null, null, null, null);
+        return new RecipeFilter(List.of(cuisines), null, null, null, null, null, null, null, null);
     }
 
     @Test

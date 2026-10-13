@@ -125,7 +125,7 @@ public class RecipeService {
         if (filter == null || filter.isEmpty()) {
             return assemblePage(recipeRepository.findAll(pageable));
         }
-        Optional<Set<String>> cuisineKeys = cuisineCatalog.resolveFilter(filter.cuisine(), filter.region());
+        Optional<Set<String>> cuisineKeys = cuisineCatalog.resolveFilter(filter.cuisine(), filter.region(), filter.sea());
         if (cuisineKeys.isPresent() && cuisineKeys.get().isEmpty()) {
             // Cuisines/regions were requested but none are known: nothing can match.
             return Page.empty(pageable);

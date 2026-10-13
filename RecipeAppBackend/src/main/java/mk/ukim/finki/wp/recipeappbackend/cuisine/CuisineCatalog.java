@@ -24,6 +24,9 @@ public class CuisineCatalog {
     private static final String RESOURCE = "/cuisines.csv";
     private static final String MEDITERRANEAN = "mediterranean";
 
+    public static final Set<String> SEA_KEYS =
+            Set.of("mediterranean", "caribbean", "north_sea", "pacific", "gulf_of_mexico");
+
     private final List<CuisineEntry> entries;
     private final Map<String, CuisineEntry> byKey;
 
@@ -42,14 +45,8 @@ public class CuisineCatalog {
                 if (line.isBlank()) {
                     continue;
                 }
-                String[] f = line.split(",", -1);
-                if (f.length != 4) {
-                    throw new IllegalStateException(RESOURCE + " line " + lineNo + ": expected 4 fields");
-                }
-                String key = f[0].trim();
-                Region region = Region.fromKey(f[2])
-                        .orElseThrow(() -> new IllegalStateException("Unknown region '" + f[2] + "' for cuisine '" + key + "'"));
-                CuisineEntry entry = new CuisineEntry(key, f[1].trim(), region, Boolean.parseBoolean(f[3].trim()));
+                CuisineEntry entry = parseLine(line, lineNo);
+                String key = entry.key();
                 if (index.putIfAbsent(key, entry) != null) {
                     throw new IllegalStateException("Duplicate cuisine key '" + key + "'");
                 }
@@ -60,6 +57,29 @@ public class CuisineCatalog {
         }
         this.entries = List.copyOf(loaded);
         this.byKey = Map.copyOf(index);
+    }
+
+    /** Parses one {@code key,label,region,seas} row; rejects an unknown region or sea key. */
+    static CuisineEntry parseLine(String line, int lineNo) {
+        String[] f = line.split(",", -1);
+        if (f.length != 4) {
+            throw new IllegalStateException(RESOURCE + " line " + lineNo + ": expected 4 fields");
+        }
+        String key = f[0].trim();
+        Region region = Region.fromKey(f[2])
+                .orElseThrow(() -> new IllegalStateException("Unknown region '" + f[2] + "' for cuisine '" + key + "'"));
+        List<String> seas = new ArrayList<>();
+        for (String raw : f[3].split("\\|")) {
+            String sea = raw.trim();
+            if (sea.isEmpty()) {
+                continue;
+            }
+            if (!SEA_KEYS.contains(sea)) {
+                throw new IllegalStateException(RESOURCE + " line " + lineNo + ": unknown sea '" + sea + "' for cuisine '" + key + "'");
+            }
+            seas.add(sea);
+        }
+        return new CuisineEntry(key, f[1].trim(), region, List.copyOf(seas));
     }
 
     public List<CuisineEntry> all() {
@@ -86,12 +106,8 @@ public class CuisineCatalog {
         String k = normalize(regionKey);
         Set<String> keys = new LinkedHashSet<>();
         if (MEDITERRANEAN.equals(k)) {
-            for (CuisineEntry e : entries) {
-                if (e.mediterranean()) {
-                    keys.add(e.key());
-                }
-            }
-            return keys;
+            // Backward compatible alias: region=mediterranean is the Mediterranean sea.
+            return keysForSea(MEDITERRANEAN);
         }
         Optional<Region> region = Region.fromKey(k);
         if (region.isPresent()) {
@@ -104,13 +120,25 @@ public class CuisineCatalog {
         return keys;
     }
 
+    public Set<String> keysForSea(String seaKey) {
+        String k = normalize(seaKey);
+        Set<String> keys = new LinkedHashSet<>();
+        for (CuisineEntry e : entries) {
+            if (e.seas().contains(k)) {
+                keys.add(e.key());
+            }
+        }
+        return keys;
+    }
+
     /**
      * Empty means "no cuisine filter". A present (possibly empty) set means "match only these keys".
      */
-    public Optional<Set<String>> resolveFilter(List<String> cuisines, List<String> regions) {
+    public Optional<Set<String>> resolveFilter(List<String> cuisines, List<String> regions, List<String> seas) {
         List<String> cs = nonBlank(cuisines);
         List<String> rs = nonBlank(regions);
-        if (cs.isEmpty() && rs.isEmpty()) {
+        List<String> ss = nonBlank(seas);
+        if (cs.isEmpty() && rs.isEmpty() && ss.isEmpty()) {
             return Optional.empty();
         }
         Set<String> union = new LinkedHashSet<>();
@@ -122,6 +150,9 @@ public class CuisineCatalog {
         }
         for (String r : rs) {
             union.addAll(keysForRegion(r));
+        }
+        for (String s : ss) {
+            union.addAll(keysForSea(s));
         }
         return Optional.of(union);
     }

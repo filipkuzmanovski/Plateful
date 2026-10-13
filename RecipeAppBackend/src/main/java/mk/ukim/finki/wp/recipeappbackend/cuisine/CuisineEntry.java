@@ -1,4 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.cuisine;
 
-public record CuisineEntry(String key, String label, Region region, boolean mediterranean) {
+import java.util.List;
+
+public record CuisineEntry(String key, String label, Region region, List<String> seas) {
 }

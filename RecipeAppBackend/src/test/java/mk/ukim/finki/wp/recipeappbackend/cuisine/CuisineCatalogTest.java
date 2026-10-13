@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -56,18 +57,18 @@ class CuisineCatalogTest {
 
     @Test
     void resolveFilterNoInputMeansNoFilter() {
-        assertThat(catalog.resolveFilter(null, List.of())).isEmpty();
+        assertThat(catalog.resolveFilter(null, List.of(), null)).isEmpty();
     }
 
     @Test
     void resolveFilterUnionsRegionsAndCuisines() {
-        Set<String> keys = catalog.resolveFilter(List.of(" Italian "), List.of("asia")).orElseThrow();
+        Set<String> keys = catalog.resolveFilter(List.of(" Italian "), List.of("asia"), null).orElseThrow();
         assertThat(keys).contains("italian", "chinese", "japanese", "asian").doesNotContain("mexican");
     }
 
     @Test
     void resolveFilterOnlyUnknownMeansMatchNothing() {
-        assertThat(catalog.resolveFilter(List.of("lol"), List.of("atlantis"))).hasValue(Set.of());
+        assertThat(catalog.resolveFilter(List.of("lol"), List.of("atlantis"), null)).hasValue(Set.of());
     }
 
     @Test
@@ -75,5 +76,45 @@ class CuisineCatalogTest {
         assertThat(catalog.normalizeAndValidate(List.of("  Italian ", "ITALIAN", "Greek"))).containsExactly("italian", "greek");
         assertThatThrownBy(() -> catalog.normalizeAndValidate(List.of("italian", "lol")))
                 .isInstanceOf(InvalidCuisineException.class).hasMessageContaining("lol");
+    }
+
+    @Test
+    void seasColumnParses() {
+        assertThat(catalog.find("french").orElseThrow().seas()).containsExactly("mediterranean", "north_sea");
+        assertThat(catalog.find("mexican").orElseThrow().seas()).containsExactly("pacific", "gulf_of_mexico");
+        assertThat(catalog.find("swiss").orElseThrow().seas()).isEmpty();
+    }
+
+    @Test
+    void keysForSeaCaribbean() {
+        assertThat(catalog.keysForSea("caribbean")).contains("jamaican", "cuban").doesNotContain("british");
+    }
+
+    @Test
+    void mediterraneanSeaMatchesOldFlagRows() {
+        assertThat(catalog.keysForSea("mediterranean")).contains("greek", "lebanese", "moroccan", "italian");
+    }
+
+    @Test
+    void regionMediterraneanIsAliasForSea() {
+        assertThat(catalog.resolveFilter(null, List.of("mediterranean"), null))
+                .isEqualTo(Optional.of(catalog.keysForSea("mediterranean")));
+    }
+
+    @Test
+    void resolveUnionOfAllThree() {
+        Set<String> keys = catalog.resolveFilter(List.of("thai"), List.of("africa"), List.of("north_sea")).orElseThrow();
+        assertThat(keys).contains("thai", "moroccan", "british");
+    }
+
+    @Test
+    void onlyUnknownSeaMatchesNothing() {
+        assertThat(catalog.resolveFilter(null, null, List.of("atlantis"))).isEqualTo(Optional.of(Set.of()));
+    }
+
+    @Test
+    void unknownSeaKeyInCsvFailsStartup() {
+        assertThatThrownBy(() -> CuisineCatalog.parseLine("x,X,europe,lake", 2))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

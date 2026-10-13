@@ -35,7 +35,7 @@ class RecipeCuisineQueryDbTest {
     private RecipeRepository recipeRepository;
 
     private static RecipeFilter filter(Boolean vegetarian) {
-        return new RecipeFilter(null, null, null, null, null, vegetarian, null, null);
+        return new RecipeFilter(null, null, null, null, null, null, vegetarian, null, null);
     }
 
     @Test

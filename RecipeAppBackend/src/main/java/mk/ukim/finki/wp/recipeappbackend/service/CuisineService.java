@@ -32,7 +32,7 @@ public class CuisineService {
         }
         return catalog.all().stream()
                 .map(e -> new CuisineInfoDto(e.key(), e.label(), e.region().key(),
-                        e.mediterranean(), counts.getOrDefault(e.key(), 0L)))
+                        e.seas(), counts.getOrDefault(e.key(), 0L)))
                 .sorted(Comparator.comparingLong(CuisineInfoDto::count).reversed()
                         .thenComparing(CuisineInfoDto::label))
                 .toList();
