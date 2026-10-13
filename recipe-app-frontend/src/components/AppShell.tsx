@@ -100,6 +100,21 @@ export default function AppShell() {
               >
                 Sign out
               </button>
+            ) : status === 'needs-mfa' ? (
+              <>
+                <Link
+                  to="/verify-2fa"
+                  className={`${pillLink} ml-1 bg-olive text-cream shadow-button hover:-translate-y-px hover:bg-olive/90`}
+                >
+                  Finish signing in
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className={`${pillLink} border border-olive/25 text-olive hover:border-olive/60 hover:bg-cream`}
+                >
+                  Sign out
+                </button>
+              </>
             ) : status !== 'loading' ? (
               <Link
                 to="/login"

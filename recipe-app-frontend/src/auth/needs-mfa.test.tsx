@@ -1,0 +1,96 @@
+import { http, HttpResponse } from 'msw';
+import { act, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { server } from '@/test/server';
+import { renderApp } from '@/test/utils';
+import { profileFixture, pageOf } from '@/test/fixtures';
+
+const BASE = 'http://localhost:8080';
+
+const b64url = (o: unknown) =>
+  btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const jwt = (aal: string) => `${b64url({ alg: 'HS256' })}.${b64url({ aal })}.sig`;
+const sessionFor = (id: string, aal: string) => ({
+  access_token: jwt(aal),
+  user: { id, email: `${id}@example.com` },
+});
+
+const mocks = vi.hoisted(() => ({
+  session: null as unknown,
+  fire: undefined as undefined | ((event: string, session: unknown) => void),
+  signOut: undefined as undefined | (() => Promise<unknown>),
+  getAal: undefined as undefined | (() => Promise<unknown>),
+}));
+
+vi.mock('@/auth/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: async () => ({ data: { session: mocks.session } }),
+      onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
+        mocks.fire = cb;
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
+      signOut: () => mocks.signOut!(),
+      mfa: { getAuthenticatorAssuranceLevel: () => mocks.getAal!() },
+    },
+  },
+}));
+
+let meCalls = 0;
+
+beforeEach(() => {
+  meCalls = 0;
+  mocks.fire = undefined;
+  mocks.session = sessionFor('u-1', 'aal1');
+  mocks.signOut = vi.fn(async () => ({}));
+  mocks.getAal = async () => ({ data: { currentLevel: 'aal1', nextLevel: 'aal2' }, error: null });
+  server.use(
+    http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/users/me`, () => {
+      meCalls += 1;
+      return HttpResponse.json(profileFixture);
+    }),
+  );
+});
+
+test('protectedRouteRedirectsToVerify', async () => {
+  renderApp('/me');
+  expect(await screen.findByRole('heading', { name: /two-factor verification/i })).toBeInTheDocument();
+  expect(meCalls).toBe(0);
+});
+
+test('publicPageStillRenders', async () => {
+  renderApp('/');
+  expect(await screen.findByRole('heading', { name: /cook something/i })).toBeInTheDocument();
+  expect(meCalls).toBe(0);
+});
+
+test('upgradeToAal2LoadsProfile', async () => {
+  renderApp('/');
+  expect(await screen.findByRole('link', { name: /finish signing in/i })).toBeInTheDocument();
+  expect(meCalls).toBe(0);
+
+  await act(async () => { mocks.fire?.('TOKEN_REFRESHED', sessionFor('u-1', 'aal2')); });
+  expect(await screen.findByRole('button', { name: /jane/i })).toBeInTheDocument();
+  expect(meCalls).toBe(1);
+  expect(screen.queryByRole('link', { name: /finish signing in/i })).not.toBeInTheDocument();
+
+  await act(async () => { mocks.fire?.('TOKEN_REFRESHED', sessionFor('u-1', 'aal2')); });
+  expect(meCalls).toBe(1); // a further aal2 refresh must not refetch
+  expect(screen.getByRole('button', { name: /jane/i })).toBeInTheDocument();
+});
+
+test('headerOffersSignOutWhileNeedsMfa', async () => {
+  renderApp('/');
+  const signOut = await screen.findByRole('button', { name: /sign out/i });
+  expect(screen.getByRole('link', { name: /finish signing in/i })).toHaveAttribute('href', '/verify-2fa');
+  await userEvent.click(signOut);
+  expect(mocks.signOut).toHaveBeenCalled();
+});
+
+test('a failing AAL lookup falls back to the normal profile path', async () => {
+  mocks.getAal = () => Promise.reject(new Error('network'));
+  renderApp('/');
+  expect(await screen.findByRole('button', { name: /jane/i })).toBeInTheDocument();
+  expect(meCalls).toBe(1);
+});

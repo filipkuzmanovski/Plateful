@@ -2,10 +2,11 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { getMe } from '@/api/users';
-import { ApiError } from '@/api/client';
+import { ApiError, setMfaRequiredHandler } from '@/api/client';
+import { aalOf } from './aal';
 import type { UserDisplay } from '@/lib/types';
 
-type Status = 'loading' | 'anonymous' | 'needs-profile' | 'ready';
+type Status = 'loading' | 'anonymous' | 'needs-profile' | 'needs-mfa' | 'ready';
 
 interface AuthState {
   session: Session | null;
@@ -28,7 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let latest = 0; // id of the newest resolution; results from older ones are dropped
 
     async function resolveProfile(s: Session | null) {
-      const key = s?.user?.id ?? null;
+      // The assurance level is part of the key: an aal1 -> aal2 upgrade is a real change to resolve.
+      const key = s ? `${s.user.id}:${aalOf(s) ?? 'none'}` : null;
       if (key === lastUserKey) return; // dedupes INITIAL_SESSION/getSession double-fire and token refreshes
       lastUserKey = key;
       const run = ++latest;
@@ -39,6 +41,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (isCurrent()) setStatus('loading');
+      if (aalOf(s) === 'aal1') {
+        // Half signed-in? An account with a verified factor must reach aal2 before /me can load.
+        try {
+          const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (data && data.currentLevel === 'aal1' && data.nextLevel === 'aal2') {
+            if (isCurrent()) { setProfileState(null); setStatus('needs-mfa'); }
+            return;
+          }
+        } catch {
+          // fall back to the normal path; the backend still enforces aal2
+        }
+        if (!isCurrent()) return;
+      }
       try {
         const me = await getMe();
         if (isCurrent()) { setProfileState(me); setStatus('ready'); }
@@ -53,6 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
+
+    setMfaRequiredHandler(() => { if (!cancelled) setStatus('needs-mfa'); });
 
     supabase.auth.getSession()
       .then(({ data }) => {
@@ -75,7 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       void resolveProfile(s);
     });
-    return () => { cancelled = true; subscription.unsubscribe(); };
+    return () => {
+      cancelled = true;
+      setMfaRequiredHandler(null);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const value: AuthState = {
