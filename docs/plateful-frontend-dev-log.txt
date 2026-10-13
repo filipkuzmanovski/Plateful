@@ -2401,3 +2401,514 @@ Rollout
      value.
   4. The frontend needs VITE_SUPABASE_URL set to the same project (it is
      already used for sign-in).
+
+################################################################################
+################################################################################
+
+ PART 4 — SEAS AND SORTING
+ Branch: feature/seas-and-sorting
+ Spec: docs/superpowers/specs/2026-10-13-seas-and-sorting-design.md
+ Plan: docs/superpowers/plans/2026-10-13-seas-and-sorting.md
+
+################################################################################
+################################################################################
+
+Why this round happened
+-----------------------
+Two requests from the user:
+  1. A table of five seas (Mediterranean, Caribbean, North Sea, Sea of Japan
+     & Pacific, Gulf of Mexico), each with a "vibe", its star ingredients and
+     its icon dishes. The idea: pick a sea in the filters and get the cuisines
+     around it, and read a short card about that sea's food.
+  2. Sort options on the browse page: newest, most rated, most popular and
+     most comments. Until now the list was always newest first.
+
+The decisions taken before any code was written:
+  - A sea is a second way to group cuisines, next to regions. One cuisine can
+    touch several seas (French is Mediterranean and North Sea; Mexican is
+    Pacific and Gulf of Mexico), so a cuisine now carries a LIST of seas.
+  - The old "mediterranean" yes/no flag on a cuisine goes away. It is just one
+    of the five seas now. Old links with region=mediterranean must keep
+    working.
+  - The sea text is copied word for word from the user's table.
+  - Sorting is done by the database, over the whole result, not by the browser
+    on the one page it happens to hold. Nothing new is stored on recipes: the
+    rating and comment numbers are computed when needed.
+  - The sort control is a native select, and the sea information is shown
+    only for the seas that are ticked.
+
+The order of the work: the catalogue and the filter (Task 1), the seas
+endpoint (2), the sort orders (3), the frontend URL state and API calls (4),
+the Seas section with info cards (5), and the Sort by control (6). Task 7 is
+this write-up plus the final check.
+
+Cuisines that no sea lists (for example Swiss, Thai) belong to no sea. That is
+intended: the loader never invents rows, and a cuisine is tagged only where the
+spec lists it.
+
+
+================================================================================
+ SEA TASK 1 — Seas in the catalogue and the filter (backend)
+ Files: RecipeAppBackend/src/main/resources/cuisines.csv, seas.json
+        .../cuisine/CuisineEntry.java, CuisineCatalog.java, Sea.java,
+        SeaCatalog.java
+        .../model/RecipeFilter.java, displayDTO/CuisineInfoDto.java
+        .../service/CuisineService.java, RecipeService.java
+================================================================================
+
+What was done
+-------------
+The fourth column of cuisines.csv used to be "mediterranean" (true/false).
+It is now "seas": zero or more sea keys joined with "|", for example
+"mediterranean|north_sea". The header is key,label,region,seas, and an empty
+field means no seas. All 198 rows kept their place; only the last column
+changed. The 23 rows that were "true" now say "mediterranean". The other four
+seas got their cuisines from the spec's membership lists: caribbean 19 rows,
+north_sea 11, pacific 14, gulf_of_mexico 5. (A cuisine can be in two lists, so
+these numbers count rows per sea, not distinct cuisines.)
+
+The five sea keys are fixed: mediterranean, caribbean, north_sea, pacific,
+gulf_of_mexico. CuisineEntry became (key, label, region, List<String> seas),
+and CuisineInfoDto (what GET /api/recipes/cuisines returns) now has
+"seas": [...] instead of "mediterranean": true/false.
+
+The loader checks each row when the backend starts. An unknown region or an
+unknown sea key makes startup fail with a message that names the cuisine (and
+the line number for a sea), the same way an unknown region always did. A typo
+in the CSV can't slip through quietly.
+
+Why the sea text is JSON, not CSV
+---------------------------------
+seas.json holds the five seas in order, each with key, label, vibe,
+starIngredients and iconDishes. The text is full of commas ("Fresh,
+olive-oil drenched, citrusy, and simple."), which would fight with CSV
+columns, so it is JSON. SeaCatalog reads it once and exposes all(). At startup
+it checks that the keys are exactly the five expected ones with no repeats.
+(The project uses Jackson 3, so the reader is tools.jackson's JsonMapper, not
+the older ObjectMapper.)
+
+The filter: sea joins cuisines and regions
+------------------------------------------
+RecipeFilter gained "sea" (a repeatable query parameter, ?sea=caribbean&
+sea=pacific). resolveFilter(cuisines, regions, seas) turns the three lists
+into one set of cuisine keys, and it is the UNION: a recipe matches when it
+belongs to ANY of the picked cuisines, regions or seas. The old meanings are
+unchanged:
+  - nothing picked at all: no filter;
+  - something picked but nothing known: matches nothing (an empty page).
+So ?sea=nonsense returns an empty page, not everything.
+
+region=mediterranean keeps working
+----------------------------------
+Mediterranean used to be a region chip; it is a sea now. To keep old links
+and bookmarks alive, asking for the region "mediterranean" is answered with
+the Mediterranean sea's members (keysForRegion hands over to keysForSea). On
+the frontend the same link is moved to the Seas section (Task 4).
+
+How it was tested
+-----------------
+CuisineCatalogTest (17) and the new SeaCatalogTest (3): the seas column
+parses, an unknown sea key fails, keysForSea, the union of cuisine + region +
+sea, the alias, only-unknown values match nothing, five seas in order with the
+exact text of one. The existing controller and service tests were updated for
+the new shapes.
+
+
+================================================================================
+ SEA TASK 2 — GET /api/recipes/seas (backend)
+ Files: .../controller/CuisineController.java (+ test)
+================================================================================
+
+What was done
+-------------
+One new endpoint returns the five seas in file order:
+[{key, label, vibe, starIngredients, iconDishes}]. It is public. The existing
+rule that GET /api/recipes/** is open to everyone already covers it, so
+SecurityConfig was not touched.
+
+The literal path against /{id}
+------------------------------
+RecipeController already has GET /api/recipes/{id}, where {id} is a number.
+A request for /api/recipes/seas could be mistaken for a recipe whose id is the
+word "seas". Spring prefers a literal path over a variable one, and
+"cuisines" already relied on that, so "seas" works the same way. But this is
+easy to break by accident later, so a test pins it. Before the endpoint
+existed, that test failed with a 400 (the word "seas" could not be converted
+into a number), which is exactly the symptom of the variable path swallowing
+the request.
+
+How it was tested
+-----------------
+Three new tests in CuisineControllerTest: the endpoint is public and returns
+five, it is not swallowed by /{id}, and the cuisine entries carry seas. The
+slice test imports the REAL SeaCatalog rather than a mock, so it checks the
+real contract (five seas, Mediterranean first, the label "Sea of Japan &
+Pacific" in fourth place). A web slice does not pick up @Component classes by
+itself, so the class is imported explicitly. 5 tests in that class.
+
+
+================================================================================
+ SEA TASK 3 — Browse sort orders (backend)
+ Files: .../model/RecipeSort.java, exception/InvalidSortException.java
+        .../exception/GlobalExceptionHandler.java
+        .../specification/RecipeSpecifications.java (withSort)
+        .../service/RecipeService.java, controller/RecipeController.java
+        .../repository/RecipeSortDbTest.java (new, real database)
+================================================================================
+
+What was done
+-------------
+Browse takes a new parameter, sortBy, with four values:
+newest, most-rated, top-rated, most-comments. Missing means newest. An unknown
+value is a 400 in the same shape as the other validation errors:
+detail "Validation failed" and errors = {"sortBy": "Unknown sort: <value>"}.
+The client no longer sends Spring's own "sort" parameter; if some client still
+does, the server ignores it (the service builds a PageRequest with only the
+page number and size).
+
+The four ORDER BY rules
+-----------------------
+  newest         created_at desc, id asc
+  most-rated     rating count desc, average rating desc (nulls last),
+                 created_at desc, id asc
+  top-rated      average rating desc (nulls last), rating count desc,
+                 created_at desc, id asc
+  most-comments  comment count desc, created_at desc, id asc
+
+"Most popular" in the UI is top-rated: the best average first, and the number
+of ratings breaks a tie (a 5.0 from many people beats a 5.0 from one).
+Recipes nobody has rated have no average at all, so "nulls last" puts them at
+the end instead of letting the database decide.
+
+Every rule ends with id asc. If two recipes tie on everything else (same
+rating numbers, same created_at), the database could return them in either
+order, and the order could differ between the page-1 request and the page-2
+request, so a recipe could show up on both pages or on neither. A last key
+that is unique makes the whole order total, so paging is stable.
+
+Correlated subqueries instead of stored columns
+-----------------------------------------------
+The rating count, rating average and comment count are computed with
+subqueries, one per recipe row ("how many ratings does THIS recipe have"):
+
+  ratingCountQ.where(cb.equal(rc.get("recipe"), root));
+
+withSort(...) is a Specification that only sets query.orderBy(...) and adds no
+condition, so it combines with the filter through and(). Nothing is added to
+the recipes table, so there is nothing to keep in sync when someone rates or
+comments. The cost is two or three small subqueries per row, which is fine at
+this size; stored (denormalized) counts are the thing to revisit only if
+sorting gets slow (the spec lists that as out of scope).
+
+The count query and the Long guard
+----------------------------------
+A page of results needs a second query: "how many recipes match in total".
+That one has no use for an ORDER BY (Spring clears it anyway). withSort checks
+the result type of the query being built; if it is Long, it is the count
+query, and the method returns early without building the subqueries:
+
+  if (query == null || Long.class.equals(query.getResultType())) {
+      return cb.conjunction();
+  }
+
+So the totals stay correct and no work is wasted.
+
+Browse always uses the Specification
+------------------------------------
+Before, a browse with no filter took a shortcut (findAll(pageable)). That
+shortcut had no way to apply a sort, so browse now ALWAYS goes through
+findAll(filterSpec.and(sortSpec), page). With no filter the filter part just
+matches everything. The short-circuit stays for "only unknown cuisines": that
+still returns an empty page without asking the database.
+
+How it was tested
+-----------------
+Unit tests: browse passes sortBy through, defaults to newest, an unknown
+sortBy is 400, an empty filter still takes the Specification path, and the
+PageRequest is unsorted but keeps the page number and size. A handler test
+checks the 400 body.
+
+RecipeSortDbTest runs against the real database (same annotations as the other
+DB tests, see below). Five tests check that each order holds over the first
+page: counts non-increasing, non-null averages before nulls, createdAt
+non-increasing, and that two pages don't overlap. But the live database held
+almost no recipes when this was written, so those checks hold trivially. A
+sixth test therefore plants its own data: it inserts four recipes with ratings
+and comments, borrows two existing users (read only), and asserts the exact
+order of those four for each of the four sorts. The data distinguishes the
+count-first rule from the average-first rule (two ratings averaging 3, against
+one rating of 5, one of 4, and one recipe with no rating). It runs inside the
+test's transaction, which is rolled back and never committed, so it leaves
+nothing behind; if fewer than two users exist it skips.
+
+Hibernate accepted ORDER BY over subqueries and Postgres executed them, so the
+plan's "stop if Hibernate refuses" condition never came up.
+
+A fixture fix for an older DB test: RecipePhotoRepositoryDbTest used the first
+recipe in the table, which clashes with the UNIQUE (recipe_id, position) rule
+when that recipe already has photos. It now picks a recipe without photo rows
+and skips (not fails) if there is none.
+
+Same annotations as the other DB tests
+--------------------------------------
+Every DB test class carries exactly the annotations of RecipeCuisineQueryDbTest,
+including @TestPropertySource(properties = "spring.flyway.enabled=false").
+Identical settings let Spring reuse one cached test context. A class with
+different settings would build a second context with its own connection pool,
+and together with the running backend that can hit Supabase's limit of 15
+clients (the same trouble described in Part 3).
+
+
+================================================================================
+ SEA TASK 4 — API and URL state for seas and sort (frontend)
+ Files: src/api/cuisines.ts, src/api/recipes.ts, src/lib/types.ts,
+        src/features/browse/filterParams.ts, regions.ts, BrowsePage.tsx
+================================================================================
+
+What was done
+-------------
+  - CuisineInfo has seas (a list of keys) instead of mediterranean.
+    getSeas() calls the new endpoint and is cached under the key ['seas'].
+  - RecipeFilter and FilterState have sea (a list). It is read from and
+    written to the page URL as the repeatable param sea, and it counts in
+    countActive and in the request sent to the server.
+  - Old links: readFilters moves region=mediterranean into sea (without
+    duplicates) and removes it from region, so the chip shows up under Seas.
+  - regions.ts no longer lists Mediterranean among the Regions. It gained
+    SEAS_FALLBACK (the five seas with their labels) and seaLabel(key). The
+    fallback is used before the seas endpoint answers, or if it fails, so the
+    chips are never missing.
+
+Two names: sort in the page URL, sortBy in the API
+--------------------------------------------------
+The browser address uses ?sort=most-rated. The request to the server uses
+sortBy=most-rated. Different names on purpose: "sort" is also what Spring
+itself understands (sort=createdAt,desc), and the server now ignores that one,
+so the API side gets its own word and the client stops sending the old
+"sort=createdAt,desc&sort=id,asc" pair. The page address keeps the short
+word. browseRecipes(filter, page, size, sort = 'newest') does the mapping.
+
+Sort is not part of FilterState. It is not a filter: it does not count in the
+"N filters" badge, and it is not an active chip. It has its own helpers:
+  - readSort(params) returns one of the four keys; anything unknown (or
+    missing) falls back to newest;
+  - writeSort(sort, params) returns new params with sort replaced (the
+    parameter is left out for newest, which keeps the default address clean)
+    and with page deleted.
+
+writeSort drops page
+--------------------
+Changing the order changes which recipe is first, so page 3 of the old order
+means nothing in the new one (and might not even exist). Resetting to page 1
+is the only sensible thing, so writeSort removes page from the address.
+
+BrowsePage passes readSort(params) to browseRecipes. The query key already
+contained the whole address string, so a changed sort refetches without extra
+code.
+
+How it was tested
+-----------------
+filterParams.test.ts (sea round trip, the region=mediterranean move, the
+sort helpers, page removed), regions.test.ts (new), and client.test.ts
+(sortBy sent, no "sort" sent, repeated sea params, getSeas). Fixtures in the
+browse and authoring tests were switched from the mediterranean flag to
+seas lists. Whole frontend suite then: 150 tests.
+
+
+================================================================================
+ SEA TASK 5 — The Seas section and info cards (frontend)
+ Files: src/features/browse/FilterDrawer.tsx, SeaCard.tsx (new),
+        ActiveFilterChips.tsx, src/api/cuisines.ts
+================================================================================
+
+What the user sees
+------------------
+In the filter drawer, a "Seas" section sits under "Regions", with five chips
+in the order of seas.json. Ticking a sea opens an info card for it directly
+below the chips: the sea's name as a small serif heading, then three labelled
+lines, "Vibe", "Star ingredients" and "Icon dishes". The card is a paper tile
+with a sand ring, and the labels are small uppercase text in the olive tone at
+70 percent, matching the rest of the Golden Hour look. Several ticked seas
+show several cards, always in sea order, not in the order they were ticked.
+
+The "Show N recipes" count in the drawer includes the picked seas. After
+applying, each picked sea also appears as a removable chip in the active
+filters row ("Remove Caribbean"), after the region chips.
+
+If the seas endpoint fails
+--------------------------
+The chips come from the endpoint's answer when there is one, and from
+SEAS_FALLBACK when there isn't. So the section always shows five working
+chips and filtering by sea still works. What a failure cannot supply is the
+card text (vibe, ingredients, dishes), which only the endpoint has, so no card
+is drawn and no error banner is shown. The result is a quiet degradation
+rather than a broken drawer.
+
+A type bug found on the way
+---------------------------
+Task 4 had typed starIngredients and iconDishes as lists of strings, but the
+backend (Sea.java, seas.json) sends one string each. Task 5 corrected the
+type and the test fixture to string.
+
+How it was tested
+-----------------
+Five new tests: five chips appear; ticking Caribbean shows the card with its
+exact rows and sends sea=caribbean (with the drawer open there are no emojis);
+cards follow sea order, not tick order; ?sea=north_sea pre-ticks the chip and
+the active chip removes it; a failing endpoint still shows the chips and no
+card. Whole frontend suite then: 155 tests.
+
+
+================================================================================
+ SEA TASK 6 — The Sort by control (frontend)
+ Files: src/features/browse/BrowsePage.tsx (+ browse.test.tsx)
+================================================================================
+
+What the user sees
+------------------
+A "Sort by" dropdown on the same row as the Filters button (it wraps below on
+a narrow phone). Options, in order: Newest, Most rated, Most popular, Most
+comments. Choosing one changes the address to ?sort=... at once, goes back to
+page 1, and reloads the list. Filters that were set stay set, and applying new
+filters in the drawer keeps the chosen sort.
+
+Why a native select
+-------------------
+The control is a real <select>, not a custom dropdown. It brings the
+keyboard behaviour, the screen-reader behaviour and the phone's own picker for
+free, which a hand-built menu would have to rebuild. It is styled to match the
+text inputs (sand border, paper background, olive hover and a focus ring) with
+the browser's own arrow hidden (appearance-none) and two small decorative
+icons: sort arrows on the left and a chevron on the right. The icons ignore
+clicks (pointer-events-none) and are hidden from screen readers. The control is
+labelled "Sort by".
+
+The visible label "Most popular" is the API's top-rated sort (average rating
+first). The labels, keys and order all come from SORT_KEYS and SORT_LABELS in
+filterParams.ts, so the select cannot drift from the URL helpers.
+
+How it was tested
+-----------------
+Four new tests: the select offers exactly the four options in order (and has
+no emoji); choosing "Most rated" changes the address to ?sort=most-rated and
+the request carries sortBy=most-rated; applying filters keeps the sort; an
+invalid ?sort= shows Newest. Whole frontend suite then: 159 tests.
+
+A quick look in a real browser at 375 pixels wide (done by hand during the
+review, not by the automated tests) found no horizontal scroll, the select
+reading "Sort by" with ?sort=most-rated, and the Seas section and the
+Caribbean card rendering without overflow.
+
+
+================================================================================
+ SEAS AND SORTING — VERIFICATION
+================================================================================
+
+Run on 2026-10-13, branch feature/seas-and-sorting, after Task 6 (7815aea).
+
+  - Backend, targeted: 21 test classes, 139 tests, 0 failures, 0 errors, 0
+    skipped. This is every class from the regression list (CuisineCatalogTest,
+    SeaCatalogTest, CuisineServiceTest, CuisineControllerTest,
+    RecipeServiceBrowseTest, RecipeServiceCuisineValidationTest,
+    RecipeServicePhotosTest, RecipeControllerTest,
+    SpoonacularRecipeTranslatorTest, SpoonacularImportServiceTest) plus
+    GlobalExceptionHandlerTest, CommentControllerTest, RatingControllerTest,
+    ReactionControllerTest, UserControllerTest, RecipePhotoPathsTest,
+    TextArrayFunctionsTest, CurrentUserIdArgumentResolverTest,
+    SpoonacularClientTest, SpoonacularPropertiesTest and
+    SpoonacularImportRunnerTest.
+  - Backend, real database (*DbTest): 4 classes, 13 tests: 9 pass, 3 fail,
+    1 skipped.
+      CommentReactionQueryDbTest      2 of 2 pass
+      RecipeSortDbTest                6 of 6 pass (incl. the planted-data
+                                      exact-order test)
+      RecipePhotoRepositoryDbTest     1 pass, 1 skipped (no recipe without
+                                      photo rows to use as a fixture)
+      RecipeCuisineQueryDbTest        3 of 3 fail
+    The 3 failures are caused by the data in the live database, not by the
+    code. The database held only one user-made recipe, because the imported
+    recipes were wiped (see the incident below). Those tests expect Italian
+    and Greek recipes:
+      anyOfFilterReturnsOnlyMatchingRecipes  "Expecting actual not to be empty"
+      anyOfFilterCombinesWithDietFlag        "Expecting actual not to be empty"
+      countCuisinesReturnsPositiveCounts     no entry with key "italian" and a
+                                             positive count
+    They should pass again once the recipes are re-imported. The same three
+    tests failed the same way on the code from before this feature, when the
+    database already lacked the imported recipes.
+  - Frontend: 17 test files, 159 tests pass (vitest), and `npm run build`
+    is clean (only the usual chunk-size warning).
+  - Not covered by automated work: sorting real imported data, checked by eye
+    in the browser. The planted-data DB test covers the ORDER BY itself.
+
+
+Incident: imported recipes wiped
+--------------------------------
+During this round the imported (Spoonacular) recipes in the database
+disappeared. What happened, in order:
+  - The backend had been left running with two launch arguments from an
+    earlier one-off import:
+      --spoonacular.import.enabled=true
+      --spoonacular.import.replace-existing=true
+  - Spring DevTools restarts the application whenever compiled code changes,
+    and a restart reuses the ORIGINAL launch arguments. So every compile
+    (every task of this round) started the backend with the import switched
+    on, and the import ran again in replace mode.
+  - Replace mode first deletes all imported recipes, then fetches new ones.
+    The daily Spoonacular API quota was already used up, so each run deleted
+    everything and fetched nothing.
+  - The result was an almost empty database: user-made recipes only. The
+    imported ones were gone, and the DB tests that need Italian and Greek
+    recipes started to fail.
+
+The fix: stop the backend process completely (removing the arguments from the
+run configuration alone is not enough while the old process keeps running),
+start it again without arguments, and re-import once, after the daily quota
+resets.
+
+Lesson: after any one-off import run, stop the process completely before
+making code changes. A DevTools restart is not a fresh start with new
+settings.
+
+
+Known gaps
+----------
+  - RecipeCuisineQueryDbTest (3 tests) and the photo-replace test in
+    RecipePhotoRepositoryDbTest need imported recipes in the database. They
+    fail or skip until the re-import is done.
+  - Sorting runs two or three subqueries per recipe row. Fine at the current
+    size; if browse gets slow with many thousands of recipes, stored rating
+    and comment counts are the next step.
+  - ?sortBy= with an empty value falls back to newest (it is not a 400). Only
+    a non-empty unknown value is rejected.
+  - The sort is not shown as an active-filter chip and does not count in the
+    filter badge, by design. The only sign of it is the select.
+  - If the seas endpoint is down, the chips still work, but the info cards do
+    not appear (see Task 5).
+  - Sea chip labels in the active-filters row come from the built-in list
+    (seaLabel), not from the endpoint. If a label is ever changed in
+    seas.json, SEAS_FALLBACK in regions.ts has to be changed with it.
+  - A cuisine that no sea lists (Swiss, Thai and others) can't be found
+    through the Seas section.
+  - Several Task 5 behaviours were checked by reading the code but have no
+    automated test of their own: closing the drawer discards unapplied sea
+    ticks, the live "Show N recipes" request includes sea, removing one of
+    several sea chips keeps the others, and removing a chip keeps the chosen
+    sort.
+  - The sort-change test starts without any filter set (a sort together with
+    filters is covered by the applying-filters test and the unit tests).
+  - The seas-failure test waits a fixed 50 ms, and the five-chips test can't
+    tell the endpoint's labels from the fallback's.
+  - The Sort by select was looked at in a browser only at 375 pixels wide, not
+    at other widths or in other browsers.
+
+
+Rollout
+-------
+  1. Nothing to run in the database: no migration this round. Seas are read
+     from cuisines.csv at startup and applied to the cuisine keys stored on
+     each recipe, so existing recipes are covered at once.
+  2. Restart the backend without launch arguments (see the incident above),
+     then re-import the recipes when the Spoonacular quota has reset.
+  3. Old links with ?region=mediterranean keep working; they now show up as
+     the Mediterranean sea chip.
