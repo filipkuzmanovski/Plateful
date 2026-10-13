@@ -2970,3 +2970,342 @@ Known limits
     window) allows another attempt; anyone can type a false date.
   - The server does not check age_confirmed_at; it is only stored in the
     Supabase user metadata.
+
+
+################################################################################
+################################################################################
+
+ PART 6 — TWO-FACTOR AUTHENTICATION
+ Branch: feature/two-factor-auth
+
+################################################################################
+################################################################################
+
+Why
+---
+The user asked for two-factor authentication (2FA) and made four choices:
+  - Optional: each user turns it on from their own profile page. Nobody is
+    forced.
+  - Server-enforced: it is not only a screen in the browser. For an account
+    with 2FA, the backend itself refuses account and write actions unless the
+    sign-in included a code. A password alone is not enough.
+  - Up to 2 authenticator devices per account (a phone and a spare).
+  - Recovery by hand: if a user loses every device, the site owner removes
+    their factors with one SQL line (see Recovery below). There are no backup
+    codes and no SMS.
+
+The method is an authenticator app (Google Authenticator, Microsoft
+Authenticator, Authy, a password manager) producing 6-digit codes that change
+every 30 seconds (TOTP). It runs on Supabase Auth's built-in MFA, which is free.
+Enrolling, challenging, verifying and removing a device all happen directly
+between the browser and Supabase, using the user's own session. The backend
+gained no endpoints and the database no migration; it only checks one thing
+(see Task 1).
+
+Spec: docs/superpowers/specs/2026-10-13-two-factor-auth-design.md
+Plan: docs/superpowers/plans/2026-10-13-two-factor-auth.md
+Work was done in six tasks (commits 2888751 to e2bd0cf), each reviewed.
+
+
+Supabase assurance levels (AAL), in plain words
+-----------------------------------------------
+Every Supabase access token has an "aal" claim saying how strongly the person
+proved who they are:
+  - aal1: they entered the password (or used a magic link). One factor.
+  - aal2: they also entered a valid code from their authenticator app.
+After a code is verified, Supabase refreshes the session and the new token says
+aal2. The browser library reports two levels, currentLevel and nextLevel. When
+currentLevel is aal1 and nextLevel is aal2, the user HAS a verified device but
+has not entered a code in this session yet. This log calls that "half signed
+in". A user with no 2FA stays at aal1 for good (nextLevel is aal1 too) and is
+treated as before.
+
+
+Task 1 — Backend: cached lookup of verified factors
+---------------------------------------------------
+File: security/MfaFactorLookup (a @Component). Commit 2888751.
+  - hasVerifiedFactor(UUID) runs exactly:
+      select exists(select 1 from auth.mfa_factors
+                    where user_id = ? and status = 'verified')
+    Supabase keeps factors in auth.mfa_factors, and the backend's existing
+    database connection can read it. It asks only "is there a verified one?".
+    It never selects the secret column or any other column; a unit test checks
+    that the SQL text contains no "secret".
+  - Results are cached per user for 60 seconds (ConcurrentHashMap holding the
+    answer and its expiry time, with an injectable Clock for tests). The cap is
+    10,000 entries; when it is full the cache is cleared. No new dependency.
+    Without the cache every write request would cost a query against the auth
+    schema.
+  - Cost of the cache: for up to 60 seconds after someone turns 2FA on, a half
+    signed-in token may still pass. Accepted, because the person turning it on
+    is the account owner. The same 60 seconds apply after a reset (Recovery).
+  - Ruling: the Clock is not a bean. The public constructor takes only the
+    JdbcTemplate and uses the system clock; a package-private constructor takes
+    a Clock for tests. This avoids adding a global bean for one class.
+  - Ruling (added in Task 2): a null result from the query throws instead of
+    meaning "no factor", so the lookup is fail-closed as well. A failed lookup
+    is never cached.
+Tests: 5 unit tests at first (cache hit inside the TTL, re-query after it,
+per-user cache, no secret in the SQL, clearing when full) and one
+real-database test (a random user id has no factor), run against the live
+Postgres. The "has a factor" path is not covered against the real database: the
+test is read-only and there is no known fixture user.
+
+
+Task 2 — Backend: the enforcement filter
+----------------------------------------
+Files: security/MfaEnforcementFilter, config/SecurityConfig. Commits c120d18 and
+636c954 (fix).
+Rule, in one place: for an authenticated request that needs an account (any
+method other than GET, or a path ending in /me), whose token is not aal2, and
+whose user has a verified factor, the filter answers by itself:
+  - 401, header WWW-Authenticate: Bearer error="insufficient_user_authentication"
+    (the standard "step-up" answer), and a ProblemDetail body with
+    detail "Two-factor verification required" and code "mfa_required".
+Everything else continues unchanged. Public GETs (browse, a recipe, comments,
+profiles) are never blocked. Anonymous requests are untouched, so existing
+behaviour holds. A token without an aal claim is treated as aal1. The paths
+ending in /me cover /api/users/me, the user's own rating, and the user's own
+reactions.
+
+Fail-closed: if the lookup throws (database down, null result), the filter
+answers 503 "Could not verify two-factor status". It never lets a request
+through unchecked. The log line carries only the exception class name.
+
+Why the filter must NOT be a bean: it is created with `new` inside
+SecurityConfig and added with addFilterAfter(..., BearerTokenAuthenticationFilter).
+A servlet Filter that is also a Spring bean is registered a second time by
+Spring Boot as a plain servlet filter, so it would run twice per request, once
+outside the security chain where there is no authentication yet. The class has
+no @Component and a test (filterIsNotABean) fails if someone adds one.
+
+The percent-encoded /me bypass (found in review). The first version tested the
+raw request URI for the "/me" ending. The reviewer tried
+GET /api/users/m%65 (%65 is the letter "e") with a half signed-in token: the
+filter saw a path that did not end in /me and let the request through, but
+Spring decodes the path before routing, so it reached the /me handler and
+returned 200. The fix asks Spring's own UrlPathHelper for the decoded path
+(also with ;matrix content removed) before the /me check. Three new tests send
+the encoded form for the user, rating and reaction endpoints, and the first
+one reproduced the bypass before the fix. The reviewer then probed %6D%65, a
+context path, double encoding (%25), %2F and ;matrix variants: all are either
+guarded or rejected earlier by Spring Security's request firewall.
+Tests: 10 filter tests at first (every case in the spec plus a missing aal
+claim and any-exception-is-503), 13 after the fix, and two more lookup tests.
+The six @WebMvcTest controller tests that import SecurityConfig each got a
+@MockitoBean MfaFactorLookup.
+
+
+Task 3 — Frontend: the API client understands mfa_required
+----------------------------------------------------------
+File: src/api/client.ts. Commit 0abab0c.
+Before this, the client called supabase.auth.signOut() on EVERY 401. With
+enforcement on, a half signed-in user would be signed out the moment the backend
+asked for a code, and could never reach the code step. Now:
+  - ApiError has a new field, code, read from the problem body.
+  - On a 401 whose body has code "mfa_required", the client does NOT sign out.
+    It calls a registered handler (setMfaRequiredHandler) and throws an
+    ApiError carrying the code.
+  - Any other 401 still signs out, as before.
+The handler is one module-level callback; AuthProvider registers it on mount
+and clears it on unmount.
+
+
+Task 4 — Frontend: the "needs-mfa" state, redirect and escape hatch
+-------------------------------------------------------------------
+Files: src/auth/aal.ts (new), AuthProvider, ProtectedRoute, AppShell,
+AppRoutes. Commits e9fdcb9 and cee0052 (fix).
+  - aal.ts reads the aal claim from the access token (base64url payload) and
+    never throws; unreadable tokens give null.
+  - AuthProvider has a new status, 'needs-mfa'. When a session arrives it asks
+    Supabase for the assurance level first. If currentLevel is aal1 and
+    nextLevel is aal2, the status becomes 'needs-mfa', the profile is not
+    loaded, and /me is not called. If the level lookup itself fails, it falls
+    back to the normal path.
+  - The dedupe key is "userId:aal". AuthProvider ignores repeated events for
+    the same user so it does not reload the profile needlessly. The old key
+    was just the user id, which would have ignored the upgrade after a code is
+    verified (same user, aal1 to aal2) and left the user stuck in 'needs-mfa'.
+    With the new key the upgrade reloads the profile and the status becomes
+    'ready'.
+  - ProtectedRoute sends a 'needs-mfa' user to /verify-2fa and keeps the page
+    they wanted in `from`.
+  - AppShell shows a "Finish signing in" link and a "Sign out" button in that
+    state, so a half signed-in user can always back out.
+  - /verify-2fa first existed as a placeholder heading (so the redirect test
+    had somewhere to land); Task 5 replaced it.
+
+Two problems found in review and fixed:
+  1. getMe and mfa_required. If /me answered 401 mfa_required (for example the
+     token is aal1 and the backend's view of the account differs from what the
+     level check said), the catch treated every error other than 404 as a
+     transient failure and put the user in 'anonymous' while a session was
+     live: the header said "Sign in" and the user was in limbo. Now an
+     mfa_required answer from /me lands on 'needs-mfa', and the key is kept so
+     duplicate events do not retry in a loop.
+  2. The page unmounting on the upgrade. When a user is already on a protected
+     page and verifies a code, the session goes aal1 to aal2 for the same
+     user. AuthProvider set the status to 'loading' for the reload, and
+     ProtectedRoute shows a spinner instead of its children while loading, so
+     the page was unmounted in the middle of the verification. For the profile
+     page that would have wiped its own state (the "Two-factor authentication
+     is on" message and the device list) right after the user confirmed a
+     code. A readyUserId tracker now skips 'loading' when the same user
+     re-resolves: the status stays 'ready' and the profile refetches in the
+     background. A different user or a first load still shows 'loading'. A
+     test checks that the profile heading is the same DOM node through the
+     upgrade.
+
+
+Task 5 — Frontend: the code step at sign-in
+-------------------------------------------
+Files: src/features/auth/VerifyTwoFactorPage.tsx (new), LoginPage.tsx,
+AppRoutes.tsx. Commit 57a5d6f.
+  - Route /verify-2fa (public, so ProtectedRoute cannot bounce it). The page
+    handles each status itself: loading shows a spinner, anonymous goes to
+    /login, ready goes straight on to `from` (or "/"), needs-mfa shows the form.
+  - Title "Two-factor verification", subtitle "Enter the 6-digit code from your
+    authenticator app." Field "Code" with inputMode numeric, autoComplete
+    one-time-code, maxLength 6, pattern \d{6}.
+  - Per-device challenge. With two verified devices the page shows a "Which
+    device?" radio choice (the first is selected) and sends the CHOSEN factor
+    id: challenge({factorId}) then verify({factorId, challengeId, code}). Every
+    device has its own secret, and a challenge belongs to one factor, so a code
+    from device B does not work against device A. If the page always used the
+    first factor, a user whose code came from the second phone would be told
+    "That code didn't work" with no way out.
+  - Wrong code: "That code didn't work. Check your app and try again." (a 422
+    or any message containing "code"). Other errors, such as Supabase's own
+    rate-limit message, are shown as returned.
+  - A secondary "Sign out" button is always there. With no authenticator found
+    the page says so and offers only Sign out.
+  - LoginPage: after signInWithPassword succeeds it checks the level. Half
+    signed in goes to /verify-2fa with `from`; a normal sign-in goes where it
+    did before, and so does a sign-in where the level check fails.
+Tests: 10 for the page and 5 for LoginPage (a new test file).
+
+
+Task 6 — Frontend: managing devices on the profile page
+-------------------------------------------------------
+Files: src/features/profile/TwoFactorSettings.tsx (new), MyProfilePage.tsx.
+Commit e2bd0cf. A "Two-factor authentication" section on "My profile".
+  - Status pill: "Off" or "On: N device(s)".
+  - Turn on / Add another device (the button is hidden at 2 verified devices).
+    A "Device name" input defaults to "Authenticator 1" or "Authenticator 2",
+    skipping any name already used, because Supabase requires a name that is
+    unique per user.
+  - The leftover-factor cleanup. Supabase keeps an enrolled-but-never-verified
+    factor until it is removed, and a second enroll with the same name would
+    fail. So "Continue" first reads the factor list fresh and unenrols every
+    unverified TOTP factor (an abandoned earlier setup), and only then calls
+    enroll. A test checks the call order. "Cancel" in the scan step unenrols
+    the pending factor too; a user who just closes the page leaves one behind,
+    and the next setup removes it.
+  - The scan step: the QR code as an image (alt "QR code for your
+    authenticator app") on a white tile so cameras can read it, the secret in
+    monospace under "Can't scan? Enter this key", and a "Code" input. Confirm
+    does challenge then verify against the NEW factor id. Success shows
+    "Two-factor authentication is on" and refreshes the list.
+  - Devices: name and date added, and a "Remove {name}" button that opens the
+    existing ConfirmDialog. Removing the last device warns that it turns 2FA
+    off. Supabase demands an aal2 session to remove a verified factor; if it
+    refuses (403 or a message about aal2) the page shows "Please sign in again
+    with your code to make this change."
+  - Because the first verified factor upgrades the current session to aal2,
+    the user stays signed in after turning 2FA on; thanks to the Task 4 fix
+    the page does not remount while that happens.
+Tests: 9 new (enroll and confirm, wrong code, leftover cleanup order, hidden
+add at two devices, next default name, remove through the dialog, last-device
+warning, aal1 refusal, cancel).
+
+
+Two-factor authentication — verification
+----------------------------------------
+Run on 2026-10-13, branch feature/two-factor-auth, HEAD e2bd0cf. Before
+compiling, the running backend was checked and had no spoonacular launch
+arguments (see "Incident" in Part 4), so DevTools restarts could not re-run the
+importer.
+  - Backend, targeted: the 23-class regression list (the Part 4 list plus
+    MfaFactorLookupTest and MfaEnforcementFilterTest): 160 tests, 0 failures,
+    0 errors, 0 skipped, confirmed from the surefire XML.
+  - Backend, real database (*DbTest): 5 classes, 14 tests: 10 pass, 3 fail,
+    1 skipped.
+      CommentReactionQueryDbTest      2 of 2 pass
+      MfaFactorLookupDbTest           1 of 1 pass (new)
+      RecipeSortDbTest                6 of 6 pass
+      RecipePhotoRepositoryDbTest     1 pass, 1 skipped (needs imported recipes)
+      RecipeCuisineQueryDbTest        3 of 3 fail
+    The 3 failures are the same data-caused ones as in Part 4: the live
+    database still lacks the imported (Spoonacular) recipes, so the
+    Italian/Greek queries return nothing ("Expecting actual not to be empty",
+    twice, and no "italian" count entry). This round changed no repository,
+    entity or query code. They should pass again once the recipes are
+    re-imported.
+  - Frontend: 24 test files, 213 tests pass (vitest), and `npm run build` is
+    clean (only the usual chunk-size warning).
+  - Not covered by automated work: a real authenticator app against a real
+    Supabase project, and a look in a browser at the new screens. The frontend
+    tests use a mocked supabase.auth.mfa.
+
+
+Recovery: a user lost every device
+----------------------------------
+Use this ONLY when a user can no longer produce a code from any of their
+devices (lost or reset phone, no spare device). Check that the request really
+comes from the account owner first. In the Supabase dashboard, open the SQL
+editor and run:
+
+    delete from auth.mfa_factors where user_id = '<the user id>';
+
+The user id is shown in Authentication -> Users. After that the user can sign
+in with their password alone and set up 2FA again from their profile page. The
+backend stops asking for a code within 60 seconds, because that is the lookup
+cache time. Do not remove factors for a user who still has a working device:
+they can remove it themselves from the profile page.
+
+
+Rollout
+-------
+  1. In the Supabase dashboard check that Authentication -> Multi-Factor ->
+     TOTP is enabled (it is on by default for new projects). If it is off,
+     enrolling fails.
+  2. No migration and no new environment variable. The backend reads
+     auth.mfa_factors through its existing database connection.
+  3. Deploy the backend and the frontend together. The client must understand
+     "mfa_required" before the backend starts sending it: an old frontend would
+     sign a 2FA user out on the first refused request, and the user could never
+     reach the code step.
+  4. Restart the backend without launch arguments (Part 4 incident).
+
+
+Known gaps
+----------
+Things a user could notice:
+  - If the device list fails to load on the profile page, the section shows
+    "Off" and a "Turn on two-factor" button, which is misleading for someone who
+    already has 2FA. A load error line is shown too.
+  - Any error whose text contains "code" is shown as "That code didn't work",
+    on the sign-in step and in the settings (for example a failed challenge
+    request), not only a wrong code.
+  - If the device list cannot be loaded at the sign-in step, the error has no
+    retry button; the user can only sign out and try again.
+  - Closing the page in the middle of setup leaves an unverified device on the
+    account until the next setup removes it. It does not count as a device and
+    does not turn enforcement on.
+  - For up to 60 seconds after turning 2FA on or after a reset, the backend may
+    still answer as before (the lookup cache). This is by design.
+  - A request that was already in flight when the user signed out can still
+    answer mfa_required and put a signed-out browser into the "needs a code"
+    state until the page is reloaded (the handler is not guarded against
+    sign-out).
+  - A half signed-in user can still browse public pages, but cannot rate,
+    comment, react or edit until the code is entered.
+  - Not offered: SMS, passkeys, backup codes, "remember this device", an admin
+    screen for resets, or mandatory 2FA.
+Test and review gaps (nothing a user sees):
+  - A full application-context test of the filter wiring was not run (it needs
+    the live database); the filterIsNotABean test and the WebMvc slice cover it.
+  - The "user has a factor" lookup is not tested against the real database.
+  - The encoded-path tests prove the filter acts; they do not prove routing.
+  - The profiles test mock has no auth.mfa, so those tests render the
+    settings' load-error line.
