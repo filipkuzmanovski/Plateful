@@ -408,3 +408,50 @@ test('seasEndpointFailureFallsBack', async () => {
   await applyDrawer(drawer);
   await vi.waitFor(() => expect(requests.lastGrid().getAll('sea')).toEqual(['gulf_of_mexico']));
 });
+
+// ---- sorting ----
+
+test('sortSelectOffersTheFourOrdersInOrder', async () => {
+  captureRecipes();
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  const select = screen.getByRole('combobox', { name: 'Sort by' });
+  expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    'Newest',
+    'Most rated',
+    'Most popular',
+    'Most comments',
+  ]);
+  expectNoEmoji();
+});
+
+test('sortSelectChangesUrlAndRequest', async () => {
+  const requests = captureRecipes(pageOf([recipeFixture()], { totalPages: 3, number: 2 }));
+  renderApp('/?page=2');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(requests.lastGrid().get('page')).toBe('2');
+  await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'Most rated');
+  await vi.waitFor(() => expect(requests.lastGrid().get('sortBy')).toBe('most-rated'));
+  expect(requests.lastGrid().get('page')).toBe('0');
+  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveDisplayValue('Most rated');
+});
+
+test('applyingFiltersKeepsSort', async () => {
+  const requests = captureRecipes();
+  renderApp('/?sort=top-rated');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveDisplayValue('Most popular');
+  const drawer = await openDrawer();
+  await userEvent.click(within(drawer).getByRole('button', { name: 'Vegan' }));
+  await applyDrawer(drawer);
+  await vi.waitFor(() => expect(requests.lastGrid().get('vegan')).toBe('true'));
+  expect(requests.lastGrid().get('sortBy')).toBe('top-rated');
+});
+
+test('bogusSortShowsNewest', async () => {
+  const requests = captureRecipes();
+  renderApp('/?sort=bogus');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveDisplayValue('Newest');
+  expect(requests.lastGrid().get('sortBy')).toBe('newest');
+});

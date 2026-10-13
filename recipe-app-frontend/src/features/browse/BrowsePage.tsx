@@ -1,13 +1,13 @@
 import { useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { SearchX, SlidersHorizontal } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, SearchX, SlidersHorizontal } from 'lucide-react';
 import { browseRecipes, PAGE_SIZE } from '@/api/recipes';
 import { cuisinesQueryKey, getCuisines } from '@/api/cuisines';
 import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { Spinner, Button, EmptyState } from '@/components/ui';
-import { countActive, emptyFilters, readFilters, readSort, toApiFilter, writeFilters, type FilterState } from './filterParams';
+import { countActive, emptyFilters, readFilters, readSort, SORT_KEYS, SORT_LABELS, toApiFilter, writeFilters, writeSort, type FilterState, type SortKey } from './filterParams';
 import { FilterDrawer } from './FilterDrawer';
 import { ActiveFilterChips } from './ActiveFilterChips';
 
@@ -69,6 +69,30 @@ export default function BrowsePage() {
               {active === 1 ? '1 filter active' : `${active} filters active`}
             </span>
           )}
+          <div className="relative max-w-full">
+            <ArrowUpDown
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-olive/70"
+              strokeWidth={2.25}
+            />
+            <select
+              aria-label="Sort by"
+              value={sort}
+              onChange={(e) => setParams(writeSort(e.target.value as SortKey, params))}
+              className="w-full max-w-full cursor-pointer appearance-none rounded-xl border border-sand bg-paper py-2 pr-9 pl-10 text-sm font-semibold text-olive shadow-card transition hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+            >
+              {SORT_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABELS[key]}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-olive/70"
+              strokeWidth={2.25}
+            />
+          </div>
           <ActiveFilterChips state={applied} cuisines={cuisines.data} onChange={apply} />
         </div>
       </section>
