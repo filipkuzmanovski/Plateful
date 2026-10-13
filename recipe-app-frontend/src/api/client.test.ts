@@ -91,7 +91,7 @@ test('browseRecipes sends sortBy and repeated sea', async () => {
 
 test('getSeas fetches the sea catalogue', async () => {
   const seas = [
-    { key: 'caribbean', label: 'Caribbean', vibe: 'v', starIngredients: ['a'], iconDishes: ['b'] },
+    { key: 'caribbean', label: 'Caribbean', vibe: 'v', starIngredients: 'a', iconDishes: 'b' },
   ];
   server.use(http.get(`${BASE}/api/recipes/seas`, () => HttpResponse.json(seas)));
   expect(await getSeas()).toEqual(seas);

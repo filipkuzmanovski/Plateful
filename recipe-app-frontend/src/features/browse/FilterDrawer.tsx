@@ -2,12 +2,13 @@ import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type Rea
 import * as Dialog from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, CircleAlert, Star, X } from 'lucide-react';
-import { cuisinesQueryKey, getCuisines } from '@/api/cuisines';
+import { cuisinesQueryKey, getCuisines, getSeas, seasQueryKey } from '@/api/cuisines';
 import { browseRecipes } from '@/api/recipes';
 import { Button, Chip } from '@/components/ui';
 import { countActive, emptyFilters, readMinutes, readRating, toApiFilter, type FilterState } from './filterParams';
 import { CuisineAZ } from './CuisineAZ';
-import { DIETS, REGIONS, humanizeKey } from './regions';
+import { SeaCard } from './SeaCard';
+import { DIETS, REGIONS, SEAS_FALLBACK, humanizeKey } from './regions';
 
 const POPULAR_COUNT = 10;
 const COUNT_DEBOUNCE_MS = 300;
@@ -90,6 +91,11 @@ function DrawerPanel({ applied, onApply }: { applied: FilterState; onApply: (s: 
 
   const cuisines = useQuery({ queryKey: cuisinesQueryKey, queryFn: getCuisines, staleTime: 60_000 });
 
+  // Sea labels and info cards. A failing endpoint falls back to the built-in chips and shows no cards.
+  const seas = useQuery({ queryKey: seasQueryKey, queryFn: getSeas, staleTime: Infinity });
+  const seaChips = seas.data ?? SEAS_FALLBACK;
+  const selectedSeas = (seas.data ?? []).filter((s) => draft.sea.includes(s.key));
+
   // Live count, debounced so typing and tapping don't fire a request per keystroke.
   const countFor = useDebounced(draft, COUNT_DEBOUNCE_MS);
   const count = useQuery({
@@ -153,7 +159,7 @@ function DrawerPanel({ applied, onApply }: { applied: FilterState; onApply: (s: 
           Filters
         </Dialog.Title>
         <Dialog.Description className="sr-only">
-          Narrow the recipes by region, cuisine, dish type, time and rating.
+          Narrow the recipes by region, sea, cuisine, dish type, time and rating.
         </Dialog.Description>
         <div className="flex items-center gap-1">
           <button
@@ -199,6 +205,28 @@ function DrawerPanel({ applied, onApply }: { applied: FilterState; onApply: (s: 
                   </Chip>
                 ))}
               </div>
+            </Section>
+
+            <Section title="Seas">
+              <div className="flex flex-wrap gap-2">
+                {seaChips.map((s) => (
+                  <Chip
+                    key={s.key}
+                    tone="saffron"
+                    selected={draft.sea.includes(s.key)}
+                    onClick={() => patch({ sea: toggleIn(draft.sea, s.key) })}
+                  >
+                    {s.label}
+                  </Chip>
+                ))}
+              </div>
+              {selectedSeas.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  {selectedSeas.map((s) => (
+                    <SeaCard key={s.key} sea={s} />
+                  ))}
+                </div>
+              )}
             </Section>
 
             <Section title="Popular cuisines">

@@ -43,8 +43,19 @@ function captureRecipes(body = pageOf([recipeFixture()]), countTotal = 7): Reque
   return store;
 }
 
+const seaCatalogue = [
+  { key: 'mediterranean', label: 'Mediterranean', vibe: 'Fresh, olive-oil drenched, citrusy, and simple.', starIngredients: 'Branzino, octopus, sardines, squid, mussels.', iconDishes: 'Spanish Paella, Grilled Branzino, Calamari.' },
+  { key: 'caribbean', label: 'Caribbean', vibe: 'Citrus-marinated, spicy, fried, and robust.', starIngredients: 'Spiny lobster, snapper, conch, mahi-mahi.', iconDishes: 'Conch Fritters, Jamaican Escovitch Fish.' },
+  { key: 'north_sea', label: 'North Sea', vibe: 'Comforting, smoky, pickled, and hearty.', starIngredients: 'Cod, haddock, herring, langoustines.', iconDishes: 'British Fish & Chips, Scandinavian Pickled Herring.' },
+  { key: 'pacific', label: 'Sea of Japan & Pacific', vibe: 'Umami-rich, clean, precise, often raw or lightly seared.', starIngredients: 'Salmon, mackerel, king crab, sea urchin (uni).', iconDishes: 'Sashimi, Miso-Glazed Salmon, Crab Hot Pot.' },
+  { key: 'gulf_of_mexico', label: 'Gulf of Mexico', vibe: 'Cajun/Creole spiced, buttery, and deeply comforting.', starIngredients: 'Gulf shrimp, blue crab, oysters, redfish.', iconDishes: "Shrimp Po' Boys, Seafood Gumbo, Oysters Rockefeller." },
+];
+
 beforeEach(() => {
-  server.use(http.get(`${BASE}/api/recipes/cuisines`, () => HttpResponse.json(cuisineCatalogue)));
+  server.use(
+    http.get(`${BASE}/api/recipes/cuisines`, () => HttpResponse.json(cuisineCatalogue)),
+    http.get(`${BASE}/api/recipes/seas`, () => HttpResponse.json(seaCatalogue)),
+  );
 });
 
 async function openDrawer() {
@@ -313,4 +324,87 @@ test('the open drawer and its A–Z view render without emoji characters', async
   await userEvent.click(within(drawer).getByRole('button', { name: /all cuisines/i }));
   await within(drawer).findByRole('checkbox', { name: 'Italian' });
   expectNoEmoji();
+});
+
+// ---- seas ----
+
+const group = (drawer: HTMLElement, title: string) =>
+  within(drawer).getByRole('heading', { name: title }).closest('section') as HTMLElement;
+
+test('seasSectionShowsFiveChips', async () => {
+  captureRecipes();
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  const drawer = await openDrawer();
+  const seas = group(drawer, 'Seas');
+  const chips = await within(seas).findAllByRole('button');
+  expect(chips.map((c) => c.textContent)).toEqual([
+    'Mediterranean',
+    'Caribbean',
+    'North Sea',
+    'Sea of Japan & Pacific',
+    'Gulf of Mexico',
+  ]);
+  expect(within(group(drawer, 'Regions')).queryByRole('button', { name: 'Mediterranean' })).not.toBeInTheDocument();
+});
+
+test('tickingCaribbeanShowsCardAndFilters', async () => {
+  const requests = captureRecipes();
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  const drawer = await openDrawer();
+  expect(within(drawer).queryByText('Citrus-marinated, spicy, fried, and robust.')).not.toBeInTheDocument();
+  await userEvent.click(await within(group(drawer, 'Seas')).findByRole('button', { name: 'Caribbean' }));
+  const card = await within(drawer).findByRole('region', { name: 'Caribbean' });
+  expect(within(card).getByText('Citrus-marinated, spicy, fried, and robust.')).toBeVisible();
+  expect(within(card).getByText('Vibe')).toBeInTheDocument();
+  expect(within(card).getByText('Star ingredients')).toBeInTheDocument();
+  expect(within(card).getByText('Icon dishes')).toBeInTheDocument();
+  expect(within(card).getByText('Spiny lobster, snapper, conch, mahi-mahi.')).toBeInTheDocument();
+  expectNoEmoji();
+  await applyDrawer(drawer);
+  await vi.waitFor(() => expect(requests.lastGrid().getAll('sea')).toEqual(['caribbean']));
+  expect(screen.getByRole('button', { name: 'Remove Caribbean' })).toBeInTheDocument();
+});
+
+test('seaCardsFollowSeaOrderNotSelectionOrder', async () => {
+  captureRecipes();
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  const drawer = await openDrawer();
+  const seas = group(drawer, 'Seas');
+  await userEvent.click(await within(seas).findByRole('button', { name: 'Gulf of Mexico' }));
+  await userEvent.click(within(seas).getByRole('button', { name: 'Mediterranean' }));
+  const cards = await within(drawer).findAllByRole('region', { name: /^(Mediterranean|Gulf of Mexico)$/ });
+  expect(cards.map((c) => c.getAttribute('aria-label'))).toEqual(['Mediterranean', 'Gulf of Mexico']);
+});
+
+test('urlSeaPreTicksAndActiveChipRemoves', async () => {
+  const requests = captureRecipes();
+  renderApp('/?sea=north_sea');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(requests.lastGrid().getAll('sea')).toEqual(['north_sea']);
+  const drawer = await openDrawer();
+  expect(await within(group(drawer, 'Seas')).findByRole('button', { name: 'North Sea' })).toHaveAttribute('aria-pressed', 'true');
+  await userEvent.keyboard('{Escape}');
+  await vi.waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Remove North Sea' }));
+  await vi.waitFor(() => expect(requests.lastGrid().has('sea')).toBe(false));
+});
+
+test('seasEndpointFailureFallsBack', async () => {
+  server.use(http.get(`${BASE}/api/recipes/seas`, () => HttpResponse.json({ detail: 'boom' }, { status: 500 })));
+  const requests = captureRecipes();
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  const drawer = await openDrawer();
+  const seas = group(drawer, 'Seas');
+  expect(await within(seas).findAllByRole('button')).toHaveLength(5);
+  await userEvent.click(within(seas).getByRole('button', { name: 'Gulf of Mexico' }));
+  // Let the failed query settle, then confirm no card and no error banner.
+  await new Promise((r) => setTimeout(r, 50));
+  expect(within(drawer).queryByRole('region', { name: 'Gulf of Mexico' })).not.toBeInTheDocument();
+  expect(within(drawer).queryByRole('alert')).not.toBeInTheDocument();
+  await applyDrawer(drawer);
+  await vi.waitFor(() => expect(requests.lastGrid().getAll('sea')).toEqual(['gulf_of_mexico']));
 });

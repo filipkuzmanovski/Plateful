@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import type { CuisineInfo } from '@/api/cuisines';
 import type { FilterState } from './filterParams';
-import { DIETS, humanizeKey, regionLabel } from './regions';
+import { DIETS, humanizeKey, regionLabel, seaLabel } from './regions';
 
 interface ActiveChip {
   id: string;
@@ -16,6 +16,11 @@ function chipsFor(state: FilterState, cuisines: CuisineInfo[] | undefined): Acti
       id: `region:${key}`,
       label: regionLabel(key),
       remove: (s: FilterState) => ({ ...s, region: s.region.filter((k) => k !== key) }),
+    })),
+    ...state.sea.map((key) => ({
+      id: `sea:${key}`,
+      label: seaLabel(key),
+      remove: (s: FilterState) => ({ ...s, sea: s.sea.filter((k) => k !== key) }),
     })),
     ...state.cuisine.map((key) => ({
       id: `cuisine:${key}`,

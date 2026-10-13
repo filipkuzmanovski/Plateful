@@ -16,8 +16,8 @@ export interface SeaInfo {
   key: string;
   label: string;
   vibe: string;
-  starIngredients: string[];
-  iconDishes: string[];
+  starIngredients: string;
+  iconDishes: string;
 }
 
 export const seasQueryKey = ['seas'] as const;
