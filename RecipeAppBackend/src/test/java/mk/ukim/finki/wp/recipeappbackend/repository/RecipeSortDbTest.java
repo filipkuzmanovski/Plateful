@@ -32,8 +32,8 @@ import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTest
 /**
  * Runs every browse sort order against the real Postgres, because the ORDER BY is built from
  * correlated subqueries that only the real Hibernate + Postgres pair can vouch for. Opt-in: skipped
- * unless SUPABASE_DB_PASSWORD is set. Read-only; Flyway is disabled so a test can never migrate the
- * real database. The assertions hold for any data, including an empty or one-recipe table.
+ * unless SUPABASE_DB_PASSWORD is set. Writes only inside the rolled-back test transaction; Flyway is
+ * disabled so a test can never migrate the real database. The assertions hold for any data, including an empty or one-recipe table.
  */
 @Tag("db")
 @EnabledIfEnvironmentVariable(named = "SUPABASE_DB_PASSWORD", matches = ".+")
@@ -138,6 +138,26 @@ class RecipeSortDbTest {
         assertThat(order(RecipeSort.MOST_RATED, ids)).containsExactly(r1.getId(), r2.getId(), r3.getId(), r4.getId());
         assertThat(order(RecipeSort.TOP_RATED, ids)).containsExactly(r2.getId(), r3.getId(), r1.getId(), r4.getId());
         assertThat(order(RecipeSort.MOST_COMMENTS, ids)).containsExactly(r3.getId(), r4.getId(), r2.getId(), r1.getId());
+
+        // Paging over only the seeded rows: size 2 gives two disjoint pages that together are all four.
+        Page<Recipe> first = pageOf(RecipeSort.MOST_RATED, ids, 0, 2);
+        Page<Recipe> second = pageOf(RecipeSort.MOST_RATED, ids, 1, 2);
+        Set<UUID> firstIds = first.getContent().stream().map(Recipe::getId).collect(Collectors.toSet());
+        Set<UUID> secondIds = second.getContent().stream().map(Recipe::getId).collect(Collectors.toSet());
+        assertThat(firstIds).hasSize(2);
+        assertThat(secondIds).hasSize(2);
+        assertThat(java.util.Collections.disjoint(firstIds, secondIds)).isTrue();
+        Set<UUID> union = new HashSet<>(firstIds);
+        union.addAll(secondIds);
+        assertThat(union).isEqualTo(ids);
+        assertThat(first.getTotalElements()).isEqualTo(4);
+        assertThat(second.getTotalElements()).isEqualTo(4);
+    }
+
+    private Page<Recipe> pageOf(RecipeSort sort, Set<UUID> ids, int page, int size) {
+        Specification<Recipe> onlySeeded = (root, query, cb) -> root.get("id").in(ids);
+        return recipeRepository.findAll(
+                onlySeeded.and(RecipeSpecifications.withSort(sort)), PageRequest.of(page, size));
     }
 
     private List<UUID> order(RecipeSort sort, Set<UUID> ids) {
