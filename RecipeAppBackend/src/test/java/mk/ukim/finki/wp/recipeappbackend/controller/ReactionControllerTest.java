@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.controller;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
+import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.CommentReactionCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.service.ReactionService;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,8 @@ class ReactionControllerTest {
     ReactionService reactionService;
     @MockitoBean
     JwtDecoder jwtDecoder;
+    @MockitoBean
+    MfaFactorLookup mfaFactorLookup; // SecurityConfig's MFA filter; the default false keeps these tests unaffected
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID COMMENT_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");

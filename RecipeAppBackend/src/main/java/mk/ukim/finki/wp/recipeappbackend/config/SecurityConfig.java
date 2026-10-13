@@ -1,5 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.config;
 
+import mk.ukim.finki.wp.recipeappbackend.security.MfaEnforcementFilter;
+import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,10 +10,12 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
@@ -32,7 +36,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, MfaFactorLookup mfaFactorLookup, JsonMapper jsonMapper)
+            throws Exception {
         http.csrf(csrf -> csrf.disable()) // stateless API, no cookies/forms involved
                 .cors(Customizer.withDefaults())
                 // JWT-only API: never create or read an HTTP session.
@@ -54,7 +59,12 @@ public class SecurityConfig {
                         // Deny-by-default: every mutation and unknown route.
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
+                // Created with "new" on purpose. NEVER make MfaEnforcementFilter a bean: Boot would
+                // also register it as a servlet filter that runs before JWT auth and marks the
+                // request "already filtered", silently disabling enforcement (see its Javadoc).
+                .addFilterAfter(new MfaEnforcementFilter(mfaFactorLookup, jsonMapper),
+                        BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 

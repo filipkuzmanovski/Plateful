@@ -2,6 +2,7 @@ package mk.ukim.finki.wp.recipeappbackend.security;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Clock;
@@ -11,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -92,5 +94,29 @@ class MfaFactorLookupTest {
             lookup.hasVerifiedFactor(UUID.randomUUID());
         }
         assertThat(lookup.cacheSize()).isLessThanOrEqualTo(MfaFactorLookup.MAX_ENTRIES);
+    }
+
+    @Test
+    void exceptionPropagatesAndIsNotCached() {
+        UUID id = UUID.randomUUID();
+        when(jdbc.queryForObject(eq(MfaFactorLookup.SQL), eq(Boolean.class), any(UUID.class)))
+                .thenThrow(new DataAccessResourceFailureException("db down"))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> lookup.hasVerifiedFactor(id))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+        assertThat(lookup.hasVerifiedFactor(id)).isTrue();
+        verify(jdbc, times(2)).queryForObject(MfaFactorLookup.SQL, Boolean.class, id);
+    }
+
+    @Test
+    void nullResultThrows() {
+        UUID id = UUID.randomUUID();
+        when(jdbc.queryForObject(eq(MfaFactorLookup.SQL), eq(Boolean.class), any(UUID.class))).thenReturn(null);
+
+        assertThatThrownBy(() -> lookup.hasVerifiedFactor(id))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("MFA factor lookup returned no result");
+        assertThat(lookup.cacheSize()).isZero();
     }
 }

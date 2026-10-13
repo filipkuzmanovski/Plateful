@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.controller;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
+import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.SeaCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.CuisineInfoDto;
 import mk.ukim.finki.wp.recipeappbackend.service.CuisineService;
@@ -34,6 +35,8 @@ class CuisineControllerTest {
     RecipeService recipeService;
     @MockitoBean
     JwtDecoder jwtDecoder;
+    @MockitoBean
+    MfaFactorLookup mfaFactorLookup; // SecurityConfig's MFA filter; the default false keeps these tests unaffected
 
     private void stubCatalogue() {
         when(cuisineService.listWithCounts()).thenReturn(List.of(

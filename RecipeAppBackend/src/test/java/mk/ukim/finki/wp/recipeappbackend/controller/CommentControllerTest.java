@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.controller;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
+import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCommentCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeCommentDisplayDto;
@@ -46,6 +47,8 @@ class CommentControllerTest {
     CommentService commentService;
     @MockitoBean
     JwtDecoder jwtDecoder;
+    @MockitoBean
+    MfaFactorLookup mfaFactorLookup; // SecurityConfig's MFA filter; the default false keeps these tests unaffected
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID RECIPE_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");

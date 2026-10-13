@@ -19,8 +19,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * The query only ever asks whether a row exists. It never selects the secret column, so a TOTP
  * secret can never be read, logged or leaked by this class.
  *
- * A database failure is not caught here: the DataAccessException goes to the caller, which must
- * fail closed (refuse the request) rather than assume the user has no factor.
+ * A failure is not caught here: a DataAccessException, or an IllegalStateException when the query
+ * returns no result, goes to the caller, which must fail closed (refuse the request) rather than
+ * assume the user has no factor. Failures are never cached.
  */
 @Component
 public class MfaFactorLookup {
@@ -55,7 +56,12 @@ public class MfaFactorLookup {
         if (hit != null && now.isBefore(hit.expiresAt())) {
             return hit.value();
         }
-        boolean value = Boolean.TRUE.equals(jdbc.queryForObject(SQL, Boolean.class, userId));
+        Boolean result = jdbc.queryForObject(SQL, Boolean.class, userId);
+        if (result == null) {
+            // Fail closed: "no answer" must never be read as "no factor".
+            throw new IllegalStateException("MFA factor lookup returned no result");
+        }
+        boolean value = result;
         if (cache.size() >= MAX_ENTRIES && !cache.containsKey(userId)) {
             cache.clear(); // simple bound on memory: start over when full
         }
