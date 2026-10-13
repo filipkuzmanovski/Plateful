@@ -27,6 +27,9 @@ export interface RecipeFilter {
   vegetarian?: boolean; maxReadyInMinutes?: number; minRating?: number;
 }
 
+export const SORT_KEYS = ['newest', 'most-rated', 'top-rated', 'most-comments'] as const;
+export type SortKey = (typeof SORT_KEYS)[number];
+
 export interface IngredientCreate { ingredientName: string; originalText: string; }
 export interface RecipeCreate {
   title: string; servings: number | null; readyInMinutes: number | null;

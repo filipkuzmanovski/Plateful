@@ -1,4 +1,7 @@
-import type { RecipeFilter } from '@/lib/types';
+import { SORT_KEYS, type RecipeFilter, type SortKey } from '@/lib/types';
+
+export { SORT_KEYS };
+export type { SortKey };
 
 export interface FilterState {
   cuisine: string[];
@@ -97,9 +100,6 @@ export function countActive(state: FilterState): number {
     (state.minRating !== null ? 1 : 0)
   );
 }
-
-export const SORT_KEYS = ['newest', 'most-rated', 'top-rated', 'most-comments'] as const;
-export type SortKey = (typeof SORT_KEYS)[number];
 
 export const SORT_LABELS: Record<SortKey, string> = {
   newest: 'Newest',

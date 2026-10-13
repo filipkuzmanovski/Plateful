@@ -1,6 +1,5 @@
 import { api, apiVoid } from './client';
-import type { SortKey } from '@/features/browse/filterParams';
-import type { Page, RecipeCreate, RecipeDisplay, RecipeFilter } from '@/lib/types';
+import type { Page, RecipeCreate, RecipeDisplay, RecipeFilter, SortKey } from '@/lib/types';
 
 export const PAGE_SIZE = 12;
 
