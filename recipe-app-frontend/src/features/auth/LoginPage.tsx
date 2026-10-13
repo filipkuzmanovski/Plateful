@@ -17,9 +17,23 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setBusy(false);
+      setError(error.message);
+      return;
+    }
+    const from = (location.state as { from?: string } | null)?.from ?? '/';
+    // Half signed-in? An account with a verified factor still has to enter its code.
+    let needsCode = false;
+    try {
+      const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      needsCode = data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2';
+    } catch {
+      // fall through to the normal path; the app and the backend still enforce aal2
+    }
     setBusy(false);
-    if (error) setError(error.message);
-    else navigate((location.state as { from?: string } | null)?.from ?? '/');
+    if (needsCode) navigate('/verify-2fa', { state: { from } });
+    else navigate(from);
   }
 
   return (

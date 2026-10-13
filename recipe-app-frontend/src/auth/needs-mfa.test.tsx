@@ -31,7 +31,10 @@ vi.mock('@/auth/supabaseClient', () => ({
         return { data: { subscription: { unsubscribe() {} } } };
       },
       signOut: () => mocks.signOut!(),
-      mfa: { getAuthenticatorAssuranceLevel: () => mocks.getAal!() },
+      mfa: {
+        getAuthenticatorAssuranceLevel: () => mocks.getAal!(),
+        listFactors: async () => ({ data: { all: [], totp: [{ id: 'f1', friendly_name: 'Phone' }] }, error: null }),
+      },
     },
   },
 }));

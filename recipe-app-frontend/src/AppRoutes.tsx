@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import LoginPage from '@/features/auth/LoginPage';
 import SignupPage from '@/features/auth/SignupPage';
+import VerifyTwoFactorPage from '@/features/auth/VerifyTwoFactorPage';
 import CompleteProfilePage from '@/features/profile/CompleteProfilePage';
 import BrowsePage from '@/features/browse/BrowsePage';
 import RecipeDetailPage from '@/features/recipe/RecipeDetailPage';
@@ -25,8 +26,8 @@ export default function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfilePage /></ProtectedRoute>} />
-        {/* Placeholder until VerifyTwoFactorPage lands. Deliberately not wrapped in ProtectedRoute. */}
-        <Route path="/verify-2fa" element={<h1 className="font-serif text-3xl text-olive">Two-factor verification</h1>} />
+        {/* Deliberately not wrapped in ProtectedRoute: the page handles every auth status itself. */}
+        <Route path="/verify-2fa" element={<VerifyTwoFactorPage />} />
         <Route path="*" element={<EmptyState icon={SearchX}>Page not found.</EmptyState>} />
       </Route>
     </Routes>
