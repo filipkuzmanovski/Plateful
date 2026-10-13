@@ -14,12 +14,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -193,6 +195,35 @@ class MfaEnforcementFilterTest {
                 .andExpect(jsonPath("$.code").value("mfa_required"));
 
         verifyNoInteractions(userService, recipeService);
+    }
+
+    /**
+     * Pins the filter's position in the chain. Every other test uses the jwt() post-processor, which
+     * authenticates before the chain runs, so they would still pass if the filter were moved ahead of the
+     * BearerTokenAuthenticationFilter. Here a real Authorization header goes through the real bearer filter.
+     */
+    @Test
+    void realBearerTokenIsAuthenticatedBeforeTheMfaFilter() throws Exception {
+        Jwt decoded = Jwt.withTokenValue("tok")
+                .header("alg", "none")
+                .subject(USER_ID.toString())
+                .claim("aal", "aal1")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(300))
+                .build();
+        when(jwtDecoder.decode("tok")).thenReturn(decoded);
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+
+        mockMvc.perform(post("/api/users/me")
+                        .header("Authorization", "Bearer tok")
+                        .header("Origin", "http://localhost:5173")
+                        .contentType(MediaType.APPLICATION_JSON).content(PROFILE_JSON))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("mfa_required"))
+                .andExpect(header().string("WWW-Authenticate", containsString("insufficient_user_authentication")))
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+
+        verifyNoInteractions(userService);
     }
 
     /**
