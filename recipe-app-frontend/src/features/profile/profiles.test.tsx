@@ -16,6 +16,7 @@ vi.mock('@/auth/supabaseClient', () => ({
       }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
       signOut: async () => {},
+      mfa: { listFactors: async () => ({ data: { totp: [], all: [] }, error: null }) },
     },
   },
 }));

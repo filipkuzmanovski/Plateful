@@ -24,9 +24,14 @@ interface Pending {
 
 type Step = { kind: 'idle' } | { kind: 'name' } | { kind: 'scan'; pending: Pending };
 
-function errorInfo(err: unknown): { status?: number; message: string } {
-  const { status, message } = (err ?? {}) as { status?: number; message?: string };
-  return { status, message: message || 'Something went wrong. Please try again.' };
+function errorInfo(err: unknown): { status?: number; code?: string; message: string } {
+  const { status, code, message } = (err ?? {}) as { status?: number; code?: string; message?: string };
+  return { status, code, message: message || 'Something went wrong. Please try again.' };
+}
+
+function isWrongCode(err: unknown): boolean {
+  const { status, code, message } = errorInfo(err);
+  return code === 'mfa_verification_failed' || status === 422 || /code/i.test(message);
 }
 
 function isAal2Refusal(err: unknown): boolean {
@@ -76,7 +81,8 @@ export function TwoFactorSettings() {
       setLoadError(null);
     } catch (err) {
       if (!alive.current) return;
-      setFactors((prev) => prev ?? []);
+      // Unknown, not "none": never claim the account has two-factor off when the list could not be read.
+      setFactors(null);
       setLoadError(errorInfo(err).message);
     }
   }, []);
@@ -85,15 +91,20 @@ export function TwoFactorSettings() {
     void refresh();
   }, [refresh]);
 
-  if (factors === null) return <Spinner />;
+  function retry() {
+    setLoadError(null);
+    void refresh();
+  }
 
-  const count = factors.length;
-  const canAdd = count < MAX_DEVICES && step.kind === 'idle';
+  const loaded = factors !== null;
+  const list = factors ?? [];
+  const count = list.length;
+  const canAdd = loaded && count < MAX_DEVICES && step.kind === 'idle';
 
   function startAdd() {
     setError(null);
     setJustEnabled(false);
-    setName(defaultName(factors ?? []));
+    setName(defaultName(list));
     setStep({ kind: 'name' });
   }
 
@@ -108,6 +119,13 @@ export function TwoFactorSettings() {
       // Supabase keeps unverified factors from an abandoned setup, and rejects a duplicate name: clear them first.
       const { data: listed, error: listError } = await supabase.auth.mfa.listFactors();
       if (listError) throw listError;
+      const verifiedTotp = ((listed?.all ?? []) as Factor[]).filter(
+        (f) => f.factor_type === 'totp' && f.status === 'verified',
+      ).length;
+      if (Math.max(verifiedTotp, listed?.totp?.length ?? 0) >= MAX_DEVICES) {
+        setError(`You already have ${MAX_DEVICES} devices. Remove one to add another.`);
+        return;
+      }
       const leftovers = ((listed?.all ?? []) as Factor[]).filter(
         (f) => f.factor_type === 'totp' && f.status === 'unverified',
       );
@@ -145,8 +163,8 @@ export function TwoFactorSettings() {
       await refresh();
     } catch (err) {
       if (!alive.current) return;
-      const { status, message } = errorInfo(err);
-      setError(status === 422 || /code/i.test(message) ? WRONG_CODE : message);
+      const { message } = errorInfo(err);
+      setError(isWrongCode(err) ? WRONG_CODE : message);
       setCode('');
     } finally {
       if (alive.current) setBusy(false);
@@ -194,23 +212,31 @@ export function TwoFactorSettings() {
       <p className="text-sm text-olive/70">
         Ask for a 6-digit code from an authenticator app each time you sign in.
       </p>
-      <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-olive">
-        Status
-        <Pill tone={count > 0 ? 'olive' : 'sand'}>
-          {count === 0 ? 'Off' : `On: ${count} ${count === 1 ? 'device' : 'devices'}`}
-        </Pill>
-      </p>
+      {loaded && (
+        <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-olive">
+          Status
+          <Pill tone={count > 0 ? 'olive' : 'sand'}>
+            {count === 0 ? 'Off' : `On: ${count} ${count === 1 ? 'device' : 'devices'}`}
+          </Pill>
+        </p>
+      )}
 
       {justEnabled && (
         <p role="status" className="mt-4 rounded-xl bg-olive/10 px-3.5 py-2.5 text-sm font-medium text-olive">
           Two-factor authentication is on
         </p>
       )}
-      {loadError && <div className="mt-4"><FormError>{loadError}</FormError></div>}
+      {loadError && (
+        <div className="mt-4 space-y-3">
+          <FormError>{loadError}</FormError>
+          <Button type="button" variant="outline" onClick={retry}>Try again</Button>
+        </div>
+      )}
+      {!loaded && !loadError && <Spinner />}
 
       {count > 0 && (
         <ul className="mt-4 divide-y divide-sand/70 rounded-xl ring-1 ring-sand/70">
-          {factors.map((f) => {
+          {list.map((f) => {
             const added = addedOn(f.created_at);
             return (
               <li key={f.id} className="flex items-center justify-between gap-3 px-4 py-3">
