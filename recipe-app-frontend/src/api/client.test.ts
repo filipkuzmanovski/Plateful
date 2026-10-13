@@ -1,12 +1,28 @@
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/server';
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, setMfaRequiredHandler } from '@/api/client';
 import { browseRecipes } from '@/api/recipes';
 import { getCuisines, getSeas } from '@/api/cuisines';
 import { getMyRating } from '@/api/ratings';
 import { recipeFixture, pageOf } from '@/test/fixtures';
 
+const { signOut } = vi.hoisted(() => ({ signOut: vi.fn(async () => {}) }));
+
+vi.mock('@/auth/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: async () => ({ data: { session: null } }),
+      signOut,
+    },
+  },
+}));
+
 const BASE = 'http://localhost:8080';
+
+beforeEach(() => {
+  signOut.mockClear();
+  setMfaRequiredHandler(null);
+});
 
 test('parses JSON and sends no auth header when anonymous', async () => {
   let authHeader: string | null = 'unset';
@@ -118,4 +134,43 @@ test('getMyRating maps 404 to null', async () => {
     ),
   );
   expect(await getMyRating('r-1')).toBeNull();
+});
+
+test('mfaRequired401DoesNotSignOut', async () => {
+  server.use(
+    http.post(`${BASE}/api/ping`, () =>
+      HttpResponse.json(
+        { status: 401, detail: 'Two-factor verification required', code: 'mfa_required' },
+        { status: 401 },
+      ),
+    ),
+  );
+  const handler = vi.fn();
+  setMfaRequiredHandler(handler);
+  const err = await api('/api/ping', { method: 'POST', body: JSON.stringify({}) }).catch((e) => e as unknown);
+  expect(signOut).not.toHaveBeenCalled();
+  expect(handler).toHaveBeenCalledTimes(1);
+  expect(err).toBeInstanceOf(ApiError);
+  if (err instanceof ApiError) {
+    expect(err.code).toBe('mfa_required');
+    expect(err.status).toBe(401);
+  }
+});
+
+test('plain401StillSignsOut', async () => {
+  server.use(
+    http.get(`${BASE}/api/ping`, () =>
+      HttpResponse.json({ status: 401, detail: 'Unauthorized' }, { status: 401 }),
+    ),
+  );
+  const handler = vi.fn();
+  setMfaRequiredHandler(handler);
+  const err = await api('/api/ping').catch((e) => e as unknown);
+  expect(signOut).toHaveBeenCalledTimes(1);
+  expect(handler).not.toHaveBeenCalled();
+  expect(err).toBeInstanceOf(ApiError);
+  if (err instanceof ApiError) {
+    expect(err.status).toBe(401);
+    expect(err.code).toBeUndefined();
+  }
 });

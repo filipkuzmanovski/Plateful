@@ -6,13 +6,22 @@ export class ApiError extends Error {
   status: number;
   detail: string;
   errors?: Record<string, string>;
+  code?: string;
 
-  constructor(status: number, detail: string, errors?: Record<string, string>) {
+  constructor(status: number, detail: string, errors?: Record<string, string>, code?: string) {
     super(detail);
     this.status = status;
     this.detail = detail;
     this.errors = errors;
+    this.code = code;
   }
+}
+
+let mfaRequiredHandler: (() => void) | null = null;
+
+/** Registers the callback run when the API answers 401 `mfa_required` (half signed-in session). */
+export function setMfaRequiredHandler(fn: (() => void) | null): void {
+  mfaRequiredHandler = fn;
 }
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
@@ -25,9 +34,16 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (res.ok) return res;
 
-  if (res.status === 401) await supabase.auth.signOut(); // expired/invalid token — routing reacts to session loss
   const problem = await res.json().catch(() => null);
-  throw new ApiError(res.status, problem?.detail ?? `Request failed (${res.status})`, problem?.errors);
+  if (res.status === 401) {
+    if (problem?.code === 'mfa_required') {
+      // Signed in but not yet at the second factor: keep the session, let the app route to verification.
+      mfaRequiredHandler?.();
+    } else {
+      await supabase.auth.signOut(); // expired/invalid token — routing reacts to session loss
+    }
+  }
+  throw new ApiError(res.status, problem?.detail ?? `Request failed (${res.status})`, problem?.errors, problem?.code);
 }
 
 /** JSON-returning call. */
