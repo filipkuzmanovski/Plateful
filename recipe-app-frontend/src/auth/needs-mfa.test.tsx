@@ -3,6 +3,7 @@ import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
+import { api } from '@/api/client';
 import { profileFixture, pageOf } from '@/test/fixtures';
 
 const BASE = 'http://localhost:8080';
@@ -144,4 +145,43 @@ test('an aal1 to aal2 upgrade of a ready user keeps the page mounted while it re
   await vi.waitFor(() => expect(meCalls).toBe(2));
   expect(heading).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: /^profile$/i })).toBe(heading);
+});
+
+// A request that was in flight earlier can answer mfa_required late; it must not strand the app.
+function lateMfaRequired() {
+  server.use(
+    http.get(`${BASE}/api/late`, () =>
+      HttpResponse.json(
+        { status: 401, detail: 'Two-factor verification required', code: 'mfa_required' },
+        { status: 401 },
+      ),
+    ),
+  );
+  return act(async () => { await api('/api/late').catch(() => undefined); });
+}
+
+test('a late mfa_required after sign-out leaves the app anonymous', async () => {
+  mocks.getAal = async () => ({ data: { currentLevel: 'aal1', nextLevel: 'aal1' }, error: null });
+  renderApp('/me');
+  await screen.findByRole('heading', { name: /^profile$/i });
+
+  mocks.session = null;
+  await act(async () => { mocks.fire?.('SIGNED_OUT', null); });
+  expect(await screen.findByRole('heading', { name: /^sign in$/i })).toBeInTheDocument();
+
+  await lateMfaRequired();
+  expect(screen.queryByRole('link', { name: /finish signing in/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /^sign in$/i })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: /two-factor verification/i })).not.toBeInTheDocument();
+});
+
+test('a late mfa_required for a ready aal2 user leaves the app ready', async () => {
+  mocks.session = sessionFor('u-1', 'aal2');
+  renderApp('/me');
+  await screen.findByRole('heading', { name: /^profile$/i });
+
+  await lateMfaRequired();
+  expect(screen.getByRole('heading', { name: /^profile$/i })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: /two-factor verification/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /finish signing in/i })).not.toBeInTheDocument();
 });

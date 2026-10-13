@@ -82,7 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    setMfaRequiredHandler(() => { if (!cancelled) { readyUserId = null; setStatus('needs-mfa'); } });
+    // Only a current session that is below aal2 can legitimately need the second factor. A late answer
+    // after sign-out, or after the aal2 upgrade, must not strand the app in needs-mfa.
+    setMfaRequiredHandler(() => {
+      if (!cancelled && typeof lastUserKey === 'string' && !lastUserKey.endsWith(':aal2')) {
+        readyUserId = null;
+        setStatus('needs-mfa');
+      }
+    });
 
     supabase.auth.getSession()
       .then(({ data }) => {
