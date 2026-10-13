@@ -110,6 +110,18 @@ class RecipeControllerTest {
     }
 
     @Test
+    void browse_bindsRepeatedSeaParams() throws Exception {
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/recipes?sea=caribbean&sea=pacific"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
+        verify(recipeService).browse(captor.capture(), any(), any());
+        assertThat(captor.getValue().sea()).containsExactly("caribbean", "pacific");
+    }
+
+    @Test
     void browse_singleCuisineStillBinds() throws Exception {
         when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
 
