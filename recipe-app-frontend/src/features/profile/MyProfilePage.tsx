@@ -9,6 +9,7 @@ import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { Button, Field, SectionHeading, Spinner, TextInput } from '@/components/ui';
 import { ProfileHeader } from './ProfileHeader';
+import { TwoFactorSettings } from './TwoFactorSettings';
 
 export default function MyProfilePage() {
   const { profile, setProfile } = useAuth();
@@ -61,6 +62,11 @@ export default function MyProfilePage() {
           </Field>
           <Button type="submit" disabled={busy}>Save names</Button>
         </form>
+      </section>
+
+      <SectionHeading>Two-factor authentication</SectionHeading>
+      <section className="max-w-3xl rounded-card bg-paper p-5 shadow-card ring-1 ring-sand/70 sm:p-7">
+        <TwoFactorSettings />
       </section>
 
       <SectionHeading>My recipes</SectionHeading>
