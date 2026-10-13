@@ -19,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.net.URI;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -162,6 +163,36 @@ class MfaEnforcementFilterTest {
 
         assertThat(body).doesNotContain("mfa_required");
         verifyNoInteractions(mfaFactorLookup);
+    }
+
+    /**
+     * The raw request URI is not decoded, but Spring routes on the decoded path, so "/m%65" reaches the
+     * "/me" handler. The rule must be decided on the decoded path. URI.create is required: a String
+     * template would re-encode the percent sign, which the firewall rejects.
+     */
+    @Test
+    void encodedUsersMeIs401() throws Exception {
+        assertEncodedMeIsRefused("/api/users/m%65");
+    }
+
+    @Test
+    void encodedRatingsMeIs401() throws Exception {
+        assertEncodedMeIsRefused("/api/recipes/" + UUID.randomUUID() + "/ratings/m%65");
+    }
+
+    @Test
+    void encodedCommentReactionsMeIs401() throws Exception {
+        assertEncodedMeIsRefused("/api/recipes/" + UUID.randomUUID() + "/comments/reactions/m%65");
+    }
+
+    private void assertEncodedMeIsRefused(String encodedPath) throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+
+        mockMvc.perform(get(URI.create(encodedPath)).with(token("aal1")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("mfa_required"));
+
+        verifyNoInteractions(userService, recipeService);
     }
 
     /**

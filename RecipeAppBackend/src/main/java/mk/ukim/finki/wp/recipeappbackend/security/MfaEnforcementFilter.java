@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
@@ -92,9 +93,16 @@ public final class MfaEnforcementFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    /** Mutations and "/me" reads are guarded; every other GET (public browsing) is not. */
+    /**
+     * Mutations and "/me" reads are guarded; every other GET (public browsing) is not.
+     *
+     * The decision is made on the DECODED path. getRequestURI() is raw, so "/api/users/m%65" would not
+     * end with "/me" and slip past, yet Spring routes on the decoded path and would reach the "/me"
+     * handler. UrlPathHelper also drops ";" path parameters, matching how the routes are resolved.
+     */
     private static boolean isGuarded(HttpServletRequest request) {
-        return !"GET".equals(request.getMethod()) || request.getRequestURI().endsWith("/me");
+        return !"GET".equals(request.getMethod())
+                || UrlPathHelper.defaultInstance.getPathWithinApplication(request).endsWith("/me");
     }
 
     private void writeProblem(HttpServletResponse response, HttpStatus status, String detail, boolean mfaRequired)
