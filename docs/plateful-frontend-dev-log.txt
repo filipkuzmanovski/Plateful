@@ -2912,3 +2912,61 @@ Rollout
      then re-import the recipes when the Spoonacular quota has reset.
   3. Old links with ?region=mediterranean keep working; they now show up as
      the Mediterranean sea chip.
+
+
+################################################################################
+################################################################################
+
+ PART 5 — AGE CHECK AT SIGN-UP
+ Branch: feature/age-check
+
+################################################################################
+################################################################################
+
+What was done
+-------------
+The sign-up form now asks for a required "Date of birth" between Email and
+Password. Someone under 13 cannot create an account. The label and the page
+never mention an age (a neutral age gate), so a child is not told which date to
+type. Frontend only; the backend, login and profile pages are unchanged, and
+existing accounts are not affected.
+
+How it works
+------------
+  - src/features/auth/ageCheck.ts has MIN_AGE (13), ageOn(birth, today) and
+    validateBirthDate(birth, today). ageOn gives whole years, correct around
+    birthdays; a 29 Feb birthday counts as reached on 1 Mar in non-leap years.
+    It returns null for text that is not a real date. validateBirthDate says
+    'invalid' for an unparseable date, a future date, or one more than 120
+    years ago.
+  - On submit, an invalid date shows "Please enter a valid date of birth" and
+    nothing is sent to Supabase.
+  - Under 13: nothing is sent. The form is replaced by a status panel (same
+    style as "Check your email", ShieldAlert icon) saying "Sorry, you need to be
+    at least 13 to create a Plateful account." The flag
+    sessionStorage['plateful.ageBlocked'] = '1' is set, and on mount the page
+    shows the panel straight away when the flag is there, so another date can't
+    be tried in the same tab. Every sessionStorage access is in try/catch; if
+    storage is unavailable the block still holds in memory for that page view.
+  - 13 or older: supabase.auth.signUp is called with
+    options.data.age_confirmed_at (ISO time of the check). The birth date is not
+    part of the request. The rest of the flow is unchanged.
+
+Tests
+-----
+  - ageCheck.test.ts (9): day before / on the 13th birthday, 29 Feb in leap and
+    non-leap years, future date, 121 vs 120 years, garbage.
+  - SignupPage.test.tsx (6): adult sends age_confirmed_at and no birth date;
+    under 13 is blocked and nothing is sent; the block survives a re-render in
+    the same tab; the block holds when sessionStorage throws; a future date is
+    rejected; the form text never mentions 13 or an age. The clock is fixed
+    (only Date is faked).
+  - needs-profile.test.tsx: the existing sign-up test now fills in a date of
+    birth.
+
+Known limits
+------------
+  - This is a self-declared age gate. Clearing session storage (new tab or
+    window) allows another attempt; anyone can type a false date.
+  - The server does not check age_confirmed_at; it is only stored in the
+    Supabase user metadata.
