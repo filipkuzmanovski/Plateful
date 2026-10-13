@@ -1,10 +1,15 @@
 package mk.ukim.finki.wp.recipeappbackend.specification;
 
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Nulls;
+import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
+import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeComment;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeRating;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -100,6 +105,49 @@ public final class RecipeSpecifications {
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    /**
+     * Sets the ORDER BY for the browse (spec 4.3). Rating count, average and comment count are
+     * correlated subqueries, so nothing is denormalized onto recipes. It only sets query.orderBy and
+     * adds no predicate; combine it with withFilter() through and(). The final tie-breaker is always
+     * id asc so paging is stable. The count query (result type Long) is skipped: Spring clears its
+     * orderBy anyway, this just avoids building subqueries nobody uses.
+     */
+    public static Specification<Recipe> withSort(RecipeSort sort) {
+        return (root, query, cb) -> {
+            if (query == null || Long.class.equals(query.getResultType())) {
+                return cb.conjunction();
+            }
+
+            Subquery<Long> ratingCountQ = query.subquery(Long.class);
+            Root<RecipeRating> rc = ratingCountQ.from(RecipeRating.class);
+            ratingCountQ.select(cb.count(rc));
+            ratingCountQ.where(cb.equal(rc.get("recipe"), root));
+
+            Subquery<Double> avgQ = query.subquery(Double.class);
+            Root<RecipeRating> ra = avgQ.from(RecipeRating.class);
+            avgQ.select(cb.avg(ra.get("rating")));
+            avgQ.where(cb.equal(ra.get("recipe"), root));
+
+            Subquery<Long> commentCountQ = query.subquery(Long.class);
+            Root<RecipeComment> cc = commentCountQ.from(RecipeComment.class);
+            commentCountQ.select(cb.count(cc));
+            commentCountQ.where(cb.equal(cc.get("recipe"), root));
+
+            Expression<?> createdAt = root.get("createdAt");
+            Order newestFirst = cb.desc(createdAt);
+            Order idAsc = cb.asc(root.get("id"));
+
+            List<Order> orders = switch (sort) {
+                case NEWEST -> List.of(newestFirst, idAsc);
+                case MOST_RATED -> List.of(cb.desc(ratingCountQ), cb.desc(avgQ, Nulls.LAST), newestFirst, idAsc);
+                case TOP_RATED -> List.of(cb.desc(avgQ, Nulls.LAST), cb.desc(ratingCountQ), newestFirst, idAsc);
+                case MOST_COMMENTS -> List.of(cb.desc(commentCountQ), newestFirst, idAsc);
+            };
+            query.orderBy(orders);
+            return cb.conjunction();
         };
     }
 }

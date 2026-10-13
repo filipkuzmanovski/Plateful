@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.repository;
 import jakarta.persistence.EntityManager;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipePhoto;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -48,7 +49,13 @@ class RecipePhotoRepositoryDbTest {
 
     @Test
     void replaceKeepsPositionsUniqueAndOrdered() {
-        Recipe recipe = recipeRepository.findAll(PageRequest.of(0, 1)).getContent().get(0);
+        // Imported recipes may already carry photo rows, which would clash with positions 0..2 on
+        // UNIQUE (recipe_id, position); use one that has none. Everything is rolled back anyway.
+        Recipe recipe = recipeRepository.findAll(PageRequest.of(0, 200)).getContent().stream()
+                .filter(r -> !recipePhotoRepository.existsByRecipeId(r.getId()))
+                .findFirst()
+                .orElse(null);
+        Assumptions.assumeTrue(recipe != null, "No recipe without photo rows to use as a fixture");
         UUID id = recipe.getId();
 
         photo(recipe, "a", 0);

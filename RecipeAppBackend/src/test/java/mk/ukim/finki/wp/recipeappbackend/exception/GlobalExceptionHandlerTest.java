@@ -82,4 +82,14 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getProperties())
                 .containsEntry("errors", Map.of("photos", "At most 6 photos"));
     }
+
+    @Test
+    void invalidSortMapsTo400WithSortByFieldError() {
+        ProblemDetail problem = handler.handleInvalidSort(new InvalidSortException("Unknown sort: bogus"));
+
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getDetail()).isEqualTo("Validation failed");
+        assertThat(problem.getProperties())
+                .containsEntry("errors", Map.of("sortBy", "Unknown sort: bogus"));
+    }
 }

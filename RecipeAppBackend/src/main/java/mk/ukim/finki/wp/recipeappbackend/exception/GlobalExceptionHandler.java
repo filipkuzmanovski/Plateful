@@ -57,6 +57,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** Unknown sortBy -> 400 in the same shape as bean-validation failures. */
+    @ExceptionHandler(InvalidSortException.class)
+    ProblemDetail handleInvalidSort(InvalidSortException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        problem.setProperty("errors", Map.of("sortBy", ex.getMessage()));
+        return problem;
+    }
+
     /** Bad photo paths (foreign folder, duplicates, too many) -> 400 in the bean-validation shape. */
     @ExceptionHandler(InvalidPhotoException.class)
     ProblemDetail handleInvalidPhoto(InvalidPhotoException ex) {

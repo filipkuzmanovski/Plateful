@@ -2,6 +2,7 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 
 import jakarta.validation.Valid;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -37,8 +39,10 @@ public class RecipeController {
 
     /** Filter params bind straight into the RecipeFilter record; absent = null = no filter. */
     @GetMapping
-    public Page<RecipeDisplayDto> browse(@ModelAttribute RecipeFilter filter, Pageable pageable) {
-        return recipeService.browse(filter, pageable);
+    public Page<RecipeDisplayDto> browse(@ModelAttribute RecipeFilter filter,
+                                         @RequestParam(defaultValue = "newest") String sortBy,
+                                         Pageable pageable) {
+        return recipeService.browse(filter, RecipeSort.fromKey(sortBy), pageable);
     }
 
     @PostMapping

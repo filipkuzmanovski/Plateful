@@ -200,13 +200,13 @@ class RecipeServicePhotosTest {
         Recipe ra = Recipe.builder().id(a).title("A").build();
         Recipe rb = Recipe.builder().id(b).title("B").build();
         Pageable pageable = PageRequest.of(0, 12);
-        when(recipeRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(ra, rb), pageable, 2));
+        when(recipeRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(ra, rb), pageable, 2));
         when(photoRepository.findByRecipeIdInOrderByPositionAsc(anyCollection())).thenReturn(List.of(
                 RecipePhoto.builder().recipe(ra).path(p1).position(0).build(),
                 RecipePhoto.builder().recipe(ra).path(p2).position(1).build(),
                 RecipePhoto.builder().recipe(rb).path(p2).position(0).build()));
 
-        List<RecipeDisplayDto> content = service.browse(null, pageable).getContent();
+        List<RecipeDisplayDto> content = service.browse(null, mk.ukim.finki.wp.recipeappbackend.model.RecipeSort.NEWEST, pageable).getContent();
 
         verify(photoRepository, times(1)).findByRecipeIdInOrderByPositionAsc(anyCollection());
         verify(photoRepository, never()).findByRecipeIdOrderByPositionAsc(any());

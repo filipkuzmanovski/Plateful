@@ -5,6 +5,7 @@ import mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeIngredientDisplayDto;
@@ -23,6 +24,7 @@ import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
 import mk.ukim.finki.wp.recipeappbackend.specification.RecipeSpecifications;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -121,17 +123,24 @@ public class RecipeService {
      * queries-per-recipe.
      */
     @Transactional(readOnly = true)
-    public Page<RecipeDisplayDto> browse(RecipeFilter filter, Pageable pageable) {
-        if (filter == null || filter.isEmpty()) {
-            return assemblePage(recipeRepository.findAll(pageable));
-        }
-        Optional<Set<String>> cuisineKeys = cuisineCatalog.resolveFilter(filter.cuisine(), filter.region(), filter.sea());
+    public Page<RecipeDisplayDto> browse(RecipeFilter filter, RecipeSort sort, Pageable pageable) {
+        RecipeFilter effective = filter != null ? filter
+                : new RecipeFilter(null, null, null, null, null, null, null, null, null);
+        Optional<Set<String>> cuisineKeys = effective.isEmpty()
+                ? Optional.empty()
+                : cuisineCatalog.resolveFilter(effective.cuisine(), effective.region(), effective.sea());
         if (cuisineKeys.isPresent() && cuisineKeys.get().isEmpty()) {
             // Cuisines/regions were requested but none are known: nothing can match.
             return Page.empty(pageable);
         }
+        // The order lives in the Specification (see RecipeSpecifications.withSort), so the page
+        // request must carry no sort of its own. Always the Specification path, so the sort
+        // applies with or without a filter.
+        Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
         return assemblePage(recipeRepository.findAll(
-                RecipeSpecifications.withFilter(filter, cuisineKeys), pageable));
+                RecipeSpecifications.withFilter(effective, cuisineKeys)
+                        .and(RecipeSpecifications.withSort(sort)),
+                unsorted));
     }
 
     /** "Recipes by this user" — profile page, same batched assembly. */

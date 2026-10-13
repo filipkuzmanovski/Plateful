@@ -2,6 +2,7 @@ package mk.ukim.finki.wp.recipeappbackend.service;
 
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
@@ -13,6 +14,7 @@ import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -56,7 +58,7 @@ class RecipeServiceBrowseTest {
     @Test
     @SuppressWarnings("unchecked")
     void onlyUnknownCuisinesReturnsEmptyPageWithoutQuerying() {
-        Page<RecipeDisplayDto> result = service.browse(cuisineFilter("lol"), pageable);
+        Page<RecipeDisplayDto> result = service.browse(cuisineFilter("lol"), RecipeSort.NEWEST, pageable);
 
         assertThat(result.getContent()).isEmpty();
         verify(recipeRepository, never()).findAll(any(Specification.class), any(Pageable.class));
@@ -69,8 +71,37 @@ class RecipeServiceBrowseTest {
         when(recipeRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<Recipe>(List.of(), pageable, 0));
 
-        service.browse(cuisineFilter("italian"), pageable);
+        service.browse(cuisineFilter("italian"), RecipeSort.NEWEST, pageable);
 
         verify(recipeRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void emptyFilterStillUsesSpecificationPath() {
+        when(recipeRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<Recipe>(List.of(), pageable, 0));
+
+        service.browse(new RecipeFilter(null, null, null, null, null, null, null, null, null),
+                RecipeSort.MOST_RATED, pageable);
+
+        verify(recipeRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));
+        verify(recipeRepository, never()).findAll(any(Pageable.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void pageRequestIsUnsorted() {
+        when(recipeRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<Recipe>(List.of(), pageable, 0));
+        Pageable sorted = PageRequest.of(2, 12, org.springframework.data.domain.Sort.by("title"));
+
+        service.browse(null, RecipeSort.TOP_RATED, sorted);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(recipeRepository).findAll(any(Specification.class), captor.capture());
+        assertThat(captor.getValue().getSort().isUnsorted()).isTrue();
+        assertThat(captor.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(captor.getValue().getPageSize()).isEqualTo(12);
     }
 }

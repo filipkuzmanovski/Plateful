@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import org.junit.jupiter.api.Test;
@@ -70,7 +71,7 @@ class RecipeControllerTest {
     @Test
     void browse_anonymous_is200() throws Exception {
         UUID recipeId = UUID.randomUUID();
-        when(recipeService.browse(any(), any()))
+        when(recipeService.browse(any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(sampleRecipe(recipeId))));
 
         mockMvc.perform(get("/api/recipes"))
@@ -80,13 +81,13 @@ class RecipeControllerTest {
 
     @Test
     void browse_bindsFilterParams() throws Exception {
-        when(recipeService.browse(any(), any())).thenReturn(Page.empty());
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/recipes?cuisine=italian&vegan=true&maxReadyInMinutes=30&minRating=4"))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
-        verify(recipeService).browse(captor.capture(), any());
+        verify(recipeService).browse(captor.capture(), any(), any());
         RecipeFilter filter = captor.getValue();
         assertThat(filter.cuisine()).containsExactly("italian");
         assertThat(filter.vegan()).isTrue();
@@ -97,39 +98,66 @@ class RecipeControllerTest {
 
     @Test
     void browse_bindsRepeatedCuisineAndRegionParams() throws Exception {
-        when(recipeService.browse(any(), any())).thenReturn(Page.empty());
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/recipes?cuisine=italian&cuisine=greek&region=asia"))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
-        verify(recipeService).browse(captor.capture(), any());
+        verify(recipeService).browse(captor.capture(), any(), any());
         assertThat(captor.getValue().cuisine()).containsExactly("italian", "greek");
         assertThat(captor.getValue().region()).containsExactly("asia");
     }
 
     @Test
     void browse_singleCuisineStillBinds() throws Exception {
-        when(recipeService.browse(any(), any())).thenReturn(Page.empty());
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/recipes?cuisine=thai"))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
-        verify(recipeService).browse(captor.capture(), any());
+        verify(recipeService).browse(captor.capture(), any(), any());
         assertThat(captor.getValue().cuisine()).containsExactly("thai");
     }
 
     @Test
     void browse_pageSizeIsCappedAt50() throws Exception {
-        when(recipeService.browse(any(), any())).thenReturn(Page.empty());
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/recipes?size=500"))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(recipeService).browse(any(), captor.capture());
+        verify(recipeService).browse(any(), any(), captor.capture());
         assertThat(captor.getValue().getPageSize()).isEqualTo(50);
+    }
+
+    @Test
+    void browsePassesSortBy() throws Exception {
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/recipes?sortBy=most-rated"))
+                .andExpect(status().isOk());
+
+        verify(recipeService).browse(any(), eq(RecipeSort.MOST_RATED), any());
+    }
+
+    @Test
+    void browseDefaultsToNewest() throws Exception {
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/recipes"))
+                .andExpect(status().isOk());
+
+        verify(recipeService).browse(any(), eq(RecipeSort.NEWEST), any());
+    }
+
+    @Test
+    void unknownSortIs400() throws Exception {
+        mockMvc.perform(get("/api/recipes?sortBy=bogus"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.sortBy").value("Unknown sort: bogus"));
     }
 
     @Test
