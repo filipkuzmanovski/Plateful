@@ -3309,3 +3309,81 @@ Test and review gaps (nothing a user sees):
   - The encoded-path tests prove the filter acts; they do not prove routing.
   - The profiles test mock has no auth.mfa, so those tests render the
     settings' load-error line.
+
+
+################################################################################
+################################################################################
+ PART 7 — INACTIVITY TIMEOUT
+ Branch: feature/idle-timeout
+
+################################################################################
+################################################################################
+
+What was done
+-------------
+A signed-in user who does nothing for 60 minutes is signed out. One minute
+before that, a dialog asks "Still there?" with a live countdown. After the
+sign-out the browser goes to /login, which shows "You were signed out after 60
+minutes of inactivity." once. Frontend only; no backend change.
+
+How it works
+------------
+  - src/auth/idleTimeout.ts holds the constants: IDLE_TIMEOUT_MS (60 min),
+    WARNING_MS (60 s), ACTIVITY_THROTTLE_MS (5 s) and the two storage keys.
+  - src/auth/useIdleTimeout.ts is the hook. Activity is pointerdown, keydown,
+    touchstart, wheel and scroll (capture, passive) on window. At most one
+    activity is recorded per 5 seconds; recording writes Date.now() to
+    localStorage['plateful.lastActivity'] (in try/catch) and keeps a copy in
+    memory.
+  - Idle time is always "now minus the newer of the memory copy and
+    localStorage", never a running counter. So activity in another tab (the
+    'storage' event) resets this tab too, and a computer that slept is caught
+    when the tab becomes visible again or the window gets focus: if the idle
+    time is already 60 minutes or more, the user is signed out at once with no
+    warning.
+  - One setTimeout is re-armed to the next deadline: the start of the warning,
+    then every second during the warning (never later than the deadline).
+  - At the timeout: sessionStorage['plateful.signedOutIdle'] = '1' (try/catch),
+    supabase.auth.signOut(), then navigate('/login'). A "fired" flag makes this
+    happen once per idle period, even if the timer, focus and visibility checks
+    run together. If signOut fails, the user is still sent to /login.
+  - Only active while the auth status is ready, needs-mfa or needs-profile.
+    When it becomes anonymous or loading (or the guard unmounts), timers and
+    listeners are removed and the flag is reset. When a session starts, activity
+    is recorded immediately, so an old timestamp from a previous session (for
+    example 3 hours old) cannot cause an instant sign-out.
+  - src/auth/IdleSessionGuard.tsx renders the dialog (Radix Dialog, same
+    styling as ConfirmDialog): title "Still there?", body "You'll be signed out
+    in N seconds due to inactivity.", buttons "Stay signed in" (records
+    activity, closes) and "Sign out now" (signs out like a timeout). Any
+    activity, Escape or a click outside also closes it and resets the clock.
+    Opening the dialog is not activity. It is mounted once in AppShell, inside
+    the router, so it can navigate.
+  - LoginPage reads sessionStorage['plateful.signedOutIdle'] on mount, shows a
+    role="status" panel (same style as "Check your email", Clock icon), and
+    removes the key in an effect so it shows once.
+
+Tests
+-----
+src/auth/idle-timeout.test.tsx (12), with fake timers and a mocked supabase
+whose signOut fires SIGNED_OUT like the real client:
+  - noSignOutWhileActive, warningAt59Minutes (60 s, then 50 s, no emoji),
+    staySignedInResets, activityWhileWarningClosesIt,
+    signsOutAt60AndLoginShowsMessage (once; gone on a fresh visit),
+    otherTabActivityResets, returnAfterSleepSignsOutImmediately (visibility)
+    and the same on window focus, signOutNowButton, notActiveWhenAnonymous,
+    staleTimestampFromOldSessionIgnored, activityIsThrottledButStillWritten.
+The guard removes its listeners and timer on unmount, so it does not leak into
+other tests.
+
+Known limits
+------------
+  - The timeout is enforced in the browser only. A copied access token keeps
+    working on the server until it expires; this is a convenience for shared
+    computers, not a server-side session limit.
+  - "Sign out now" also shows the "signed out after 60 minutes" message on the
+    login page, because it signs out the same way as a timeout.
+  - If localStorage is unavailable, only this tab's own activity is counted, so
+    activity in another tab does not reset the clock.
+  - The countdown text is not announced by screen readers on every second; the
+    dialog itself is announced when it opens.
