@@ -9,11 +9,11 @@ import { expectNoEmoji } from '@/test/noEmoji';
 const BASE = 'http://localhost:8080';
 
 const cuisineCatalogue = [
-  { key: 'italian', label: 'Italian', region: 'europe', mediterranean: true, count: 12 },
-  { key: 'japanese', label: 'Japanese', region: 'asia', mediterranean: false, count: 5 },
-  { key: 'greek', label: 'Greek', region: 'europe', mediterranean: true, count: 3 },
-  { key: 'macedonian', label: 'Macedonian', region: 'europe', mediterranean: false, count: 1 },
-  { key: 'german', label: 'German', region: 'europe', mediterranean: false, count: 0 },
+  { key: 'italian', label: 'Italian', region: 'europe', seas: ['mediterranean'], count: 12 },
+  { key: 'japanese', label: 'Japanese', region: 'asia', seas: [], count: 5 },
+  { key: 'greek', label: 'Greek', region: 'europe', seas: ['mediterranean'], count: 3 },
+  { key: 'macedonian', label: 'Macedonian', region: 'europe', seas: [], count: 1 },
+  { key: 'german', label: 'German', region: 'europe', seas: [], count: 0 },
 ];
 
 /** Every /api/recipes request, split into grid requests (size=12) and live-count requests (size=1). */

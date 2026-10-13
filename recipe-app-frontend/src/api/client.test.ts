@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '@/test/server';
 import { api, ApiError } from '@/api/client';
 import { browseRecipes } from '@/api/recipes';
-import { getCuisines } from '@/api/cuisines';
+import { getCuisines, getSeas } from '@/api/cuisines';
 import { getMyRating } from '@/api/ratings';
 import { recipeFixture, pageOf } from '@/test/fixtures';
 
@@ -70,20 +70,44 @@ test('browseRecipes sends repeated cuisine and region params', async () => {
   expect(params.getAll('cuisine')).toEqual(['italian', 'greek']);
   expect(params.getAll('region')).toEqual(['asia', 'europe']);
   expect(params.get('size')).toBe('1');
-  expect(params.getAll('sort')).toEqual(['createdAt,desc', 'id,asc']);
+  expect(params.has('sort')).toBe(false);
+  expect(params.get('sortBy')).toBe('newest');
+});
+
+test('browseRecipes sends sortBy and repeated sea', async () => {
+  let url = '';
+  server.use(
+    http.get(`${BASE}/api/recipes`, ({ request }) => {
+      url = request.url;
+      return HttpResponse.json(pageOf([recipeFixture()]));
+    }),
+  );
+  await browseRecipes({ sea: ['pacific', 'caribbean'] }, 0, 12, 'most-rated');
+  const params = new URL(url).searchParams;
+  expect(params.get('sortBy')).toBe('most-rated');
+  expect(params.has('sort')).toBe(false);
+  expect(params.getAll('sea')).toEqual(['pacific', 'caribbean']);
+});
+
+test('getSeas fetches the sea catalogue', async () => {
+  const seas = [
+    { key: 'caribbean', label: 'Caribbean', vibe: 'v', starIngredients: ['a'], iconDishes: ['b'] },
+  ];
+  server.use(http.get(`${BASE}/api/recipes/seas`, () => HttpResponse.json(seas)));
+  expect(await getSeas()).toEqual(seas);
 });
 
 test('getCuisines fetches the catalogue', async () => {
   server.use(
     http.get(`${BASE}/api/recipes/cuisines`, () =>
       HttpResponse.json([
-        { key: 'italian', label: 'Italian', region: 'europe', mediterranean: true, count: 40 },
+        { key: 'italian', label: 'Italian', region: 'europe', seas: ['mediterranean'], count: 40 },
       ]),
     ),
   );
   const cuisines = await getCuisines();
   expect(cuisines).toEqual([
-    { key: 'italian', label: 'Italian', region: 'europe', mediterranean: true, count: 40 },
+    { key: 'italian', label: 'Italian', region: 'europe', seas: ['mediterranean'], count: 40 },
   ]);
 });
 

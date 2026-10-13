@@ -2,12 +2,12 @@ import { useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { SearchX, SlidersHorizontal } from 'lucide-react';
-import { browseRecipes } from '@/api/recipes';
+import { browseRecipes, PAGE_SIZE } from '@/api/recipes';
 import { cuisinesQueryKey, getCuisines } from '@/api/cuisines';
 import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { Spinner, Button, EmptyState } from '@/components/ui';
-import { countActive, emptyFilters, readFilters, toApiFilter, writeFilters, type FilterState } from './filterParams';
+import { countActive, emptyFilters, readFilters, readSort, toApiFilter, writeFilters, type FilterState } from './filterParams';
 import { FilterDrawer } from './FilterDrawer';
 import { ActiveFilterChips } from './ActiveFilterChips';
 
@@ -15,6 +15,7 @@ export default function BrowsePage() {
   const [params, setParams] = useSearchParams();
   const paramString = params.toString();
   const applied = useMemo(() => readFilters(new URLSearchParams(paramString)), [paramString]);
+  const sort = readSort(params);
   const page = Math.max(0, Number.parseInt(params.get('page') ?? '0', 10) || 0);
   const active = countActive(applied);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -22,7 +23,7 @@ export default function BrowsePage() {
 
   const query = useQuery({
     queryKey: ['recipes', paramString],
-    queryFn: () => browseRecipes(toApiFilter(applied), page),
+    queryFn: () => browseRecipes(toApiFilter(applied), page, PAGE_SIZE, sort),
     placeholderData: keepPreviousData,
   });
 

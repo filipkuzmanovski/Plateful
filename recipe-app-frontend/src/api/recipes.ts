@@ -1,4 +1,5 @@
 import { api, apiVoid } from './client';
+import type { SortKey } from '@/features/browse/filterParams';
 import type { Page, RecipeCreate, RecipeDisplay, RecipeFilter } from '@/lib/types';
 
 export const PAGE_SIZE = 12;
@@ -7,6 +8,7 @@ export function browseRecipes(
   filter: RecipeFilter,
   page: number,
   size: number = PAGE_SIZE,
+  sort: SortKey = 'newest',
 ): Promise<Page<RecipeDisplay>> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filter)) {
@@ -18,8 +20,7 @@ export function browseRecipes(
   }
   params.set('page', String(page));
   params.set('size', String(size));
-  params.append('sort', 'createdAt,desc');
-  params.append('sort', 'id,asc');
+  params.set('sortBy', sort);
   return api(`/api/recipes?${params}`);
 }
 

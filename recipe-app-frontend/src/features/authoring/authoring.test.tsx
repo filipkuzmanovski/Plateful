@@ -31,9 +31,9 @@ vi.mock('@/auth/supabaseClient', () => ({
 }));
 
 const cuisineCatalogue = [
-  { key: 'italian', label: 'Italian', region: 'Europe', mediterranean: true, count: 12 },
-  { key: 'macedonian', label: 'Macedonian', region: 'Europe', mediterranean: false, count: 0 },
-  { key: 'greek', label: 'Greek', region: 'Europe', mediterranean: true, count: 4 },
+  { key: 'italian', label: 'Italian', region: 'Europe', seas: ['mediterranean'], count: 12 },
+  { key: 'macedonian', label: 'Macedonian', region: 'Europe', seas: [], count: 0 },
+  { key: 'greek', label: 'Greek', region: 'Europe', seas: ['mediterranean'], count: 4 },
 ];
 
 beforeEach(() => {
@@ -262,7 +262,7 @@ test('picker: ArrowDown on a closed list opens it on the first option, and Enter
 test('pickerCapsAtTen: the input is disabled after ten selections', async () => {
   stubMe();
   const many = Array.from({ length: 12 }, (_, i) => ({
-    key: `c${i}`, label: `Cuisine${String.fromCharCode(65 + i)}`, region: 'Europe', mediterranean: false, count: 1,
+    key: `c${i}`, label: `Cuisine${String.fromCharCode(65 + i)}`, region: 'Europe', seas: [], count: 1,
   }));
   server.use(http.get(`${BASE}/api/recipes/cuisines`, () => HttpResponse.json(many)));
   renderApp('/recipes/new');
@@ -315,7 +315,7 @@ test('picker: a failed cuisines load offers Retry', async () => {
 test('selecting the tenth cuisine closes the list and removing a chip does not reopen it', async () => {
   stubMe();
   const many = Array.from({ length: 12 }, (_, i) => ({
-    key: `c${i}`, label: `Cuisine${String.fromCharCode(65 + i)}`, region: 'Europe', mediterranean: false, count: 1,
+    key: `c${i}`, label: `Cuisine${String.fromCharCode(65 + i)}`, region: 'Europe', seas: [], count: 1,
   }));
   server.use(http.get(`${BASE}/api/recipes/cuisines`, () => HttpResponse.json(many)));
   renderApp('/recipes/new');
