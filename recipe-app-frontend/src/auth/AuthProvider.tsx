@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     let lastUserKey: string | null | undefined; // undefined = nothing resolved yet
     let latest = 0; // id of the newest resolution; results from older ones are dropped
+    let readyUserId: string | null = null; // user whose profile is loaded; same-user re-resolves stay 'ready'
 
     async function resolveProfile(s: Session | null) {
       // The assurance level is part of the key: an aal1 -> aal2 upgrade is a real change to resolve.
@@ -37,15 +38,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isCurrent = () => !cancelled && run === latest;
 
       if (!s) {
+        readyUserId = null;
         if (isCurrent()) { setProfileState(null); setStatus('anonymous'); }
         return;
       }
-      if (isCurrent()) setStatus('loading');
+      // An aal1 -> aal2 upgrade of an already-loaded user refetches in the background; showing the
+      // spinner would unmount protected pages mid-flow. A different user or a first load still shows it.
+      if (readyUserId !== s.user.id) {
+        readyUserId = null;
+        if (isCurrent()) setStatus('loading');
+      }
       if (aalOf(s) === 'aal1') {
         // Half signed-in? An account with a verified factor must reach aal2 before /me can load.
         try {
           const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
           if (data && data.currentLevel === 'aal1' && data.nextLevel === 'aal2') {
+            readyUserId = null;
             if (isCurrent()) { setProfileState(null); setStatus('needs-mfa'); }
             return;
           }
@@ -56,12 +64,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const me = await getMe();
-        if (isCurrent()) { setProfileState(me); setStatus('ready'); }
+        if (isCurrent()) { readyUserId = s.user.id; setProfileState(me); setStatus('ready'); }
       } catch (e) {
         if (!isCurrent()) return; // a newer session already took over
+        readyUserId = null;
         setProfileState(null);
         if (e instanceof ApiError && e.status === 404) {
           setStatus('needs-profile');
+        } else if (e instanceof ApiError && e.code === 'mfa_required') {
+          // The API wants the second factor (e.g. enabled on another device since this tab loaded).
+          // Keep lastUserKey so duplicate events don't loop; the aal2 upgrade changes the key.
+          setStatus('needs-mfa');
         } else {
           lastUserKey = undefined; // transient failure: let the next auth event retry
           setStatus('anonymous'); // e.g. 401 already signed us out
@@ -69,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    setMfaRequiredHandler(() => { if (!cancelled) setStatus('needs-mfa'); });
+    setMfaRequiredHandler(() => { if (!cancelled) { readyUserId = null; setStatus('needs-mfa'); } });
 
     supabase.auth.getSession()
       .then(({ data }) => {

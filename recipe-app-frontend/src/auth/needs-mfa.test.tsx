@@ -94,3 +94,51 @@ test('a failing AAL lookup falls back to the normal profile path', async () => {
   expect(await screen.findByRole('button', { name: /jane/i })).toBeInTheDocument();
   expect(meCalls).toBe(1);
 });
+
+test('an mfa_required answer from /me lands on needs-mfa, not anonymous', async () => {
+  // e.g. 2FA was enabled on another device after this browser signed in: the AAL lookup sees no factor.
+  mocks.getAal = async () => ({ data: { currentLevel: 'aal1', nextLevel: 'aal1' }, error: null });
+  server.use(
+    http.get(`${BASE}/api/users/me`, () => {
+      meCalls += 1;
+      return HttpResponse.json(
+        { status: 401, detail: 'Two-factor verification required', code: 'mfa_required' },
+        { status: 401 },
+      );
+    }),
+  );
+  renderApp('/');
+  expect(await screen.findByRole('link', { name: /finish signing in/i })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /^sign in$/i })).not.toBeInTheDocument();
+  expect(meCalls).toBe(1);
+
+  await act(async () => { mocks.fire?.('TOKEN_REFRESHED', sessionFor('u-1', 'aal1')); });
+  expect(meCalls).toBe(1); // duplicate event must not retry in a loop
+});
+
+test('an aal1 to aal2 upgrade of a ready user keeps the page mounted while it refetches', async () => {
+  mocks.getAal = async () => ({ data: { currentLevel: 'aal1', nextLevel: 'aal1' }, error: null }); // no factor yet
+  renderApp('/me');
+  const heading = await screen.findByRole('heading', { name: /^profile$/i });
+  expect(meCalls).toBe(1);
+
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  server.use(
+    http.get(`${BASE}/api/users/me`, async () => {
+      meCalls += 1;
+      await gate;
+      return HttpResponse.json(profileFixture);
+    }),
+  );
+
+  await act(async () => { mocks.fire?.('MFA_CHALLENGE_VERIFIED', sessionFor('u-1', 'aal2')); });
+  await vi.waitFor(() => expect(meCalls).toBe(2)); // refetch is in flight
+  expect(heading).toBeInTheDocument(); // same node, never unmounted (a spinner swap would detach it)
+  expect(screen.getByRole('heading', { name: /^profile$/i })).toBe(heading);
+
+  await act(async () => { release(); });
+  await vi.waitFor(() => expect(meCalls).toBe(2));
+  expect(heading).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /^profile$/i })).toBe(heading);
+});
