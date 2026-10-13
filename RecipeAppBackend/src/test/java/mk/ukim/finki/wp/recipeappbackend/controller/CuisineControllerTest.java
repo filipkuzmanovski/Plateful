@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.controller;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
+import mk.ukim.finki.wp.recipeappbackend.cuisine.SeaCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.CuisineInfoDto;
 import mk.ukim.finki.wp.recipeappbackend.service.CuisineService;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
@@ -21,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest({CuisineController.class, RecipeController.class})
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, SeaCatalog.class})
 class CuisineControllerTest {
 
     @Autowired
@@ -59,5 +60,31 @@ class CuisineControllerTest {
         mockMvc.perform(get("/api/recipes/cuisines")).andExpect(status().isOk());
 
         verifyNoInteractions(recipeService);
+    }
+
+    @Test
+    void seasIsPublicAndReturnsFive() throws Exception {
+        mockMvc.perform(get("/api/recipes/seas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$[0].key").value("mediterranean"))
+                .andExpect(jsonPath("$[3].label").value("Sea of Japan & Pacific"));
+    }
+
+    @Test
+    void seasNotSwallowedByRecipeId() throws Exception {
+        mockMvc.perform(get("/api/recipes/seas")).andExpect(status().isOk());
+
+        verifyNoInteractions(recipeService);
+    }
+
+    @Test
+    void cuisinesCarrySeas() throws Exception {
+        stubCatalogue();
+
+        mockMvc.perform(get("/api/recipes/cuisines"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].seas").isArray())
+                .andExpect(jsonPath("$[0].mediterranean").doesNotExist());
     }
 }
