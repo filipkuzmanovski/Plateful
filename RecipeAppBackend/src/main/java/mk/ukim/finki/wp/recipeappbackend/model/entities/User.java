@@ -66,7 +66,7 @@ public class User implements Persistable<UUID> {
     // persist (INSERT) or merge (SELECT + UPDATE). Defaults to true for
     // newly constructed instances; flipped off once persisted or loaded.
     @Transient
-    @Builder.Default
+    @Builder.Default//so that lombok sees the default value we set
     private boolean isNew = true;
 
     @Override
@@ -74,8 +74,8 @@ public class User implements Persistable<UUID> {
         return isNew;
     }
 
-    @PostLoad
-    @PostPersist
+    @PostLoad//execute after fetching from db
+    @PostPersist//execute after inserting into db
     void markNotNew() {
         this.isNew = false;
     }

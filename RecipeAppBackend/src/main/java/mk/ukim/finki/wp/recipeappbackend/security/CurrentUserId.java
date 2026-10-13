@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  * parameter. The ONLY sanctioned way for controllers to learn who is calling
  * — identity never comes from a request body or path variable.
  */
-@Target(ElementType.PARAMETER)
-@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.PARAMETER)//can only be placed as a parameter like on controller arguments
+@Retention(RetentionPolicy.RUNTIME)//doesnt allow the id to come from anywhere else except the JWT token
 public @interface CurrentUserId {
 }

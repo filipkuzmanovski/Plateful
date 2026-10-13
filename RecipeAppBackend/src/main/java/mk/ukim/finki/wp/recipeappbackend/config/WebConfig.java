@@ -16,6 +16,7 @@ import java.util.List;
  * auto-configuration back off, which silently disabled the
  * max-page-size property.
  */
+//extracts users ID from the JWT token
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 

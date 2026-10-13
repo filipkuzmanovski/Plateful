@@ -31,7 +31,8 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "recipe_ratings",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"recipe_id", "user_id"})
+        uniqueConstraints = @UniqueConstraint(columnNames = {"recipe_id", "user_id"})//enforces 1 rating per user id so that one eprson cannot react
+        //many times to 1 recipe
 )
 @Getter
 @Setter

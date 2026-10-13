@@ -27,7 +27,7 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
     }
 
     @Override
-    public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+    public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer, //resolves the arguemtn to get the ID
                                   NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
