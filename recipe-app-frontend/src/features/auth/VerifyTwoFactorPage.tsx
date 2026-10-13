@@ -30,6 +30,7 @@ export default function VerifyTwoFactorPage() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0); // bumped by "Try again" to re-run the device-list load
 
   const needsMfa = status === 'needs-mfa';
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function VerifyTwoFactorPage() {
         if (!cancelled) setLoaded({ kind: 'error', message: e instanceof Error ? e.message : 'Something went wrong.' });
       });
     return () => { cancelled = true; };
-  }, [needsMfa]);
+  }, [needsMfa, attempt]);
 
   if (status === 'loading') return <Spinner />;
   if (status === 'anonymous') return <Navigate to="/login" replace />;
@@ -73,8 +74,8 @@ export default function VerifyTwoFactorPage() {
       if (verifyError) throw verifyError;
       navigate(from, { replace: true });
     } catch (err) {
-      const { status: errStatus, message } = err as { status?: number; message?: string };
-      if (errStatus === 422 || /code/i.test(message ?? '')) setError(WRONG_CODE);
+      const { status: errStatus, code: errCode, message } = err as { status?: number; code?: string; message?: string };
+      if (errCode === 'mfa_verification_failed' || errStatus === 422 || /code/i.test(message ?? '')) setError(WRONG_CODE);
       else setError(message || 'Something went wrong. Please try again.');
       setCode('');
     } finally {
@@ -94,6 +95,14 @@ export default function VerifyTwoFactorPage() {
       {loaded.kind === 'error' && (
         <div className="space-y-4">
           <FormError>{loaded.message}</FormError>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => { setLoaded({ kind: 'loading' }); setAttempt((n) => n + 1); }}
+            className="w-full"
+          >
+            Try again
+          </Button>
           {signOutButton}
         </div>
       )}

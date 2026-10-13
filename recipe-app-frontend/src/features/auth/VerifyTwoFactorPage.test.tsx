@@ -153,3 +153,24 @@ test('loadingStatusShowsSpinner', () => {
   expect(screen.getByRole('status')).toBeInTheDocument();
   expect(screen.queryByLabelText('Code')).not.toBeInTheDocument();
 });
+
+test('wrongCodeIsDetectedByErrorCode', async () => {
+  mocks.verify.mockResolvedValue({ data: null, error: { code: 'mfa_verification_failed', message: 'Verification failed' } });
+  renderPage();
+  await enterCode('000000');
+
+  expect(await screen.findByText(WRONG)).toBeInTheDocument();
+});
+
+test('loadErrorOffersTryAgainAndSignOut', async () => {
+  mocks.listFactors.mockResolvedValueOnce({ data: null, error: { message: 'Network down' } });
+  renderPage();
+
+  expect(await screen.findByText('Network down')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+  expect(await screen.findByLabelText('Code')).toBeInTheDocument();
+  expect(screen.queryByText('Network down')).not.toBeInTheDocument();
+  expect(mocks.listFactors).toHaveBeenCalledTimes(2);
+});
