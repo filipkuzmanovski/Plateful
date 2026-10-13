@@ -7,6 +7,10 @@ import {
   WARNING_MS,
 } from './idleTimeout';
 
+/** Put this attribute on the warning dialog so its own controls are not treated as activity. */
+export const IDLE_WARNING_ATTRIBUTE = 'data-idle-warning';
+const IDLE_WARNING_SELECTOR = `[${IDLE_WARNING_ATTRIBUTE}]`;
+
 function readStoredActivity(): number {
   try {
     const n = Number(localStorage.getItem(LAST_ACTIVITY_KEY));
@@ -70,7 +74,13 @@ export function useIdleTimeout(enabled: boolean, onTimeout: () => void) {
     };
     recordRef.current = record;
 
-    const onActivity = () => record(false);
+    // Presses inside the warning dialog are choices (Stay / Sign out now), not activity: counting them
+    // would close the dialog on pointerdown or keydown, before the click lands.
+    const onActivity = (e: Event) => {
+      const target = e.target;
+      if (target instanceof Element && target.closest(IDLE_WARNING_SELECTOR)) return;
+      record(false);
+    };
     const onStorage = (e: StorageEvent) => {
       if (e.key !== LAST_ACTIVITY_KEY) return;
       const n = Number(e.newValue);

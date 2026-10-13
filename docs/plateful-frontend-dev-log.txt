@@ -3355,10 +3355,15 @@ How it works
   - src/auth/IdleSessionGuard.tsx renders the dialog (Radix Dialog, same
     styling as ConfirmDialog): title "Still there?", body "You'll be signed out
     in N seconds due to inactivity.", buttons "Stay signed in" (records
-    activity, closes) and "Sign out now" (signs out like a timeout). Any
+    activity, closes) and "Sign out now" (the same sign-out and navigation as a
+    timeout, but it does not set the idle flag). Any
     activity, Escape or a click outside also closes it and resets the clock.
-    Opening the dialog is not activity. It is mounted once in AppShell, inside
-    the router, so it can navigate.
+    Opening the dialog is not activity. Presses inside the dialog (pointerdown,
+    keydown, touchstart, scroll whose target is within [data-idle-warning]) are
+    also not activity: otherwise the dialog would close on pointerdown or on
+    Tab/Enter, before the click on "Sign out now" lands. "Stay signed in" gets
+    the focus when the dialog opens, so Enter or Space keeps the user in.
+    It is mounted once in AppShell, inside the router, so it can navigate.
   - LoginPage reads sessionStorage['plateful.signedOutIdle'] on mount, shows a
     role="status" panel (same style as "Check your email", Clock icon), and
     removes the key in an effect so it shows once.
@@ -3373,6 +3378,10 @@ whose signOut fires SIGNED_OUT like the real client:
     otherTabActivityResets, returnAfterSleepSignsOutImmediately (visibility)
     and the same on window focus, signOutNowButton, notActiveWhenAnonymous,
     staleTimestampFromOldSessionIgnored, activityIsThrottledButStillWritten.
+  - Real input (userEvent with fake timers): a full pointer sequence on each
+    button, Tab then Enter on "Sign out now", focus on "Stay signed in" and
+    Enter keeping the user in, and Tab plus a press inside the dialog not
+    dismissing it. signOutNowButton asserts no status message on /login.
 The guard removes its listeners and timer on unmount, so it does not leak into
 other tests.
 
@@ -3381,8 +3390,6 @@ Known limits
   - The timeout is enforced in the browser only. A copied access token keeps
     working on the server until it expires; this is a convenience for shared
     computers, not a server-side session limit.
-  - "Sign out now" also shows the "signed out after 60 minutes" message on the
-    login page, because it signs out the same way as a timeout.
   - If localStorage is unavailable, only this tab's own activity is counted, so
     activity in another tab does not reset the clock.
   - The countdown text is not announced by screen readers on every second; the

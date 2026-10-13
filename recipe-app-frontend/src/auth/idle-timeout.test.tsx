@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { act, cleanup, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { expectNoEmoji } from '@/test/noEmoji';
@@ -46,6 +47,10 @@ async function boot(route = '/') {
 }
 
 const warning = () => screen.queryByRole('dialog', { name: /still there/i });
+
+// Testing Library only drains its own timers under fake timers when it sees a `jest` global.
+beforeAll(() => { (globalThis as { jest?: unknown }).jest = { advanceTimersByTime: vi.advanceTimersByTime }; });
+afterAll(() => { delete (globalThis as { jest?: unknown }).jest; });
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: false, toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
@@ -163,6 +168,8 @@ test('returnAfterSleepOnWindowFocusSignsOut', async () => {
   expect(warning()).not.toBeInTheDocument();
 });
 
+const realUser = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
 test('signOutNowButton', async () => {
   await boot();
   await advance(59 * MIN);
@@ -170,8 +177,66 @@ test('signOutNowButton', async () => {
   await advance(0);
   expect(mocks.signOut).toHaveBeenCalledTimes(1);
   expect(screen.getByRole('heading', { name: /^sign in$/i })).toBeInTheDocument();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument(); // a chosen sign-out is not an inactivity message
+  expect(sessionStorage.getItem(SIGNED_OUT_IDLE_KEY)).toBeNull();
   await advance(IDLE_TIMEOUT_MS);
   expect(mocks.signOut).toHaveBeenCalledTimes(1);
+});
+
+test('signOutNowWorksWithARealPointerSequence', async () => {
+  await boot();
+  await advance(59 * MIN);
+  // pointerdown, mousedown, pointerup, mouseup, click: the dialog must survive until the click.
+  await realUser().click(screen.getByRole('button', { name: /sign out now/i }));
+  await advance(0);
+  expect(mocks.signOut).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('heading', { name: /^sign in$/i })).toBeInTheDocument();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('signOutNowWorksFromTheKeyboard', async () => {
+  await boot();
+  await advance(59 * MIN);
+  const user = realUser();
+  await user.tab(); // Tab inside the dialog is not activity
+  const signOutNow = screen.getByRole('button', { name: /sign out now/i });
+  expect(warning()).toBeInTheDocument();
+  expect(signOutNow).toHaveFocus();
+  await user.keyboard('{Enter}');
+  await advance(0);
+  expect(mocks.signOut).toHaveBeenCalledTimes(1);
+});
+
+test('staySignedInWorksWithARealPointerSequence', async () => {
+  await boot();
+  await advance(59 * MIN);
+  await realUser().click(screen.getByRole('button', { name: /stay signed in/i }));
+  expect(warning()).not.toBeInTheDocument();
+  await advance(58 * MIN);
+  expect(warning()).not.toBeInTheDocument();
+  expect(mocks.signOut).not.toHaveBeenCalled();
+});
+
+test('staySignedInHasFocusAndEnterKeepsTheUserSignedIn', async () => {
+  await boot();
+  await advance(59 * MIN);
+  const stay = screen.getByRole('button', { name: /stay signed in/i });
+  expect(stay).toHaveFocus();
+  await realUser().keyboard('{Enter}');
+  expect(warning()).not.toBeInTheDocument();
+  expect(mocks.signOut).not.toHaveBeenCalled();
+  await advance(58 * MIN);
+  expect(warning()).not.toBeInTheDocument();
+  expect(mocks.signOut).not.toHaveBeenCalled();
+});
+
+test('tabAndPointerInsideTheDialogDoNotDismissIt', async () => {
+  await boot();
+  await advance(59 * MIN);
+  const user = realUser();
+  await user.tab(); await user.tab();
+  await user.pointer({ keys: '[MouseLeft>]', target: screen.getByText(/signed out in/i) });
+  expect(warning()).toBeInTheDocument();
 });
 
 test('notActiveWhenAnonymous', async () => {
