@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
@@ -44,7 +44,10 @@ test('a logged-in user without a profile is sent to complete-profile from a publ
 test('signup with email confirmation on shows a check-your-email message', async () => {
   renderApp('/signup');
   await userEvent.type(await screen.findByLabelText(/email/i), 'new@example.com');
-  fireEvent.change(screen.getByLabelText(/date of birth/i), { target: { value: '1990-01-01' } });
+  await userEvent.type(screen.getByRole('textbox', { name: 'Day' }), '01');
+  await userEvent.click(screen.getByRole('combobox', { name: 'Month' }));
+  await userEvent.click(await screen.findByRole('option', { name: 'January' }));
+  await userEvent.type(screen.getByRole('textbox', { name: 'Year' }), '1990');
   await userEvent.type(screen.getByLabelText(/password/i), 'secret123');
   await userEvent.click(screen.getByRole('button', { name: /sign up/i }));
   expect(await screen.findByText(/check your email/i)).toBeInTheDocument();

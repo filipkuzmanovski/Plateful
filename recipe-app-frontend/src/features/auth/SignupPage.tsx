@@ -1,9 +1,10 @@
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/auth/supabaseClient';
 import { MailCheck, UserCheck } from 'lucide-react';
 import { Button, Field, TextInput } from '@/components/ui';
 import { AuthCard, authLinkClass, FormError } from './AuthCard';
+import { BirthDateField } from './BirthDateField';
 import { ageOn, MIN_AGE, validateBirthDate } from './ageCheck';
 
 // Older versions locked an under-13 visitor out for the tab via this key. There is no lockout now;
@@ -29,7 +30,6 @@ export default function SignupPage() {
   const [confirmEmail, setConfirmEmail] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
   const [birthError, setBirthError] = useState<string | null>(null);
-  const birthErrorId = useId();
   const navigate = useNavigate();
 
   useEffect(clearLegacyBlock, []);
@@ -86,26 +86,14 @@ export default function SignupPage() {
         <Field label="Email">
           <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </Field>
-        <div>
-          <Field label="Date of birth">
-            <TextInput
-              type="date"
-              value={birth}
-              onChange={(e) => {
-                setBirth(e.target.value);
-                setBirthError(null);
-              }}
-              required
-              aria-invalid={birthError ? true : undefined}
-              aria-describedby={birthError ? birthErrorId : undefined}
-            />
-          </Field>
-          {birthError && (
-            <p id={birthErrorId} role="alert" className="mt-1.5 text-xs font-medium text-danger">
-              {birthError}
-            </p>
-          )}
-        </div>
+        <BirthDateField
+          value={birth}
+          onChange={(value) => {
+            setBirth(value);
+            setBirthError(null);
+          }}
+          error={birthError ?? undefined}
+        />
         <Field label="Password">
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
         </Field>

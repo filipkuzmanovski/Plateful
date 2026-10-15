@@ -1,5 +1,5 @@
 import { MemoryRouter } from 'react-router';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SignupPage from './SignupPage';
 import { expectNoEmoji } from '@/test/noEmoji';
@@ -23,9 +23,27 @@ function renderSignup() {
   );
 }
 
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** Types a YYYY-MM-DD date into the Day / Month / Year parts. */
+async function enterDob(dob: string) {
+  const [y, m, d] = dob.split('-');
+  const day = screen.getByRole('textbox', { name: 'Day' });
+  const year = screen.getByRole('textbox', { name: 'Year' });
+  await userEvent.clear(day);
+  await userEvent.type(day, d);
+  await userEvent.click(screen.getByRole('combobox', { name: 'Month' }));
+  await userEvent.click(await screen.findByRole('option', { name: MONTHS[Number(m) - 1] }));
+  await userEvent.clear(year);
+  await userEvent.type(year, y);
+}
+
 async function fillAndSubmit(dob: string) {
   await userEvent.type(screen.getByLabelText('Email'), 'jane@example.com');
-  fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: dob } });
+  await enterDob(dob);
   await userEvent.type(screen.getByLabelText('Password'), 'secret123');
   await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
 }
@@ -66,7 +84,7 @@ test('underThirteenIsBlockedAndNothingSent', async () => {
 
   const alert = await screen.findByText(BLOCKED);
   expect(alert).toHaveAttribute('role', 'alert');
-  expect(screen.getByLabelText('Date of birth')).toHaveAttribute('aria-describedby', alert.id);
+  expect(screen.getByRole('group', { name: 'Date of birth' })).toHaveAttribute('aria-describedby', alert.id);
   expect(signUp).not.toHaveBeenCalled();
   // The form stays visible and editable: no lockout.
   expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument();
@@ -80,7 +98,7 @@ test('canCorrectDateImmediately', async () => {
   await fillAndSubmit(MINOR_DOB);
   expect(await screen.findByText(BLOCKED)).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: ADULT_DOB } });
+  await enterDob(ADULT_DOB);
   expect(screen.queryByText(BLOCKED)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
 
@@ -91,7 +109,7 @@ test('canCorrectDateImmediately', async () => {
 test('staleBlockKeyIsCleared', () => {
   sessionStorage.setItem('plateful.ageBlocked', '1');
   renderSignup();
-  expect(screen.getByLabelText('Date of birth')).toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'Date of birth' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument();
   expect(screen.queryByText(BLOCKED)).not.toBeInTheDocument();
   expect(sessionStorage.getItem('plateful.ageBlocked')).toBeNull();
@@ -124,7 +142,7 @@ test('invalidDateRejected', async () => {
 
 test('labelIsNeutral', () => {
   renderSignup();
-  const form = screen.getByLabelText('Date of birth').closest('form')!;
+  const form = screen.getByRole('group', { name: 'Date of birth' }).closest('form')!;
   expect(form.textContent).toContain('Date of birth');
   expect(form.textContent).not.toMatch(/13|thirteen|age/i);
   expectNoEmoji();

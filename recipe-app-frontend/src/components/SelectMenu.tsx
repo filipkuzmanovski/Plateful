@@ -6,13 +6,22 @@ import { Check, type LucideIcon } from 'lucide-react';
  * The shared dropdown surface (Radix Select): a paper panel lifted off the page, items that
  * light up in cream/sand, and a check on the chosen one. Triggers are styled where they are used.
  */
-export function SelectMenuContent({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function SelectMenuContent({
+  children,
+  className = '',
+  onCloseAutoFocus,
+}: {
+  children: ReactNode;
+  className?: string;
+  onCloseAutoFocus?: (event: Event) => void;
+}) {
   return (
     <Select.Portal>
       <Select.Content
         position="popper"
         sideOffset={6}
         collisionPadding={12}
+        onCloseAutoFocus={onCloseAutoFocus}
         className={`z-50 max-h-[min(var(--radix-select-content-available-height),20rem)] min-w-(--radix-select-trigger-width) origin-(--radix-select-content-transform-origin) overflow-hidden rounded-2xl bg-paper shadow-lift ring-1 ring-sand/70 data-[state=open]:animate-menu-in ${className}`}
       >
         <Select.Viewport className="p-1.5">{children}</Select.Viewport>
