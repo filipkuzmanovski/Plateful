@@ -10,10 +10,14 @@ export function SelectMenuContent({
   children,
   className = '',
   onCloseAutoFocus,
+  onEscapeKeyDown,
+  onPointerDownOutside,
 }: {
   children: ReactNode;
   className?: string;
   onCloseAutoFocus?: (event: Event) => void;
+  onEscapeKeyDown?: (event: KeyboardEvent) => void;
+  onPointerDownOutside?: (event: Event) => void;
 }) {
   return (
     <Select.Portal>
@@ -22,6 +26,8 @@ export function SelectMenuContent({
         sideOffset={6}
         collisionPadding={12}
         onCloseAutoFocus={onCloseAutoFocus}
+        onEscapeKeyDown={onEscapeKeyDown}
+        onPointerDownOutside={onPointerDownOutside}
         className={`z-50 max-h-[min(var(--radix-select-content-available-height),20rem)] min-w-(--radix-select-trigger-width) origin-(--radix-select-content-transform-origin) overflow-hidden rounded-2xl bg-paper shadow-lift ring-1 ring-sand/70 data-[state=open]:animate-menu-in ${className}`}
       >
         <Select.Viewport className="p-1.5">{children}</Select.Viewport>

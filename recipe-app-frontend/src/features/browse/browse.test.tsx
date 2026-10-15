@@ -411,7 +411,7 @@ test('seasEndpointFailureFallsBack', async () => {
 
 // ---- sorting ----
 
-const sortTrigger = () => screen.getByRole('combobox', { name: 'Sort by' });
+const sortTrigger = () => screen.getByRole('combobox', { name: /^Sort by/ });
 
 test('sortSelectOffersTheFourOrdersInOrder', async () => {
   captureRecipes();
@@ -439,6 +439,7 @@ test('sortSelectChangesUrlAndRequest', async () => {
   await vi.waitFor(() => expect(requests.lastGrid().get('sortBy')).toBe('most-rated'));
   expect(requests.lastGrid().get('page')).toBe('0');
   expect(sortTrigger()).toHaveTextContent('Sort: Most rated');
+  expect(sortTrigger()).toHaveAccessibleName('Sort by: Most rated');
 });
 
 test('applyingFiltersKeepsSort', async () => {
@@ -458,5 +459,6 @@ test('bogusSortShowsNewest', async () => {
   renderApp('/?sort=bogus');
   await screen.findByText('Bruschetta Pork & Pasta');
   expect(sortTrigger()).toHaveTextContent('Sort: Newest');
+  expect(sortTrigger()).toHaveAccessibleName('Sort by: Newest');
   expect(requests.lastGrid().get('sortBy')).toBe('newest');
 });

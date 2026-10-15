@@ -92,6 +92,32 @@ test('choosingAMonthMovesFocusToYear', async () => {
   expect(month()).toHaveTextContent('July');
 });
 
+test('choosingTheAlreadySelectedMonthStillMovesFocusToYear', async () => {
+  render(<Harness initial="1990-03-07" />);
+  await chooseMonth('March');
+  expect(year()).toHaveFocus();
+  expect(month()).toHaveTextContent('March');
+});
+
+test('escapingTheMonthMenuKeepsFocusOnMonth', async () => {
+  render(<Harness />);
+  await userEvent.click(month());
+  await screen.findByRole('option', { name: 'May' });
+  await userEvent.keyboard('{Escape}');
+  expect(month()).toHaveFocus();
+});
+
+test('typeaheadOnTheClosedMonthTriggerDoesNotSendALaterEscapeToYear', async () => {
+  render(<Harness />);
+  month().focus();
+  await userEvent.keyboard('m');
+  expect(month()).toHaveTextContent(/March|May/);
+  await userEvent.keyboard('{Enter}');
+  await screen.findByRole('option', { name: 'May' });
+  await userEvent.keyboard('{Escape}');
+  expect(month()).toHaveFocus();
+});
+
 test('backspaceInAnEmptyYearGoesBackToMonth', async () => {
   render(<Harness />);
   await chooseMonth('July');
@@ -143,13 +169,12 @@ test('thePartsHaveAccessibleNamesInsideALabelledGroup', () => {
   expectNoEmoji();
 });
 
-test('anErrorIsAnnouncedAndWiredToTheGroupAndParts', () => {
+test('theErrorIsDescribedOnTheGroupOnlyAndThePartsAreInvalid', () => {
   render(<Harness error="Something is off" />);
   const alert = screen.getByRole('alert');
   expect(alert).toHaveTextContent('Something is off');
-  for (const el of [screen.getByRole('group', { name: 'Date of birth' }), day(), month(), year()]) {
-    expect(el).toHaveAttribute('aria-describedby', alert.id);
-  }
+  expect(screen.getByRole('group', { name: 'Date of birth' })).toHaveAttribute('aria-describedby', alert.id);
+  for (const el of [day(), month(), year()]) expect(el).not.toHaveAttribute('aria-describedby');
   for (const el of [day(), month(), year()]) expect(el).toHaveAttribute('aria-invalid', 'true');
 });
 

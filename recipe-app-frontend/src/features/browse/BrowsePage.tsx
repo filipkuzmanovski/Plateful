@@ -80,7 +80,7 @@ export default function BrowsePage() {
           )}
           <Select.Root value={sort} onValueChange={(value) => setParams(writeSort(value as SortKey, params))}>
             <Select.Trigger
-              aria-label="Sort by"
+              aria-label={`Sort by: ${SORT_LABELS[sort]}`}
               className="group inline-flex max-w-full items-center gap-2 rounded-xl border border-sand bg-paper py-2 pr-3 pl-3.5 text-sm font-semibold text-olive shadow-card transition duration-200 hover:border-olive/30 hover:shadow-lift focus-visible:outline-olive data-[state=open]:border-olive/50"
             >
               <ArrowUpDown aria-hidden="true" className="size-4 shrink-0" strokeWidth={2.25} />

@@ -58,7 +58,8 @@ export function BirthDateField({
   const dayRef = useRef<HTMLInputElement>(null);
   const monthRef = useRef<HTMLButtonElement>(null);
   const yearRef = useRef<HTMLInputElement>(null);
-  const monthChosen = useRef(false);
+  // True when the open month menu was dismissed (Escape, outside click) rather than chosen from.
+  const monthDismissed = useRef(false);
 
   // Follow the parent when it sets a different date from outside (e.g. a reset).
   useEffect(() => {
@@ -89,6 +90,7 @@ export function BirthDateField({
   }
 
   const invalid = error ? true : undefined;
+  // The error is described on the group only, so a screen reader does not read it once per part.
   const describedBy = error ? errorId : undefined;
 
   return (
@@ -114,23 +116,21 @@ export function BirthDateField({
           placeholder="DD"
           aria-labelledby={dayLabelId}
           aria-invalid={invalid}
-          aria-describedby={describedBy}
           value={parts.day}
           onChange={(e) => onDay(e.target.value)}
           className={`${SEGMENT} placeholder:text-olive/70`}
         />
         <Select.Root
           value={parts.month}
-          onValueChange={(month) => {
-            monthChosen.current = true;
-            update({ ...parts, month });
+          onValueChange={(month) => update({ ...parts, month })}
+          onOpenChange={(open) => {
+            if (open) monthDismissed.current = false;
           }}
         >
           <Select.Trigger
             ref={monthRef}
             aria-labelledby={monthLabelId}
             aria-invalid={invalid}
-            aria-describedby={describedBy}
             onKeyDown={(e) => backspaceGoesBack(e, true, dayRef.current)}
             className={`${SEGMENT} group flex items-center justify-between gap-1.5 text-left`}
           >
@@ -146,10 +146,16 @@ export function BirthDateField({
             </Select.Icon>
           </Select.Trigger>
           <SelectMenuContent
+            onEscapeKeyDown={() => {
+              monthDismissed.current = true;
+            }}
+            onPointerDownOutside={() => {
+              monthDismissed.current = true;
+            }}
             onCloseAutoFocus={(e) => {
-              // Picking a month moves on to the year; dismissing the menu leaves focus where it was.
-              if (!monthChosen.current) return;
-              monthChosen.current = false;
+              // Choosing a month (even the one already chosen) moves on to the year; dismissing
+              // the menu leaves focus on the trigger.
+              if (monthDismissed.current) return;
               e.preventDefault();
               yearRef.current?.focus();
             }}
@@ -169,7 +175,6 @@ export function BirthDateField({
           placeholder="YYYY"
           aria-labelledby={yearLabelId}
           aria-invalid={invalid}
-          aria-describedby={describedBy}
           value={parts.year}
           onChange={(e) => onYear(e.target.value)}
           onKeyDown={(e) => backspaceGoesBack(e, parts.year === '', monthRef.current)}
