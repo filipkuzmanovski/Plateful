@@ -12,6 +12,10 @@ import RecipeDetailPage from '@/features/recipe/RecipeDetailPage';
 import RecipeFormPage from '@/features/authoring/RecipeFormPage';
 import MyProfilePage from '@/features/profile/MyProfilePage';
 import PublicProfilePage from '@/features/profile/PublicProfilePage';
+import AboutPage from '@/features/content/AboutPage';
+import PrivacyPage from '@/features/content/PrivacyPage';
+import TermsPage from '@/features/content/TermsPage';
+import ContactPage from '@/features/content/ContactPage';
 
 export default function AppRoutes() {
   return (
@@ -28,6 +32,10 @@ export default function AppRoutes() {
         <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfilePage /></ProtectedRoute>} />
         {/* Deliberately not wrapped in ProtectedRoute: the page handles every auth status itself. */}
         <Route path="/verify-2fa" element={<VerifyTwoFactorPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="*" element={<EmptyState icon={SearchX}>Page not found.</EmptyState>} />
       </Route>
     </Routes>
