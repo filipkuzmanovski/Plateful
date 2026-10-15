@@ -85,7 +85,7 @@ export default function BrowsePage() {
             >
               <ArrowUpDown aria-hidden="true" className="size-4 shrink-0" strokeWidth={2.25} />
               <span className="truncate">
-                <Select.Value>Sort: {SORT_LABELS[sort]}</Select.Value>
+                <Select.Value>Sort by: {SORT_LABELS[sort]}</Select.Value>
               </span>
               <Select.Icon asChild>
                 <ChevronDown

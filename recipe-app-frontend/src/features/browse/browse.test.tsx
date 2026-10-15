@@ -438,7 +438,7 @@ test('sortSelectChangesUrlAndRequest', async () => {
   await userEvent.click(await screen.findByRole('option', { name: 'Most rated' }));
   await vi.waitFor(() => expect(requests.lastGrid().get('sortBy')).toBe('most-rated'));
   expect(requests.lastGrid().get('page')).toBe('0');
-  expect(sortTrigger()).toHaveTextContent('Sort: Most rated');
+  expect(sortTrigger()).toHaveTextContent('Sort by: Most rated');
   expect(sortTrigger()).toHaveAccessibleName('Sort by: Most rated');
 });
 
@@ -446,7 +446,7 @@ test('applyingFiltersKeepsSort', async () => {
   const requests = captureRecipes();
   renderApp('/?sort=top-rated');
   await screen.findByText('Bruschetta Pork & Pasta');
-  expect(sortTrigger()).toHaveTextContent('Sort: Most popular');
+  expect(sortTrigger()).toHaveTextContent('Sort by: Most popular');
   const drawer = await openDrawer();
   await userEvent.click(within(drawer).getByRole('button', { name: 'Vegan' }));
   await applyDrawer(drawer);
@@ -458,7 +458,7 @@ test('bogusSortShowsNewest', async () => {
   const requests = captureRecipes();
   renderApp('/?sort=bogus');
   await screen.findByText('Bruschetta Pork & Pasta');
-  expect(sortTrigger()).toHaveTextContent('Sort: Newest');
+  expect(sortTrigger()).toHaveTextContent('Sort by: Newest');
   expect(sortTrigger()).toHaveAccessibleName('Sort by: Newest');
   expect(requests.lastGrid().get('sortBy')).toBe('newest');
 });
