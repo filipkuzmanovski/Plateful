@@ -18,6 +18,7 @@ import org.springframework.web.util.UrlPathHelper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.UUID;
 
 /**
@@ -27,7 +28,7 @@ import java.util.UUID;
  * only the password could still call the API.
  *
  * The rule: for an authenticated request that is a mutation (any method other than GET) or a
- * "/me" read, if the token is not aal2 and the user has a verified factor, answer 401 with code
+ * read of a path with a "me" segment, if the token is not aal2 and the user has a verified factor, answer 401 with code
  * "mfa_required". Public GETs are never blocked, so browsing works for everyone.
  *
  * Fail closed: if we cannot find out whether the user has a factor (database down, or any other
@@ -94,15 +95,19 @@ public final class MfaEnforcementFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Mutations and "/me" reads are guarded; every other GET (public browsing) is not.
+     * Mutations and reads of any path with a "me" segment are guarded; every other GET (public browsing)
+     * is not. Segments are compared whole, so "medium" does not match, while "/api/users/me/saved" does.
      *
      * The decision is made on the DECODED path. getRequestURI() is raw, so "/api/users/m%65" would not
-     * end with "/me" and slip past, yet Spring routes on the decoded path and would reach the "/me"
-     * handler. UrlPathHelper also drops ";" path parameters, matching how the routes are resolved.
+     * contain a "me" segment and slip past, yet Spring routes on the decoded path and would reach the
+     * "/me" handler. UrlPathHelper also drops ";" path parameters, matching how the routes are resolved.
      */
     private static boolean isGuarded(HttpServletRequest request) {
-        return !"GET".equals(request.getMethod())
-                || UrlPathHelper.defaultInstance.getPathWithinApplication(request).endsWith("/me");
+        if (!"GET".equals(request.getMethod())) {
+            return true;
+        }
+        String path = UrlPathHelper.defaultInstance.getPathWithinApplication(request);
+        return Arrays.asList(path.split("/")).contains("me");
     }
 
     private void writeProblem(HttpServletResponse response, HttpStatus status, String detail, boolean mfaRequired)

@@ -2,9 +2,11 @@ package mk.ukim.finki.wp.recipeappbackend.security;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.controller.RecipeController;
+import mk.ukim.finki.wp.recipeappbackend.controller.SavedRecipeController;
 import mk.ukim.finki.wp.recipeappbackend.controller.UserController;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.UserDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
+import mk.ukim.finki.wp.recipeappbackend.service.SavedRecipeService;
 import mk.ukim.finki.wp.recipeappbackend.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({UserController.class, RecipeController.class})
+@WebMvcTest({UserController.class, RecipeController.class, SavedRecipeController.class})
 @Import(SecurityConfig.class)
 class MfaEnforcementFilterTest {
 
@@ -49,6 +51,8 @@ class MfaEnforcementFilterTest {
     UserService userService;
     @MockitoBean
     RecipeService recipeService;
+    @MockitoBean
+    SavedRecipeService savedRecipeService;
     @MockitoBean
     JwtDecoder jwtDecoder;
     @MockitoBean
@@ -187,6 +191,51 @@ class MfaEnforcementFilterTest {
         assertEncodedMeIsRefused("/api/recipes/" + UUID.randomUUID() + "/comments/reactions/m%65");
     }
 
+    @Test
+    void getSavedAal1WithFactorIs401() throws Exception {
+        assertGetIsRefused("/api/users/me/saved");
+    }
+
+    @Test
+    void getSavedIdsAal1WithFactorIs401() throws Exception {
+        assertGetIsRefused("/api/users/me/saved/ids");
+    }
+
+    @Test
+    void encodedSavedIs401() throws Exception {
+        assertEncodedMeIsRefused("/api/users/m%65/saved");
+    }
+
+    @Test
+    void getSavedAal2WithFactorPasses() throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+        when(savedRecipeService.list(any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/users/me/saved").with(token("aal2")))
+                .andExpect(status().isOk());
+    }
+
+    /** Whole-segment comparison: a public user's recipes list is still unguarded for aal1. */
+    @Test
+    void publicUserRecipesGetAal1WithFactorPasses() throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+        UUID other = UUID.randomUUID();
+        when(recipeService.getByAuthor(any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/users/" + other + "/recipes").with(token("aal1")))
+                .andExpect(status().isOk());
+    }
+
+    private void assertGetIsRefused(String path) throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+
+        mockMvc.perform(get(path).with(token("aal1")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("mfa_required"));
+
+        verifyNoInteractions(userService, recipeService, savedRecipeService);
+    }
+
     private void assertEncodedMeIsRefused(String encodedPath) throws Exception {
         when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
 
@@ -194,7 +243,7 @@ class MfaEnforcementFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("mfa_required"));
 
-        verifyNoInteractions(userService, recipeService);
+        verifyNoInteractions(userService, recipeService, savedRecipeService);
     }
 
     /**
