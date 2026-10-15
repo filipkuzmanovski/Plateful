@@ -53,7 +53,7 @@ class RecipeSortDbTest {
     private UserRepository userRepository;
 
     private static final RecipeFilter EMPTY =
-            new RecipeFilter(null, null, null, null, null, null, null, null, null);
+            new RecipeFilter(null, null, null, null, null, null, null, null, null, null);
 
     private Page<Recipe> page(RecipeSort sort, int page, int size) {
         return recipeRepository.findAll(

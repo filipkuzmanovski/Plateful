@@ -52,7 +52,7 @@ class RecipeServiceBrowseTest {
     }
 
     private static RecipeFilter cuisineFilter(String... cuisines) {
-        return new RecipeFilter(List.of(cuisines), null, null, null, null, null, null, null, null);
+        return new RecipeFilter(List.of(cuisines), null, null, null, null, null, null, null, null, null);
     }
 
     @Test
@@ -82,7 +82,7 @@ class RecipeServiceBrowseTest {
         when(recipeRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<Recipe>(List.of(), pageable, 0));
 
-        service.browse(new RecipeFilter(null, null, null, null, null, null, null, null, null),
+        service.browse(new RecipeFilter(null, null, null, null, null, null, null, null, null, null),
                 RecipeSort.MOST_RATED, pageable);
 
         verify(recipeRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));

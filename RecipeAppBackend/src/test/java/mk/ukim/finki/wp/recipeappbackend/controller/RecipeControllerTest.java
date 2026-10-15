@@ -100,6 +100,31 @@ class RecipeControllerTest {
     }
 
     @Test
+    void browse_bindsSearchQuery() throws Exception {
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/recipes").param("q", "garlic chicken"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
+        verify(recipeService).browse(captor.capture(), any(), any());
+        assertThat(captor.getValue().q()).isEqualTo("garlic chicken");
+        assertThat(captor.getValue().isEmpty()).isFalse();
+    }
+
+    @Test
+    void browse_blankSearchQueryIsTreatedAsUnset() throws Exception {
+        when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/recipes").param("q", "  "))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<RecipeFilter> captor = ArgumentCaptor.forClass(RecipeFilter.class);
+        verify(recipeService).browse(captor.capture(), any(), any());
+        assertThat(captor.getValue().isEmpty()).isTrue();
+    }
+
+    @Test
     void browse_bindsRepeatedCuisineAndRegionParams() throws Exception {
         when(recipeService.browse(any(), any(), any())).thenReturn(Page.empty());
 

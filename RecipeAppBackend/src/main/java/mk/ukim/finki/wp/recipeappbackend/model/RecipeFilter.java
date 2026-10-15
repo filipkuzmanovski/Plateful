@@ -14,6 +14,8 @@ import java.util.List;
  * as CommentReactionCreateDto.isLike: null must mean "not filtering", which
  * a primitive can't express (it would silently become false and filter for
  * non-vegan recipes when the user never asked for that).
+ * <p>
+ * q is the free-text search (recipe title or ingredient name); null or blank means "no search".
  */
 public record RecipeFilter(
         List<String> cuisine,
@@ -24,13 +26,15 @@ public record RecipeFilter(
         Boolean vegan,
         Boolean vegetarian,
         Integer maxReadyInMinutes,
-        Double minRating
+        Double minRating,
+        String q
 ) {
     /** True when no criteria are set — lets the service skip filtering. */
     public boolean isEmpty() {
         return isUnset(cuisine) && isUnset(region) && isUnset(sea) && dairyFree == null && glutenFree == null
                 && vegan == null && vegetarian == null
-                && maxReadyInMinutes == null && minRating == null;
+                && maxReadyInMinutes == null && minRating == null
+                && (q == null || q.isBlank());
     }
 
     private static boolean isUnset(List<String> values) {

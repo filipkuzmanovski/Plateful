@@ -125,7 +125,7 @@ public class RecipeService {
     @Transactional(readOnly = true)
     public Page<RecipeDisplayDto> browse(RecipeFilter filter, RecipeSort sort, Pageable pageable) {
         RecipeFilter effective = filter != null ? filter
-                : new RecipeFilter(null, null, null, null, null, null, null, null, null);
+                : new RecipeFilter(null, null, null, null, null, null, null, null, null, null);
         Optional<Set<String>> cuisineKeys = effective.isEmpty()
                 ? Optional.empty()
                 : cuisineCatalog.resolveFilter(effective.cuisine(), effective.region(), effective.sea());

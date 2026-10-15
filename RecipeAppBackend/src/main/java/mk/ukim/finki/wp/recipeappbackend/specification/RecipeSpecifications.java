@@ -10,11 +10,14 @@ import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeComment;
+import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeIngredient;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeRating;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
@@ -38,6 +41,12 @@ import java.util.Set;
  * index. Hibernate's built-in array_contains() can't be used here: it casts
  * the value to varchar[], and Postgres has no text[] @> varchar[] operator
  * (see TextArrayFunctions).
+ * <p>
+ * SEARCH (q) — the query is trimmed, capped at 100 characters, lowercased and split on whitespace.
+ * Every word must match somewhere: lower(title) LIKE %word% OR an EXISTS subquery over the recipe's
+ * ingredients (lower(ingredient_name) LIKE %word%). EXISTS rather than a join, so a recipe with two
+ * matching ingredients still appears once and the paging counts stay right. LIKE wildcards in the
+ * user's text (backslash, percent, underscore) are escaped so they only match themselves.
  * <p>
  * MIN RATING — average rating isn't a column on recipes, so this is a
  * correlated subquery: "(SELECT AVG(r.rating) FROM recipe_ratings r WHERE
@@ -104,8 +113,43 @@ public final class RecipeSpecifications {
                 predicates.add(cb.ge(avg, f.minRating()));
             }
 
+            for (String word : searchWords(f.q())) {
+                String pattern = "%" + escapeLike(word) + "%";
+                Subquery<Integer> ingredientMatch = query.subquery(Integer.class);
+                Root<RecipeIngredient> i = ingredientMatch.from(RecipeIngredient.class);
+                ingredientMatch.select(cb.literal(1));
+                ingredientMatch.where(
+                        cb.equal(i.get("recipe"), root),
+                        cb.like(cb.lower(i.get("ingredientName")), pattern, LIKE_ESCAPE));
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("title")), pattern, LIKE_ESCAPE),
+                        cb.exists(ingredientMatch)));
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private static final char LIKE_ESCAPE = '\\';
+    private static final int MAX_QUERY_LENGTH = 100;
+
+    /** Trim, cap at 100 characters, lowercase and split on whitespace; blank or null gives no words. */
+    private static List<String> searchWords(String q) {
+        if (q == null) {
+            return List.of();
+        }
+        String trimmed = q.trim();
+        if (trimmed.length() > MAX_QUERY_LENGTH) {
+            trimmed = trimmed.substring(0, MAX_QUERY_LENGTH);
+        }
+        return Arrays.stream(trimmed.toLowerCase(Locale.ROOT).split("\\s+"))
+                .filter(w -> !w.isEmpty())
+                .toList();
+    }
+
+    /** Escapes the LIKE wildcards so user text matches literally (escape character is a backslash). */
+    private static String escapeLike(String word) {
+        return word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     /**
