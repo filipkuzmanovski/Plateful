@@ -5,6 +5,7 @@ import { ChevronDown, LogOut, Plus, UserRound } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { IdleSessionGuard } from '@/auth/IdleSessionGuard';
 import { ErrorBoundary } from './ErrorBoundary';
+import SiteFooter from './SiteFooter';
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
   `relative rounded-full px-2.5 py-1.5 sm:px-3 transition-colors ${
@@ -136,6 +137,7 @@ export default function AppShell() {
           )}
         </ErrorBoundary>
       </main>
+      <SiteFooter />
       <IdleSessionGuard />
       <Toaster
         position="bottom-right"

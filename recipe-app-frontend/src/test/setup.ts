@@ -8,6 +8,8 @@ proto.hasPointerCapture ??= () => false;
 proto.setPointerCapture ??= () => {};
 proto.releasePointerCapture ??= () => {};
 proto.scrollIntoView ??= () => {};
+// jsdom logs "not implemented" for window.scrollTo; the content pages call it on open.
+window.scrollTo = () => {};
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
 afterEach(() => server.resetHandlers());
