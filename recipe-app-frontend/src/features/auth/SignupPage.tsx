@@ -1,30 +1,24 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/auth/supabaseClient';
-import { MailCheck, ShieldAlert } from 'lucide-react';
+import { MailCheck } from 'lucide-react';
 import { Button, Field, TextInput } from '@/components/ui';
 import { AuthCard, authLinkClass, FormError } from './AuthCard';
 import { ageOn, MIN_AGE, validateBirthDate } from './ageCheck';
 
-const BLOCK_KEY = 'plateful.ageBlocked';
+// Older versions locked an under-13 visitor out for the tab via this key. There is no lockout now;
+// the key is only removed on mount so anyone who was already blocked is freed.
+const LEGACY_BLOCK_KEY = 'plateful.ageBlocked';
 
-// sessionStorage can throw (privacy modes, disabled storage); the in-memory
-// `blocked` state still applies when it does.
-function readBlocked(): boolean {
+function clearLegacyBlock() {
   try {
-    return sessionStorage.getItem(BLOCK_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeBlocked() {
-  try {
-    sessionStorage.setItem(BLOCK_KEY, '1');
+    sessionStorage.removeItem(LEGACY_BLOCK_KEY);
   } catch {
     /* storage unavailable */
   }
 }
+
+const UNDER_AGE_MESSAGE = 'Sorry, you need to be at least 13 to create a Plateful account.';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -33,20 +27,23 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState(false);
-  const [blocked, setBlocked] = useState(readBlocked);
+  const [birthError, setBirthError] = useState<string | null>(null);
+  const birthErrorId = useId();
   const navigate = useNavigate();
+
+  useEffect(clearLegacyBlock, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setBirthError(null);
     const today = new Date();
     if (validateBirthDate(birth, today) !== 'ok') {
       setError('Please enter a valid date of birth');
       return;
     }
     if ((ageOn(birth, today) ?? 0) < MIN_AGE) {
-      writeBlocked();
-      setBlocked(true);
+      setBirthError(UNDER_AGE_MESSAGE);
       return;
     }
     setBusy(true);
@@ -68,12 +65,7 @@ export default function SignupPage() {
       subtitle="Join Plateful to share your recipes, rate dishes and join the conversation."
       footer={<>Have an account? <Link to="/login" className={authLinkClass}>Sign in</Link></>}
     >
-      {blocked ? (
-        <p role="status" className="flex items-start gap-3 rounded-2xl bg-saffron/15 px-4 py-3.5 text-sm text-olive">
-          <ShieldAlert aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-saffron-deep" />
-          Sorry, you need to be at least 13 to create a Plateful account.
-        </p>
-      ) : confirmEmail ? (
+      {confirmEmail ? (
         <p role="status" className="flex items-start gap-3 rounded-2xl bg-saffron/15 px-4 py-3.5 text-sm text-olive">
           <MailCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-saffron-deep" />
           Check your email to confirm your account, then sign in.
@@ -83,9 +75,26 @@ export default function SignupPage() {
         <Field label="Email">
           <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </Field>
-        <Field label="Date of birth">
-          <TextInput type="date" value={birth} onChange={(e) => setBirth(e.target.value)} required />
-        </Field>
+        <div>
+          <Field label="Date of birth">
+            <TextInput
+              type="date"
+              value={birth}
+              onChange={(e) => {
+                setBirth(e.target.value);
+                setBirthError(null);
+              }}
+              required
+              aria-invalid={birthError ? true : undefined}
+              aria-describedby={birthError ? birthErrorId : undefined}
+            />
+          </Field>
+          {birthError && (
+            <p id={birthErrorId} role="alert" className="mt-1.5 text-xs font-medium text-danger">
+              {birthError}
+            </p>
+          )}
+        </div>
         <Field label="Password">
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
         </Field>

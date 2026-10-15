@@ -64,42 +64,51 @@ test('underThirteenIsBlockedAndNothingSent', async () => {
   renderSignup();
   await fillAndSubmit(MINOR_DOB);
 
-  expect(await screen.findByText(BLOCKED)).toBeInTheDocument();
+  const alert = await screen.findByText(BLOCKED);
+  expect(alert).toHaveAttribute('role', 'alert');
+  expect(screen.getByLabelText('Date of birth')).toHaveAttribute('aria-describedby', alert.id);
   expect(signUp).not.toHaveBeenCalled();
-  expect(screen.queryByRole('button', { name: 'Sign up' })).not.toBeInTheDocument();
-  expect(sessionStorage.getItem('plateful.ageBlocked')).toBe('1');
+  // The form stays visible and editable: no lockout.
+  expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Email')).toBeEnabled();
+  expect(sessionStorage.getItem('plateful.ageBlocked')).toBeNull();
   expectNoEmoji();
 });
 
-test('blockPersistsInTab', async () => {
-  const first = renderSignup();
+test('canCorrectDateImmediately', async () => {
+  renderSignup();
   await fillAndSubmit(MINOR_DOB);
   expect(await screen.findByText(BLOCKED)).toBeInTheDocument();
-  first.unmount();
 
-  renderSignup();
-  expect(screen.getByText(BLOCKED)).toBeInTheDocument();
-  expect(screen.queryByLabelText('Date of birth')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Sign up' })).not.toBeInTheDocument();
-  expect(signUp).not.toHaveBeenCalled();
-  expectNoEmoji();
+  fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: ADULT_DOB } });
+  expect(screen.queryByText(BLOCKED)).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+
+  await waitFor(() => expect(signUp).toHaveBeenCalledTimes(1));
+  expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
 });
 
-test('blockStillAppliesInMemoryWhenStorageIsUnavailable', async () => {
-  const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-    throw new Error('denied');
-  });
-  const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+test('staleBlockKeyIsCleared', () => {
+  sessionStorage.setItem('plateful.ageBlocked', '1');
+  renderSignup();
+  expect(screen.getByLabelText('Date of birth')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument();
+  expect(screen.queryByText(BLOCKED)).not.toBeInTheDocument();
+  expect(sessionStorage.getItem('plateful.ageBlocked')).toBeNull();
+});
+
+test('unavailableStorageDoesNotBreakThePage', async () => {
+  const removeItem = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
     throw new Error('denied');
   });
   try {
     renderSignup();
+    expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument();
     await fillAndSubmit(MINOR_DOB);
     expect(await screen.findByText(BLOCKED)).toBeInTheDocument();
     expect(signUp).not.toHaveBeenCalled();
   } finally {
-    setItem.mockRestore();
-    getItem.mockRestore();
+    removeItem.mockRestore();
   }
 });
 
