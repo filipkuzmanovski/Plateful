@@ -83,6 +83,37 @@ describe.each(pages)('$path page', ({ path, h1, title }) => {
   });
 });
 
+describe('hash links', () => {
+  test('a malformed hash renders the page and scrolls to the top', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    renderApp('/privacy#%');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' })).toBeInTheDocument();
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    scrollTo.mockRestore();
+  });
+
+  test('an unknown hash scrolls to the top', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    renderApp('/privacy#nope');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    scrollTo.mockRestore();
+  });
+
+  test('a valid hash scrolls that section into view instead of the top', async () => {
+    const intoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    renderApp('/privacy#your-rights');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const section = document.getElementById('your-rights');
+    expect(section).not.toBeNull();
+    expect(intoView.mock.contexts).toContain(section);
+    expect(scrollTo).not.toHaveBeenCalled();
+    intoView.mockRestore();
+    scrollTo.mockRestore();
+  });
+});
+
 describe('About us', () => {
   test('says it is a student portfolio project and links to Contact', async () => {
     renderApp('/about');

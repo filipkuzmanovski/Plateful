@@ -9,6 +9,15 @@ export interface ContentSection {
   body: ReactNode;
 }
 
+/** decodeURIComponent throws on a malformed escape such as "%": fall back to the raw text. */
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 /** Index only when a page is long enough to need one. */
 const INDEX_MIN_SECTIONS = 6;
 
@@ -42,7 +51,7 @@ export function ContentPage({
 
   // Start at the top, unless the link points at one section (an "On this page" link or a shared URL).
   useEffect(() => {
-    const target = hash ? document.getElementById(decodeURIComponent(hash.slice(1))) : null;
+    const target = hash ? document.getElementById(safeDecode(hash.slice(1))) : null;
     if (target) target.scrollIntoView();
     else window.scrollTo(0, 0);
   }, [title, hash]);
@@ -52,7 +61,7 @@ export function ContentPage({
   return (
     <div className="grid gap-8 lg:grid-cols-[16rem_minmax(0,65ch)] lg:gap-16">
       <header className="lg:pt-1">
-        <div className="lg:sticky lg:top-24">
+        <div className="lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:flex-col">
           <h1 className="font-serif text-4xl leading-[1.1] font-semibold tracking-tight text-olive sm:text-5xl">
             {title}
           </h1>
@@ -60,7 +69,10 @@ export function ContentPage({
             <p className="mt-3 text-sm text-olive/70">Last updated: {SITE.legalLastUpdated}</p>
           )}
           {hasIndex && (
-            <nav aria-label="On this page" className="mt-8 hidden border-t border-sand pt-5 lg:block">
+            <nav
+              aria-label="On this page"
+              className="mt-8 hidden border-t border-sand pt-5 lg:block lg:min-h-0 lg:overflow-y-auto"
+            >
               <ul className="space-y-1.5 text-sm">
                 {sections!.map((s) => (
                   <li key={s.id}>
