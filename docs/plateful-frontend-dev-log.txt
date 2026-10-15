@@ -3394,3 +3394,70 @@ Known limits
     activity in another tab does not reset the clock.
   - The countdown text is not announced by screen readers on every second; the
     dialog itself is announced when it opens.
+
+
+################################################################################
+################################################################################
+ PART 8 — SIGN-UP AND SORT POLISH
+ Branch: fix/signup-and-sort-polish
+
+################################################################################
+################################################################################
+
+What was done (frontend only)
+-----------------------------
+1. Age check, no lockout (SignupPage.tsx)
+   - Under 13 no longer locks the tab. The form stays visible and editable, and
+     the message "Sorry, you need to be at least 13 to create a Plateful
+     account." shows as an inline role="alert" error tied to the birthday field
+     (aria-describedby). No Supabase call is made. Changing the date clears the
+     error, and a 13+ date then submits normally.
+   - sessionStorage['plateful.ageBlocked'] is no longer written or read. On
+     mount it is removed (try/catch), so anyone already blocked is freed.
+   - Unchanged: the neutral label, "Please enter a valid date of birth", the
+     birth date is never sent, age_confirmed_at is sent.
+
+2. Birthday field (src/features/auth/BirthDateField.tsx)
+   - One rounded control (same height and focus ring as TextInput) with three
+     parts and small labels above: Day (text, numeric keypad, "DD"), Month (a
+     Radix Select of month names) and Year (text, numeric keypad, "YYYY").
+   - Typing: Day jumps to Month after 2 digits, or after 1 digit above 3. Choosing
+     a month moves focus to Year. Backspace in an empty Year goes back to Month,
+     and Backspace on the Month button goes back to Day.
+   - The group is "Date of birth" (role="group"); the parts are named Day,
+     Month and Year. It takes value/onChange as YYYY-MM-DD, or '' while
+     incomplete, so ageCheck.ts is unchanged. 31 February comes out as
+     "2001-02-31", which validateBirthDate rejects. Validation stays in
+     SignupPage on submit. error wires aria-invalid and aria-describedby.
+
+3. Existing account on sign-up (SignupPage.tsx)
+   - When signUp returns no error and data.user.identities is an empty array
+     (Supabase's signal for an already-registered email while email
+     confirmation is on), the page shows "An account with this email already
+     exists." with a "Sign in" link to /login, instead of "Check your email".
+
+4. Sort by dropdown (BrowsePage.tsx, components/SelectMenu.tsx)
+   - The native select is now Radix Select (@radix-ui/react-select). The
+     trigger keeps the accessible name "Sort by" and reads "Sort: {label}" with
+     the sort icon and a chevron. The menu is a paper panel (rounded-2xl,
+     shadow-lift, ring-sand/70) with a short entrance animation (menu-in; the
+     global reduced-motion rule neutralises it), an icon per item (Clock, Users,
+     Star, MessageCircle), a Check on the selected item and a sand highlight.
+   - Behaviour is unchanged: order and labels come from SORT_KEYS and
+     SORT_LABELS, and choosing calls setParams(writeSort(value, params)).
+   - SelectMenu.tsx (menu surface and item) is shared with the month dropdown.
+   - src/test/setup.ts now polyfills hasPointerCapture, setPointerCapture,
+     releasePointerCapture and scrollIntoView for Radix in jsdom.
+
+Tests
+-----
+SignupPage.test.tsx, BirthDateField.test.tsx (new), browse.test.tsx and
+src/auth/needs-profile.test.tsx were updated or added to cover all of the above,
+including expectNoEmoji() with the menus open.
+
+Housekeeping: deleting a user
+-----------------------------
+To fully delete a test user, remove them in Supabase under Authentication ->
+Users, not just from the profiles table. A leftover Authentication user keeps
+the email registered, so signing up with it again now shows "An account with
+this email already exists."
