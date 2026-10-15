@@ -34,11 +34,14 @@ export function FilterDrawer({
   open,
   onOpenChange,
   applied,
+  query,
   onApply,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   applied: FilterState;
+  /** The applied search text, so the live count matches what the grid will show. */
+  query: string;
   onApply: (s: FilterState) => void;
 }) {
   // Radix only returns focus to a Dialog.Trigger; the Filters button lives in BrowsePage, so restore it here.
@@ -65,6 +68,7 @@ export function FilterDrawer({
         >
           <DrawerPanel
             applied={applied}
+            query={query}
             onApply={(s) => {
               onApply(s);
               onOpenChange(false);
@@ -77,7 +81,15 @@ export function FilterDrawer({
 }
 
 /** Mounted fresh on every open, so its state is the draft. */
-function DrawerPanel({ applied, onApply }: { applied: FilterState; onApply: (s: FilterState) => void }) {
+function DrawerPanel({
+  applied,
+  query,
+  onApply,
+}: {
+  applied: FilterState;
+  query: string;
+  onApply: (s: FilterState) => void;
+}) {
   const ids = useId();
   const [draft, setDraft] = useState<FilterState>(applied);
   const [timeText, setTimeText] = useState(applied.maxReadyInMinutes?.toString() ?? '');
@@ -99,8 +111,8 @@ function DrawerPanel({ applied, onApply }: { applied: FilterState; onApply: (s: 
   // Live count, debounced so typing and tapping don't fire a request per keystroke.
   const countFor = useDebounced(draft, COUNT_DEBOUNCE_MS);
   const count = useQuery({
-    queryKey: ['recipeCount', countFor],
-    queryFn: () => browseRecipes(toApiFilter(countFor), 0, 1),
+    queryKey: ['recipeCount', countFor, query],
+    queryFn: () => browseRecipes(toApiFilter(countFor), 0, 1, 'newest', query),
     staleTime: 30_000,
   });
   const settled = JSON.stringify(countFor) === JSON.stringify(draft);

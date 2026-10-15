@@ -462,3 +462,123 @@ test('bogusSortShowsNewest', async () => {
   expect(sortTrigger()).toHaveAccessibleName('Sort by: Newest');
   expect(requests.lastGrid().get('sortBy')).toBe('newest');
 });
+
+// ---- search ----
+
+const searchBox = () => screen.getByRole('searchbox', { name: 'Search recipes' });
+
+test('searchBoxHasPlaceholderAndNoClearButtonWhenEmpty', async () => {
+  captureRecipes();
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(searchBox()).toHaveAttribute('placeholder', 'Search recipes or ingredients');
+  expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
+});
+
+test('typingUpdatesTheRequestAfterTheDebounceAndResetsPage', async () => {
+  const requests = captureRecipes(pageOf([recipeFixture()], { totalPages: 3, number: 2 }));
+  renderApp('/?page=2&vegan=true');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  await userEvent.type(searchBox(), 'garlic');
+  // Not yet: the 300 ms debounce has not elapsed.
+  expect(requests.grid.some((p) => p.has('q'))).toBe(false);
+  await vi.waitFor(() => expect(requests.lastGrid().get('q')).toBe('garlic'));
+  expect(requests.lastGrid().get('page')).toBe('0');
+  expect(requests.lastGrid().get('vegan')).toBe('true');
+  // One request for the whole word, not one per keystroke.
+  expect(requests.grid.filter((p) => p.has('q'))).toHaveLength(1);
+});
+
+test('enterSearchesImmediately', async () => {
+  const requests = captureRecipes();
+  renderApp('/');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  await userEvent.type(searchBox(), 'soup{Enter}');
+  await vi.waitFor(() => expect(requests.lastGrid().get('q')).toBe('soup'), { timeout: 250 });
+});
+
+test('clearSearchRemovesQ', async () => {
+  const requests = captureRecipes();
+  renderApp('/?q=garlic&page=1');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+  expect(searchBox()).toHaveValue('');
+  expect(searchBox()).toHaveFocus();
+  await vi.waitFor(() => expect(requests.lastGrid().has('q')).toBe(false));
+  expect(requests.lastGrid().get('page')).toBe('0');
+  expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
+});
+
+test('urlQueryPrefillsTheBoxAndIsSent', async () => {
+  const requests = captureRecipes();
+  renderApp('/?q=garlic');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(searchBox()).toHaveValue('garlic');
+  expect(requests.lastGrid().get('q')).toBe('garlic');
+});
+
+test('aBlankUrlQueryIsNotSent', async () => {
+  const requests = captureRecipes();
+  renderApp('/?q=%20%20');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(requests.lastGrid().has('q')).toBe(false);
+});
+
+test('applyingADrawerFilterKeepsTheQuery', async () => {
+  const requests = captureRecipes();
+  renderApp('/?q=garlic');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  const drawer = await openDrawer();
+  await userEvent.click(within(drawer).getByRole('button', { name: 'Vegan' }));
+  await applyDrawer(drawer);
+  await vi.waitFor(() => expect(requests.lastGrid().get('vegan')).toBe('true'));
+  expect(requests.lastGrid().get('q')).toBe('garlic');
+  expect(searchBox()).toHaveValue('garlic');
+});
+
+test('theDrawerCountRequestIncludesTheQuery', async () => {
+  const requests = captureRecipes(pageOf([recipeFixture()]), 4);
+  renderApp('/?q=garlic');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  const drawer = await openDrawer();
+  expect(await within(drawer).findByRole('button', { name: 'Show 4 recipes' })).toBeInTheDocument();
+  expect(requests.count.length).toBeGreaterThan(0);
+  expect(requests.count.every((p) => p.get('q') === 'garlic')).toBe(true);
+});
+
+test('clearFiltersInTheEmptyStateAlsoClearsTheQuery', async () => {
+  const requests = captureRecipes(pageOf([]));
+  renderApp('/?q=zzz&vegan=true');
+  await screen.findByText(/no recipes match/i);
+  expect(requests.lastGrid().get('q')).toBe('zzz');
+  await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  await vi.waitFor(() => {
+    expect(requests.lastGrid().has('q')).toBe(false);
+    expect(requests.lastGrid().has('vegan')).toBe(false);
+  });
+  expect(searchBox()).toHaveValue('');
+});
+
+test('theBoxFollowsTheUrlWhenTheQueryChangesExternally', async () => {
+  // Clearing the filters from the empty state removes q from the URL; the box must follow it.
+  captureRecipes(pageOf([]));
+  renderApp('/?q=zzz');
+  await screen.findByText(/no recipes match/i);
+  expect(searchBox()).toHaveValue('zzz');
+  await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  await vi.waitFor(() => expect(searchBox()).toHaveValue(''));
+});
+
+test('theQueryDoesNotCountAsAnActiveFilter', async () => {
+  captureRecipes();
+  renderApp('/?q=garlic');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expect(screen.getByRole('button', { name: 'Filters' })).not.toHaveTextContent(/\d/);
+});
+
+test('the search box renders without emoji characters', async () => {
+  captureRecipes();
+  renderApp('/?q=garlic');
+  await screen.findByText('Bruschetta Pork & Pasta');
+  expectNoEmoji();
+});

@@ -9,9 +9,10 @@ import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { Spinner, Button, EmptyState } from '@/components/ui';
 import { SelectMenuContent, SelectMenuItem } from '@/components/SelectMenu';
-import { countActive, emptyFilters, readFilters, readSort, SORT_KEYS, SORT_LABELS, toApiFilter, writeFilters, writeSort, type FilterState, type SortKey } from './filterParams';
+import { countActive, emptyFilters, readFilters, readQuery, readSort, SORT_KEYS, SORT_LABELS, toApiFilter, writeFilters, writeQuery, writeSort, type FilterState, type SortKey } from './filterParams';
 import { FilterDrawer } from './FilterDrawer';
 import { ActiveFilterChips } from './ActiveFilterChips';
+import { SearchBar } from './SearchBar';
 
 const SORT_ICONS: Record<SortKey, LucideIcon> = {
   newest: Clock,
@@ -25,6 +26,7 @@ export default function BrowsePage() {
   const paramString = params.toString();
   const applied = useMemo(() => readFilters(new URLSearchParams(paramString)), [paramString]);
   const sort = readSort(params);
+  const q = readQuery(params);
   const page = Math.max(0, Number.parseInt(params.get('page') ?? '0', 10) || 0);
   const active = countActive(applied);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -32,7 +34,7 @@ export default function BrowsePage() {
 
   const query = useQuery({
     queryKey: ['recipes', paramString],
-    queryFn: () => browseRecipes(toApiFilter(applied), page, PAGE_SIZE, sort),
+    queryFn: () => browseRecipes(toApiFilter(applied), page, PAGE_SIZE, sort, q),
     placeholderData: keepPreviousData,
   });
 
@@ -55,7 +57,9 @@ export default function BrowsePage() {
           Cook something <em className="font-medium text-terracotta italic">wonderful</em> tonight
         </h1>
 
-        <div className="mt-6 flex flex-wrap items-center gap-2.5">
+        <SearchBar value={q} onSearch={(next) => setParams((prev) => writeQuery(next, prev))} />
+
+        <div className="mt-3 flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             aria-label="Filters"
@@ -107,7 +111,7 @@ export default function BrowsePage() {
         </div>
       </section>
 
-      <FilterDrawer open={drawerOpen} onOpenChange={setDrawerOpen} applied={applied} onApply={apply} />
+      <FilterDrawer open={drawerOpen} onOpenChange={setDrawerOpen} applied={applied} query={q} onApply={apply} />
 
       {query.isPending && <Spinner />}
       {query.isError && (
@@ -120,7 +124,7 @@ export default function BrowsePage() {
         <div aria-busy={busy} className={`transition-opacity ${busyClass}`}>
           <EmptyState
             icon={SearchX}
-            action={<Button variant="outline" onClick={() => apply(emptyFilters)}>Clear filters</Button>}
+            action={<Button variant="outline" onClick={() => setParams(writeQuery('', writeFilters(emptyFilters, params)))}>Clear filters</Button>}
           >
             No recipes match these filters.
           </EmptyState>

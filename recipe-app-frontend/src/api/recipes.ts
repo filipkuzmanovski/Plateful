@@ -8,6 +8,7 @@ export function browseRecipes(
   page: number,
   size: number = PAGE_SIZE,
   sort: SortKey = 'newest',
+  q = '',
 ): Promise<Page<RecipeDisplay>> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filter)) {
@@ -20,6 +21,7 @@ export function browseRecipes(
   params.set('page', String(page));
   params.set('size', String(size));
   params.set('sortBy', sort);
+  if (q.trim() !== '') params.set('q', q.trim());
   return api(`/api/recipes?${params}`);
 }
 

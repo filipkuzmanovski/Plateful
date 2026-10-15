@@ -2,9 +2,11 @@ import {
   countActive,
   emptyFilters,
   readFilters,
+  readQuery,
   readSort,
   toApiFilter,
   writeFilters,
+  writeQuery,
   writeSort,
   type FilterState,
 } from './filterParams';
@@ -120,4 +122,24 @@ test('readSort falls back to newest', () => {
 test('writeSort sets sort, drops page, drops newest', () => {
   expect(writeSort('most-comments', q('page=2&vegan=true')).toString()).toBe('vegan=true&sort=most-comments');
   expect(writeSort('newest', q('sort=most-rated')).toString()).toBe('');
+});
+
+test('readQuery returns the trimmed q, or empty', () => {
+  expect(readQuery(q('q=garlic'))).toBe('garlic');
+  expect(readQuery(q('q=%20%20garlic%20soup%20'))).toBe('garlic soup');
+  expect(readQuery(q('q=%20%20'))).toBe('');
+  expect(readQuery(q(''))).toBe('');
+});
+
+test('writeQuery sets q, drops page, keeps the rest', () => {
+  expect(writeQuery('  soup ', q('page=2&vegan=true&sort=top-rated')).toString()).toBe('vegan=true&sort=top-rated&q=soup');
+});
+
+test('writeQuery removes q entirely when blank', () => {
+  expect(writeQuery('', q('q=soup&page=1&vegan=true')).toString()).toBe('vegan=true');
+  expect(writeQuery('   ', q('q=soup')).toString()).toBe('');
+});
+
+test('writeFilters keeps q', () => {
+  expect(writeFilters({ ...emptyFilters, vegan: true }, q('q=soup&page=3')).get('q')).toBe('soup');
 });

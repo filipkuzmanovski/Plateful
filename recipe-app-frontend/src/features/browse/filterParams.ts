@@ -122,3 +122,18 @@ export function writeSort(sort: SortKey, base?: URLSearchParams): URLSearchParam
   if (sort !== 'newest') out.set('sort', sort);
   return out;
 }
+
+/** The `q` URL param (recipe search), trimmed; blank or missing is ''. */
+export function readQuery(params: URLSearchParams): string {
+  return (params.get('q') ?? '').trim();
+}
+
+/** Returns a new URLSearchParams with `q` replaced (removed entirely when blank) and `page` removed. */
+export function writeQuery(q: string, base?: URLSearchParams): URLSearchParams {
+  const out = new URLSearchParams(base);
+  out.delete('q');
+  out.delete('page');
+  const trimmed = q.trim();
+  if (trimmed !== '') out.set('q', trimmed);
+  return out;
+}
