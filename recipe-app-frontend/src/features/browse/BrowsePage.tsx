@@ -126,7 +126,7 @@ export default function BrowsePage() {
             icon={SearchX}
             action={<Button variant="outline" onClick={() => setParams(writeQuery('', writeFilters(emptyFilters, params)))}>Clear filters</Button>}
           >
-            No recipes match these filters.
+            No recipes match your search or filters.
           </EmptyState>
         </div>
       )}

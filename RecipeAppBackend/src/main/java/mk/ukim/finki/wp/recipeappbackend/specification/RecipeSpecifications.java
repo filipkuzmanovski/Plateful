@@ -132,18 +132,25 @@ public final class RecipeSpecifications {
 
     private static final char LIKE_ESCAPE = '\\';
     private static final int MAX_QUERY_LENGTH = 100;
+    private static final int MAX_SEARCH_WORDS = 8;
 
-    /** Trim, cap at 100 characters, lowercase and split on whitespace; blank or null gives no words. */
-    private static List<String> searchWords(String q) {
+    /**
+     * Trim, cap at 100 characters, strip control characters (NUL would make Postgres reject the query;
+     * tab and newline are kept because they separate words), lowercase, split on whitespace, drop
+     * duplicates and keep at most 8 words. Blank or null gives no words.
+     */
+    static List<String> searchWords(String q) {
         if (q == null) {
             return List.of();
         }
-        String trimmed = q.trim();
-        if (trimmed.length() > MAX_QUERY_LENGTH) {
-            trimmed = trimmed.substring(0, MAX_QUERY_LENGTH);
+        String cleaned = q.replaceAll("[\\p{Cntrl}&&[^\\s]]", "").trim();
+        if (cleaned.length() > MAX_QUERY_LENGTH) {
+            cleaned = cleaned.substring(0, MAX_QUERY_LENGTH);
         }
-        return Arrays.stream(trimmed.toLowerCase(Locale.ROOT).split("\\s+"))
+        return Arrays.stream(cleaned.toLowerCase(Locale.ROOT).split("\\s+"))
                 .filter(w -> !w.isEmpty())
+                .distinct()
+                .limit(MAX_SEARCH_WORDS)
                 .toList();
     }
 

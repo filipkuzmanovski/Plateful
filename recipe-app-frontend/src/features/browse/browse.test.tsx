@@ -1,5 +1,5 @@
 import { delay, http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
@@ -487,14 +487,35 @@ test('typingUpdatesTheRequestAfterTheDebounceAndResetsPage', async () => {
   expect(requests.lastGrid().get('vegan')).toBe('true');
   // One request for the whole word, not one per keystroke.
   expect(requests.grid.filter((p) => p.has('q'))).toHaveLength(1);
+  // The box keeps what was typed after the URL update echoes back.
+  expect(searchBox()).toHaveValue('garlic');
 });
 
 test('enterSearchesImmediately', async () => {
   const requests = captureRecipes();
   renderApp('/');
   await screen.findByText('Bruschetta Pork & Pasta');
-  await userEvent.type(searchBox(), 'soup{Enter}');
-  await vi.waitFor(() => expect(requests.lastGrid().get('q')).toBe('soup'), { timeout: 250 });
+  const gridBefore = requests.grid.length;
+
+  // Fake only the timers the debounce uses, so no wall-clock time decides the outcome. userEvent cannot
+  // run on vitest's fake timers (Testing Library only advances jest's), so events are fired directly:
+  // a change event, then the form submit that Enter triggers in a browser.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    fireEvent.change(searchBox(), { target: { value: 'soup' } });
+    expect(vi.getTimerCount()).toBeGreaterThan(0); // the 300 ms debounce is pending
+    fireEvent.submit(searchBox().closest('form') as HTMLFormElement);
+  } finally {
+    // Dropping the fake clock throws the pending debounce away without ever running it, so a request
+    // that still arrives can only have come from Enter itself, with no time advanced.
+    vi.useRealTimers();
+  }
+
+  await vi.waitFor(() => expect(requests.lastGrid().get('q')).toBe('soup'));
+  // Past the debounce window there is still exactly one request for the query.
+  await new Promise((r) => setTimeout(r, 400));
+  expect(requests.grid.slice(gridBefore).filter((p) => p.get('q') === 'soup')).toHaveLength(1);
+  expect(requests.grid.slice(gridBefore)).toHaveLength(1);
 });
 
 test('clearSearchRemovesQ', async () => {
