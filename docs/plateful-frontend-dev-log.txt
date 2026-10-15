@@ -3535,3 +3535,73 @@ Tests
   search, URL pre-fill and request, blank q not sent, drawer apply keeps q,
   drawer count request includes q, empty-state Clear filters removes q, the box
   follows the URL, q is not an active filter, expectNoEmoji().
+
+
+################################################################################
+################################################################################
+ PART 10 - FOOTER AND CONTENT PAGES
+ Branch: feature/footer-pages
+################################################################################
+################################################################################
+
+What was done
+-------------
+A site footer on every page, and four public content pages: About us, Privacy
+Policy, Terms of Service and Contact. Frontend only.
+
+IMPORTANT - the legal text is a template
+----------------------------------------
+The Privacy Policy and Terms of Service were written to match what the app
+really does, in plain English, but they are a TEMPLATE. Have someone qualified
+check them before real users sign up. Two things must be done at deployment:
+  1. Add the web hosting provider(s) to "Who processes your data" in the Privacy
+     Policy (it says they will be named once the site is deployed).
+  2. Replace the placeholder values in src/content/site.ts (the contact email
+     is an example.com address) and update legalLastUpdated.
+
+Frontend (recipe-app-frontend)
+------------------------------
+1. src/content/site.ts (new): SITE holds the name, operator, contact email,
+   country, city, data protection authority, legal "last updated" date and
+   copyright year. It is the only place these live; the footer and the pages
+   read from it.
+
+2. SiteFooter.tsx (new), rendered at the bottom of AppShell on every page. A
+   <footer> landmark on a sand-toned band with a top border. Desktop: three
+   columns (wordmark and tagline; Explore: Browse, About us, Contact; Legal:
+   Privacy Policy, Terms of Service). Phones: the columns stack. Each column is
+   a <nav> with an aria-label. Bottom row: "(c) 2026 Plateful. A student
+   portfolio project. Some recipe data provided by Spoonacular." (Spoonacular is
+   a link.) AppShell is already a flex min-h-screen column, so the footer sits at
+   the bottom of short pages.
+
+3. features/content/ContentPage.tsx (new): the shared layout. Fraunces h1 on the
+   left, prose on the right capped at 65ch; on one column on phones. Long
+   documents (6+ sections: Privacy, Terms) get an "On this page" index in the
+   left column from the lg breakpoint up. It sets document.title to
+   "<Title> . Plateful" (and restores the old title on leave), and scrolls to the
+   top when the page opens, or to the section when the URL has a #hash. Small
+   helpers: Ul, MailLink (mailto from SITE) and Strong.
+
+4. AboutPage, PrivacyPage, TermsPage, ContactPage (new), routed at /about,
+   /privacy, /terms and /contact inside AppShell (public, no sign-in needed).
+   About, Privacy ("Who we are") and Terms ("No warranty") all say plainly that
+   Plateful is a student portfolio project. The Terms food-safety disclaimer is a
+   tinted callout. Contact has the address, an "Email us" mailto button, what to
+   write about, and no form.
+
+5. Tests: src/features/content/content.test.tsx (24 tests). src/test/setup.ts now
+   stubs window.scrollTo (jsdom only logs "not implemented"). src/test/noEmoji.ts
+   now allows the copyright, registered and trademark signs: the footer needs
+   the copyright sign, which the Unicode emoji class otherwise matches.
+   Real emoji are still caught.
+
+Tests
+-----
+Footer on the browse and recipe pages inside a contentinfo landmark with the
+Explore and Legal navs; the bottom row text; each footer link opens its page;
+for each page, the h1, the document title, scroll-to-top and expectNoEmoji();
+the contact email and mailto come from SITE; Privacy and Terms show "Last
+updated: " + SITE.legalLastUpdated; Privacy states the date of birth is never
+sent or stored; Terms has the food-safety heading and a No warranty heading.
+No existing test needed changing for the footer's extra links.
