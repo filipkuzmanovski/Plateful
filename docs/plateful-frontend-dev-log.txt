@@ -3461,3 +3461,77 @@ To fully delete a test user, remove them in Supabase under Authentication ->
 Users, not just from the profiles table. A leftover Authentication user keeps
 the email registered, so signing up with it again now shows "An account with
 this email already exists."
+
+
+################################################################################
+################################################################################
+ PART 9 — RECIPE SEARCH
+ Branch: feature/recipe-search
+################################################################################
+################################################################################
+
+What was done
+-------------
+A search box on the browse page finds recipes by words in the title or in an
+ingredient name. It works together with every filter and with the sort order.
+
+Backend (RecipeAppBackend)
+--------------------------
+1. RecipeFilter has a new last component, String q. isEmpty() treats a null or
+   blank q as "not set". The controller needed no change: q arrives through the
+   existing @ModelAttribute RecipeFilter, as GET /api/recipes?q=garlic+chicken.
+
+2. RecipeSpecifications.withFilter, when q is not blank:
+   - the text is trimmed, cut to 100 characters, lowercased (Locale.ROOT) and
+     split on whitespace into words;
+   - for EACH word one predicate is added, ANDed with everything else:
+       lower(title) LIKE %word%
+       OR EXISTS (select 1 from recipe_ingredients i
+                  where i.recipe_id = recipe.id
+                    and lower(i.ingredient_name) LIKE %word%)
+     so "chicken carrot" finds a recipe with chicken in the title and carrot
+     only in an ingredient, while every word must match somewhere;
+   - the backslash, % and _ in the user's text are escaped and the LIKE uses
+     the escape character '\', so "%" finds only a literal percent sign;
+   - EXISTS (not a join) means a recipe with two matching ingredients is
+     listed once and the page totals stay correct.
+   withSort is unchanged and combines with the new predicate.
+
+Frontend (recipe-app-frontend)
+------------------------------
+1. filterParams.ts: readQuery(params) returns the trimmed q or ''. writeQuery(q,
+   base) sets q (removing it entirely when blank) and drops page. q is kept out
+   of FilterState, like sort, so it is not counted as an active filter and
+   writeFilters keeps it when filters are applied.
+
+2. api/recipes.ts: browseRecipes(filter, page, size, sort, q = '') sends q when
+   it is not blank.
+
+3. SearchBar.tsx (new), above the Filters/Sort row: a rounded-full 44px input,
+   type="search", labelled "Search recipes", placeholder "Search recipes or
+   ingredients", a Search icon, and a "Clear search" button with an X icon that
+   shows only while there is text. The text is local state, pushed to the URL
+   300 ms after the last keystroke; Enter and Clear push immediately. When q
+   changes in the URL from elsewhere (Back, Clear filters) the box follows it.
+   Styling matches TextInput (paper, sand border, olive focus border, saffron
+   ring). Full width on phones, max-w-lg from the sm breakpoint.
+
+4. BrowsePage: the grid query sends q (and the query key already contains it
+   through paramString). The empty state's "Clear filters" now also clears q.
+
+5. FilterDrawer takes a query prop, so the live "Show N recipes" count request
+   carries the current q and the number is accurate.
+
+Tests
+-----
+- Backend: RecipeFilterTest (blank q is unset), RecipeControllerTest (q binds,
+  blank q is unset), RecipeSearchDbTest (real Postgres, opt-in, writes only in
+  the rolled-back @DataJpaTest transaction): title match, ingredient-only
+  match, words split between title and ingredient, capitals ignored, "%" and
+  "_" are literal, AND with the vegan flag, runs with MOST_RATED, no duplicate
+  rows when two ingredients match and totalElements is right.
+- Frontend: filterParams.test.ts (readQuery, writeQuery, writeFilters keeps q)
+  and browse.test.tsx: debounce and page reset, Enter is immediate, Clear
+  search, URL pre-fill and request, blank q not sent, drawer apply keeps q,
+  drawer count request includes q, empty-state Clear filters removes q, the box
+  follows the URL, q is not an active filter, expectNoEmoji().
