@@ -23,7 +23,7 @@ import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTest
 /**
  * Runs the saved-recipes queries against the real Postgres. Opt-in: skipped unless
  * SUPABASE_DB_PASSWORD is set. Writes only inside the rolled-back test transaction; Flyway is
- * disabled so a test can never migrate the real database (V4 must already be applied by the app).
+ * disabled so a test can never migrate the real database (V4 and V5 must already be applied by the app).
  */
 @Tag("db")
 @EnabledIfEnvironmentVariable(named = "SUPABASE_DB_PASSWORD", matches = ".+")
@@ -164,5 +164,15 @@ class SavedRecipeRepositoryDbTest {
         List<UUID> ids = savedRepository.findAllRecipeIdsByUserId(u);
         assertThat(ids).doesNotContain(r1.getId());
         assertThat(ids).contains(r2.getId());
+    }
+
+    // V5: without row level security the public anon key could read or delete everyone's saves.
+    @Test
+    void savedRecipesHasRowLevelSecurityEnabled() {
+        Object enabled = em.createNativeQuery(
+                        "SELECT relrowsecurity FROM pg_class WHERE relname = 'saved_recipes'")
+                .getSingleResult();
+
+        assertThat(enabled).isEqualTo(true);
     }
 }

@@ -137,7 +137,7 @@ public class RecipeService {
         // request must carry no sort of its own. Always the Specification path, so the sort
         // applies with or without a filter.
         Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
-        return assemblePage(recipeRepository.findAll(
+        return toDisplayPage(recipeRepository.findAll(
                 RecipeSpecifications.withFilter(effective, cuisineKeys)
                         .and(RecipeSpecifications.withSort(sort)),
                 unsorted));
@@ -146,7 +146,7 @@ public class RecipeService {
     /** "Recipes by this user" — profile page, same batched assembly. */
     @Transactional(readOnly = true)
     public Page<RecipeDisplayDto> getByAuthor(UUID authorId, Pageable pageable) {
-        return assemblePage(recipeRepository.findByUserId(authorId, pageable));
+        return toDisplayPage(recipeRepository.findByUserId(authorId, pageable));
     }
 
     /**
@@ -275,7 +275,7 @@ public class RecipeService {
      * List-page assembly with a FIXED number of queries (the whole point of
      * the batched repository methods — see the N+1 BUGFIX comments there).
      */
-    private Page<RecipeDisplayDto> assemblePage(Page<Recipe> page) {
+    public Page<RecipeDisplayDto> toDisplayPage(Page<Recipe> page) {
         List<UUID> ids = page.getContent().stream().map(Recipe::getId).toList();
         if (ids.isEmpty()) {
             return page.map(r -> null); // empty page, keep pagination metadata
