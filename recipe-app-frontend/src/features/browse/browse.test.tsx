@@ -411,17 +411,21 @@ test('seasEndpointFailureFallsBack', async () => {
 
 // ---- sorting ----
 
+const sortTrigger = () => screen.getByRole('combobox', { name: 'Sort by' });
+
 test('sortSelectOffersTheFourOrdersInOrder', async () => {
   captureRecipes();
   renderApp('/');
   await screen.findByText('Bruschetta Pork & Pasta');
-  const select = screen.getByRole('combobox', { name: 'Sort by' });
-  expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
+  await userEvent.click(sortTrigger());
+  const menu = await screen.findByRole('listbox');
+  expect(within(menu).getAllByRole('option').map((o) => o.textContent)).toEqual([
     'Newest',
     'Most rated',
     'Most popular',
     'Most comments',
   ]);
+  expect(within(menu).getByRole('option', { name: 'Newest' })).toHaveAttribute('aria-selected', 'true');
   expectNoEmoji();
 });
 
@@ -430,17 +434,18 @@ test('sortSelectChangesUrlAndRequest', async () => {
   renderApp('/?page=2');
   await screen.findByText('Bruschetta Pork & Pasta');
   expect(requests.lastGrid().get('page')).toBe('2');
-  await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'Most rated');
+  await userEvent.click(sortTrigger());
+  await userEvent.click(await screen.findByRole('option', { name: 'Most rated' }));
   await vi.waitFor(() => expect(requests.lastGrid().get('sortBy')).toBe('most-rated'));
   expect(requests.lastGrid().get('page')).toBe('0');
-  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveDisplayValue('Most rated');
+  expect(sortTrigger()).toHaveTextContent('Sort: Most rated');
 });
 
 test('applyingFiltersKeepsSort', async () => {
   const requests = captureRecipes();
   renderApp('/?sort=top-rated');
   await screen.findByText('Bruschetta Pork & Pasta');
-  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveDisplayValue('Most popular');
+  expect(sortTrigger()).toHaveTextContent('Sort: Most popular');
   const drawer = await openDrawer();
   await userEvent.click(within(drawer).getByRole('button', { name: 'Vegan' }));
   await applyDrawer(drawer);
@@ -452,6 +457,6 @@ test('bogusSortShowsNewest', async () => {
   const requests = captureRecipes();
   renderApp('/?sort=bogus');
   await screen.findByText('Bruschetta Pork & Pasta');
-  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveDisplayValue('Newest');
+  expect(sortTrigger()).toHaveTextContent('Sort: Newest');
   expect(requests.lastGrid().get('sortBy')).toBe('newest');
 });

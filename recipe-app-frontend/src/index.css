@@ -34,6 +34,16 @@
   --animate-overlay-in: overlay-in 160ms ease-out;
   --animate-dialog-in: dialog-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
 
+  /* Dropdown menus (sort, month): a short rise and fade from the trigger. */
+  --animate-menu-in: menu-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes menu-in {
+    from {
+      opacity: 0;
+      scale: 0.97;
+      translate: 0 -4px;
+    }
+  }
   @keyframes overlay-in {
     from {
       opacity: 0;

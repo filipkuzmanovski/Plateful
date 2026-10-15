@@ -1,15 +1,24 @@
 import { useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ArrowUpDown, ChevronDown, SearchX, SlidersHorizontal } from 'lucide-react';
+import * as Select from '@radix-ui/react-select';
+import { ArrowUpDown, ChevronDown, Clock, MessageCircle, SearchX, SlidersHorizontal, Star, Users, type LucideIcon } from 'lucide-react';
 import { browseRecipes, PAGE_SIZE } from '@/api/recipes';
 import { cuisinesQueryKey, getCuisines } from '@/api/cuisines';
 import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { Spinner, Button, EmptyState } from '@/components/ui';
+import { SelectMenuContent, SelectMenuItem } from '@/components/SelectMenu';
 import { countActive, emptyFilters, readFilters, readSort, SORT_KEYS, SORT_LABELS, toApiFilter, writeFilters, writeSort, type FilterState, type SortKey } from './filterParams';
 import { FilterDrawer } from './FilterDrawer';
 import { ActiveFilterChips } from './ActiveFilterChips';
+
+const SORT_ICONS: Record<SortKey, LucideIcon> = {
+  newest: Clock,
+  'most-rated': Users,
+  'top-rated': Star,
+  'most-comments': MessageCircle,
+};
 
 export default function BrowsePage() {
   const [params, setParams] = useSearchParams();
@@ -69,30 +78,31 @@ export default function BrowsePage() {
               {active === 1 ? '1 filter active' : `${active} filters active`}
             </span>
           )}
-          <div className="relative max-w-full">
-            <ArrowUpDown
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-olive/70"
-              strokeWidth={2.25}
-            />
-            <select
+          <Select.Root value={sort} onValueChange={(value) => setParams(writeSort(value as SortKey, params))}>
+            <Select.Trigger
               aria-label="Sort by"
-              value={sort}
-              onChange={(e) => setParams(writeSort(e.target.value as SortKey, params))}
-              className="w-full max-w-full cursor-pointer appearance-none rounded-xl border border-sand bg-paper py-2 pr-9 pl-10 text-sm font-semibold text-olive shadow-card transition hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+              className="group inline-flex max-w-full items-center gap-2 rounded-xl border border-sand bg-paper py-2 pr-3 pl-3.5 text-sm font-semibold text-olive shadow-card transition duration-200 hover:border-olive/30 hover:shadow-lift focus-visible:outline-olive data-[state=open]:border-olive/50"
             >
+              <ArrowUpDown aria-hidden="true" className="size-4 shrink-0" strokeWidth={2.25} />
+              <span className="truncate">
+                <Select.Value>Sort: {SORT_LABELS[sort]}</Select.Value>
+              </span>
+              <Select.Icon asChild>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-olive/70 transition-transform duration-200 group-data-[state=open]:rotate-180"
+                  strokeWidth={2.25}
+                />
+              </Select.Icon>
+            </Select.Trigger>
+            <SelectMenuContent>
               {SORT_KEYS.map((key) => (
-                <option key={key} value={key}>
+                <SelectMenuItem key={key} value={key} icon={SORT_ICONS[key]}>
                   {SORT_LABELS[key]}
-                </option>
+                </SelectMenuItem>
               ))}
-            </select>
-            <ChevronDown
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-olive/70"
-              strokeWidth={2.25}
-            />
-          </div>
+            </SelectMenuContent>
+          </Select.Root>
           <ActiveFilterChips state={applied} cuisines={cuisines.data} onChange={apply} />
         </div>
       </section>
