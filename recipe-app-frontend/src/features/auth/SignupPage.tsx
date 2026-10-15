@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/auth/supabaseClient';
-import { MailCheck } from 'lucide-react';
+import { MailCheck, UserCheck } from 'lucide-react';
 import { Button, Field, TextInput } from '@/components/ui';
 import { AuthCard, authLinkClass, FormError } from './AuthCard';
 import { ageOn, MIN_AGE, validateBirthDate } from './ageCheck';
@@ -27,6 +27,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
   const [birthError, setBirthError] = useState<string | null>(null);
   const birthErrorId = useId();
   const navigate = useNavigate();
@@ -55,6 +56,8 @@ export default function SignupPage() {
     });
     setBusy(false);
     if (error) setError(error.message);
+    // With email confirmation on, Supabase hides duplicates by returning a user with no identities.
+    else if (data.user?.identities?.length === 0) setExistingAccount(true);
     else if (data.session) navigate('/complete-profile'); // provisioning happens there
     else setConfirmEmail(true); // email confirmation is on: no session until they confirm
   }
@@ -65,7 +68,15 @@ export default function SignupPage() {
       subtitle="Join Plateful to share your recipes, rate dishes and join the conversation."
       footer={<>Have an account? <Link to="/login" className={authLinkClass}>Sign in</Link></>}
     >
-      {confirmEmail ? (
+      {existingAccount ? (
+        <p role="status" className="flex items-start gap-3 rounded-2xl bg-saffron/15 px-4 py-3.5 text-sm text-olive">
+          <UserCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-saffron-deep" />
+          <span>
+            An account with this email already exists.{' '}
+            <Link to="/login" className={authLinkClass}>Sign in</Link>
+          </span>
+        </p>
+      ) : confirmEmail ? (
         <p role="status" className="flex items-start gap-3 rounded-2xl bg-saffron/15 px-4 py-3.5 text-sm text-olive">
           <MailCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-saffron-deep" />
           Check your email to confirm your account, then sign in.

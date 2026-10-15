@@ -1,5 +1,5 @@
 import { MemoryRouter } from 'react-router';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SignupPage from './SignupPage';
 import { expectNoEmoji } from '@/test/noEmoji';
@@ -128,4 +128,27 @@ test('labelIsNeutral', () => {
   expect(form.textContent).toContain('Date of birth');
   expect(form.textContent).not.toMatch(/13|thirteen|age/i);
   expectNoEmoji();
+});
+
+test('existingAccountShowsSignInLink', async () => {
+  signUp.mockResolvedValue({ data: { user: { identities: [] }, session: null }, error: null });
+  renderSignup();
+  await fillAndSubmit(ADULT_DOB);
+
+  expect(await screen.findByText('An account with this email already exists.')).toBeInTheDocument();
+  expect(within(screen.getByRole('status')).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
+  expect(screen.queryByText(/check your email/i)).not.toBeInTheDocument();
+  expectNoEmoji();
+});
+
+test('newAccountWithIdentitiesStillAsksToConfirmEmail', async () => {
+  signUp.mockResolvedValue({
+    data: { user: { identities: [{ id: 'i-1' }] }, session: null },
+    error: null,
+  });
+  renderSignup();
+  await fillAndSubmit(ADULT_DOB);
+
+  expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
+  expect(screen.queryByText('An account with this email already exists.')).not.toBeInTheDocument();
 });
