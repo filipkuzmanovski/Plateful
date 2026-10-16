@@ -37,10 +37,13 @@ function LocationProbe() {
   );
 }
 
-function renderAt(route: string | string[], index?: number) {
-  const queryClient = new QueryClient({
+function newQueryClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: 30_000 }, mutations: { retry: false } },
   });
+}
+
+function renderAt(route: string | string[], index?: number, queryClient = newQueryClient()) {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -278,6 +281,26 @@ describe('profile tabs', () => {
     expect(await screen.findByText('Saved Dish 1')).toBeInTheDocument();
     expect(screen.queryByText('Saved Dish 13')).not.toBeInTheDocument();
     expect(screen.queryByText(/No saved recipes yet/)).not.toBeInTheDocument();
+  });
+
+  test('savedListCacheIsScopedToTheSignedInUser', async () => {
+    // Account A's saved page is still in the shared cache (same tab, no cache clear on sign-out).
+    // Account B signs in: it must never see A's private list, only its own.
+    const queryClient = newQueryClient();
+    const aList = pageOf([recipeFixture({ id: 'a-1', title: 'Account A Secret Stew' })]);
+    queryClient.setQueryData(['savedRecipes', 'u-1', 0], aList);
+    queryClient.setQueryData(['savedRecipes', 0], aList); // the pre-fix, unscoped key
+
+    mocks.session = { access_token: 't', user: { id: 'u-2', email: 'bob@example.com' } };
+    server.use(
+      http.get(`${BASE}/api/users/me`, () => HttpResponse.json({ id: 'u-2', firstName: 'Bob', lastName: 'Smith' })),
+      http.get(`${BASE}/api/users/u-2/recipes`, () => HttpResponse.json(pageOf([]))),
+    );
+    fakeSavedServer([recipeFixture({ id: 'b-1', title: 'Account B Salad' })]);
+    renderAt('/me?tab=saved', undefined, queryClient);
+
+    expect(await screen.findByText('Account B Salad')).toBeInTheDocument();
+    expect(screen.queryByText('Account A Secret Stew')).not.toBeInTheDocument();
   });
 
   test('publicProfileHasNoSavedTab', async () => {

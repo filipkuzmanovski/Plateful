@@ -29,6 +29,7 @@ export function ProfileTabs({ mine, saved }: { mine: ReactNode; saved: ReactNode
   }
 
   function onKeyDown(e: KeyboardEvent) {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return; // leave Alt+Arrow (browser back/forward) etc. alone
     const current = TABS.findIndex((t) => t.key === selected);
     let target: number;
     switch (e.key) {
@@ -79,7 +80,7 @@ export function ProfileTabs({ mine, saved }: { mine: ReactNode; saved: ReactNode
         </div>
       </div>
       {TABS.map(({ key }) => (
-        <div key={key} role="tabpanel" id={panelId(key)} aria-labelledby={tabId(key)} hidden={key !== selected}>
+        <div key={key} role="tabpanel" id={panelId(key)} aria-labelledby={tabId(key)} tabIndex={0} hidden={key !== selected}>
           {key === selected && content[key]}
         </div>
       ))}

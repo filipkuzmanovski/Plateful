@@ -6,13 +6,18 @@ import { getSavedRecipes } from '@/api/saved';
 import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { EmptyState, Spinner } from '@/components/ui';
+import { useAuth } from '@/auth/AuthProvider';
 
 /** The signed-in user's saved recipes, newest saved first. Unsaving a card refetches this list via ['savedRecipes']. */
 export function SavedRecipesPanel() {
+  const { profile } = useAuth();
   const [page, setPage] = useState(0);
+  // Keyed by user so one account's private list is never served to another in the same tab.
+  // Invalidating the ['savedRecipes'] prefix still matches.
   const saved = useQuery({
-    queryKey: ['savedRecipes', page],
+    queryKey: ['savedRecipes', profile?.id, page],
     queryFn: () => getSavedRecipes(page),
+    enabled: !!profile,
   });
 
   // Unsaving the last card of a page leaves it empty: step back to the last page that still has recipes.
