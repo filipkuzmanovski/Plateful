@@ -31,27 +31,35 @@ export function useSavedIds() {
         navigate('/login', { state: { from: location.pathname + location.search } });
         return;
       }
+      // Until the ids arrive an already-saved recipe would look unsaved, so do nothing.
+      if (queryClient.getQueryData<string[]>(key) === undefined) return;
       if (inFlight.current.has(id)) return;
+      // Claim the id synchronously, before any await, so a second toggle is blocked.
       inFlight.current.add(id);
       setPending(new Set(inFlight.current));
 
-      const previous = queryClient.getQueryData<string[]>(key) ?? [];
-      const wasSaved = previous.includes(id);
-      queryClient.setQueryData<string[]>(key, wasSaved ? previous.filter((x) => x !== id) : [...previous, id]);
-
-      (wasSaved ? unsaveRecipe(id) : saveRecipe(id))
-        .catch(() => {
+      void (async () => {
+        let wasSaved = false;
+        try {
+          // A refetch already in flight would otherwise overwrite the optimistic value with stale data.
+          await queryClient.cancelQueries({ queryKey: key });
+          const previous = queryClient.getQueryData<string[]>(key) ?? [];
+          wasSaved = previous.includes(id);
+          queryClient.setQueryData<string[]>(key, wasSaved ? previous.filter((x) => x !== id) : [...previous, id]);
+          await (wasSaved ? unsaveRecipe(id) : saveRecipe(id));
+        } catch {
           queryClient.setQueryData<string[]>(key, (cur) => {
             const rest = (cur ?? []).filter((x) => x !== id);
             return wasSaved ? [...rest, id] : rest;
           });
           toast.error("Couldn't update saved recipes. Please try again.");
-        })
-        .finally(() => {
+        } finally {
           inFlight.current.delete(id);
           setPending(new Set(inFlight.current));
           void queryClient.invalidateQueries({ queryKey: ['savedRecipes'] });
-        });
+          void queryClient.invalidateQueries({ queryKey: key });
+        }
+      })();
     },
     [signedIn, navigate, location.pathname, location.search, queryClient, key],
   );

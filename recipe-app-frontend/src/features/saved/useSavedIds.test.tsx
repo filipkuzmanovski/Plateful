@@ -33,11 +33,13 @@ function Probe() {
     <div>
       <span data-testid="ready">{String(ready)}</span>
       <span data-testid="saved">{String(isSaved('r-1'))}</span>
+      <span data-testid="saved2">{String(isSaved('r-2'))}</span>
       <span data-testid="pending">{String(isPending('r-1'))}</span>
       <span data-testid="loc">{loc.pathname}</span>
       <span data-testid="from">{(loc.state as { from?: string } | null)?.from ?? ''}</span>
       <button onClick={() => toggle('r-1')}>toggle</button>
       <button onClick={() => { toggle('r-1'); toggle('r-1'); }}>double</button>
+      <button onClick={() => { toggle('r-1'); toggle('r-2'); }}>both</button>
     </div>
   );
 }
@@ -46,7 +48,7 @@ function renderProbe(route = '/recipes?x=1') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <MemoryRouter initialEntries={[route]}>
@@ -55,14 +57,46 @@ function renderProbe(route = '/recipes?x=1') {
       </AuthProvider>
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
-function signedIn(ids: string[] = []) {
+function signedIn() {
   mocks.session = { access_token: 't', user: { id: 'u-1', email: 'jane@example.com' } };
+  server.use(http.get(`${BASE}/api/users/me`, () => HttpResponse.json(ME)));
+}
+
+/** A tiny fake server: PUT/DELETE mutate the id list the GET returns. */
+function fakeSaved(
+  ids: string[],
+  opts: { gate?: Promise<void>; putGate?: Promise<void>; failPut?: string[] } = {},
+) {
+  const state = { ids: [...ids], gets: 0, puts: 0, deletes: 0, gateNextGet: opts.gate };
   server.use(
-    http.get(`${BASE}/api/users/me`, () => HttpResponse.json(ME)),
-    http.get(`${BASE}/api/users/me/saved/ids`, () => HttpResponse.json(ids)),
+    http.get(`${BASE}/api/users/me/saved/ids`, async () => {
+      state.gets++;
+      const snapshot = [...state.ids];
+      const g = state.gateNextGet;
+      state.gateNextGet = undefined;
+      if (g) await g;
+      return HttpResponse.json(snapshot);
+    }),
+    http.put(`${BASE}/api/users/me/saved/:id`, async ({ params }) => {
+      state.puts++;
+      if (opts.putGate) await opts.putGate;
+      const id = params.id as string;
+      if (opts.failPut?.includes(id)) {
+        return HttpResponse.json({ status: 500, detail: 'boom' }, { status: 500 });
+      }
+      if (!state.ids.includes(id)) state.ids.push(id);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.delete(`${BASE}/api/users/me/saved/:id`, ({ params }) => {
+      state.deletes++;
+      state.ids = state.ids.filter((x) => x !== params.id);
+      return new HttpResponse(null, { status: 204 });
+    }),
   );
+  return state;
 }
 
 beforeEach(() => {
@@ -71,26 +105,22 @@ beforeEach(() => {
 });
 
 test('loadsIdsWhenSignedIn', async () => {
-  signedIn(['r-1']);
+  signedIn();
+  fakeSaved(['r-1']);
   renderProbe();
   await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'));
   expect(screen.getByTestId('saved')).toHaveTextContent('true');
 });
 
 test('toggleSavesOptimistically', async () => {
-  signedIn([]);
+  signedIn();
   let release!: () => void;
-  const gate = new Promise<void>((r) => { release = r; });
-  server.use(
-    http.put(`${BASE}/api/users/me/saved/r-1`, async () => {
-      await gate;
-      return new HttpResponse(null, { status: 204 });
-    }),
-  );
+  const putGate = new Promise<void>((r) => { release = r; });
+  fakeSaved([], { putGate });
   renderProbe();
   await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'));
   await userEvent.click(screen.getByText('toggle'));
-  expect(screen.getByTestId('saved')).toHaveTextContent('true'); // before the PUT resolves
+  await waitFor(() => expect(screen.getByTestId('saved')).toHaveTextContent('true')); // PUT still held
   expect(screen.getByTestId('pending')).toHaveTextContent('true');
   release();
   await waitFor(() => expect(screen.getByTestId('pending')).toHaveTextContent('false'));
@@ -98,12 +128,8 @@ test('toggleSavesOptimistically', async () => {
 });
 
 test('rollsBackAndToastsOnError', async () => {
-  signedIn([]);
-  server.use(
-    http.put(`${BASE}/api/users/me/saved/r-1`, () =>
-      HttpResponse.json({ status: 500, detail: 'boom' }, { status: 500 }),
-    ),
-  );
+  signedIn();
+  fakeSaved([], { failPut: ['r-1'] });
   renderProbe();
   await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'));
   await userEvent.click(screen.getByText('toggle'));
@@ -115,36 +141,76 @@ test('rollsBackAndToastsOnError', async () => {
 });
 
 test('signedOutTogglesToLogin', async () => {
-  let calls = 0;
-  server.use(
-    http.put(`${BASE}/api/users/me/saved/r-1`, () => { calls++; return new HttpResponse(null, { status: 204 }); }),
-    http.delete(`${BASE}/api/users/me/saved/r-1`, () => { calls++; return new HttpResponse(null, { status: 204 }); }),
-  );
+  const state = fakeSaved([]);
   renderProbe('/recipes?x=1');
   await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('false'));
   await userEvent.click(screen.getByText('toggle'));
   expect(screen.getByTestId('loc')).toHaveTextContent('/login');
   expect(screen.getByTestId('from')).toHaveTextContent('/recipes?x=1');
-  expect(calls).toBe(0);
+  expect(state.puts + state.deletes).toBe(0);
 });
 
 test('ignoresSecondToggleWhilePending', async () => {
-  signedIn([]);
-  let puts = 0;
-  let deletes = 0;
-  server.use(
-    http.put(`${BASE}/api/users/me/saved/r-1`, async () => {
-      puts++;
-      await new Promise((r) => setTimeout(r, 50));
-      return new HttpResponse(null, { status: 204 });
-    }),
-    http.delete(`${BASE}/api/users/me/saved/r-1`, () => { deletes++; return new HttpResponse(null, { status: 204 }); }),
-  );
+  signedIn();
+  const state = fakeSaved([], { putGate: new Promise((r) => setTimeout(r, 50)) });
   renderProbe();
   await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'));
   await userEvent.click(screen.getByText('double'));
   await waitFor(() => expect(screen.getByTestId('pending')).toHaveTextContent('false'));
-  expect(puts).toBe(1);
-  expect(deletes).toBe(0);
+  expect(state.puts).toBe(1);
+  expect(state.deletes).toBe(0);
   expect(screen.getByTestId('saved')).toHaveTextContent('true');
+});
+
+test('refetchDuringToggleDoesNotRevert', async () => {
+  signedIn();
+  let releaseGet!: () => void;
+  let releasePut!: () => void;
+  const state = fakeSaved([], { putGate: new Promise<void>((r) => { releasePut = r; }) });
+  const qc = renderProbe();
+  await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'));
+
+  // A refetch starts and holds its (old, empty) response.
+  state.gateNextGet = new Promise<void>((r) => { releaseGet = r; });
+  void qc.refetchQueries({ queryKey: ['savedIds', 'u-1'] });
+  await waitFor(() => expect(state.gets).toBe(2));
+
+  await userEvent.click(screen.getByText('toggle'));
+  await waitFor(() => expect(screen.getByTestId('saved')).toHaveTextContent('true'));
+
+  releaseGet(); // the stale GET lands while the PUT is still in flight
+  await new Promise((r) => setTimeout(r, 100));
+  expect(screen.getByTestId('saved')).toHaveTextContent('true');
+
+  releasePut();
+  await waitFor(() => expect(screen.getByTestId('pending')).toHaveTextContent('false'));
+  await waitFor(() => expect(state.gets).toBe(3)); // re-synced after settle
+  expect(screen.getByTestId('saved')).toHaveTextContent('true');
+});
+
+test('toggleIgnoredBeforeIdsLoad', async () => {
+  signedIn();
+  let releaseGet!: () => void;
+  const state = fakeSaved(['r-1'], { gate: new Promise<void>((r) => { releaseGet = r; }) });
+  renderProbe();
+  await waitFor(() => expect(state.gets).toBe(1));
+  await userEvent.click(screen.getByText('toggle'));
+  expect(state.puts + state.deletes).toBe(0);
+  expect(screen.getByTestId('pending')).toHaveTextContent('false');
+  releaseGet();
+  await waitFor(() => expect(screen.getByTestId('saved')).toHaveTextContent('true'));
+  expect(state.puts + state.deletes).toBe(0);
+});
+
+test('twoRecipesOneFails', async () => {
+  signedIn();
+  const state = fakeSaved([], { failPut: ['r-2'] });
+  renderProbe();
+  await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'));
+  await userEvent.click(screen.getByText('both'));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByTestId('saved2')).toHaveTextContent('false'));
+  await waitFor(() => expect(screen.getByTestId('pending')).toHaveTextContent('false'));
+  expect(screen.getByTestId('saved')).toHaveTextContent('true');
+  expect(state.puts).toBe(2);
 });
