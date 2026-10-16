@@ -8,7 +8,9 @@ import { ApiError } from '@/api/client';
 import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { Button, Field, SectionHeading, Spinner, TextInput } from '@/components/ui';
+import { SavedRecipesPanel } from '@/features/saved/SavedRecipesPanel';
 import { ProfileHeader } from './ProfileHeader';
+import { ProfileTabs } from './ProfileTabs';
 import { TwoFactorSettings } from './TwoFactorSettings';
 
 export default function MyProfilePage() {
@@ -69,29 +71,35 @@ export default function MyProfilePage() {
         <TwoFactorSettings />
       </section>
 
-      <SectionHeading>My recipes</SectionHeading>
-      {recipes.isPending && <Spinner />}
-      {recipes.isError && <p className="text-sm text-danger">Couldn't load recipes.</p>}
-      {recipes.data && recipes.data.content.length === 0 && (
-        <p className="rounded-card border border-dashed border-sand px-4 py-10 text-center text-sm text-olive/70">
-          Nothing yet —{' '}
-          <Link
-            to="/recipes/new"
-            className="font-semibold text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
-          >
-            publish your first recipe
-          </Link>
-          .
-        </p>
-      )}
-      {recipes.data && recipes.data.content.length > 0 && (
-        <>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {recipes.data.content.map((r) => <RecipeCard key={r.id} recipe={r} />)}
-          </div>
-          <Pagination page={recipes.data.page.number} totalPages={recipes.data.page.totalPages} onPage={setPage} />
-        </>
-      )}
+      <ProfileTabs
+        mine={
+          <>
+            {recipes.isPending && <Spinner />}
+            {recipes.isError && <p className="text-sm text-danger">Couldn't load recipes.</p>}
+            {recipes.data && recipes.data.content.length === 0 && (
+              <p className="rounded-card border border-dashed border-sand px-4 py-10 text-center text-sm text-olive/70">
+                Nothing yet —{' '}
+                <Link
+                  to="/recipes/new"
+                  className="font-semibold text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
+                >
+                  publish your first recipe
+                </Link>
+                .
+              </p>
+            )}
+            {recipes.data && recipes.data.content.length > 0 && (
+              <>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {recipes.data.content.map((r) => <RecipeCard key={r.id} recipe={r} />)}
+                </div>
+                <Pagination page={recipes.data.page.number} totalPages={recipes.data.page.totalPages} onPage={setPage} />
+              </>
+            )}
+          </>
+        }
+        saved={<SavedRecipesPanel />}
+      />
     </div>
   );
 }
