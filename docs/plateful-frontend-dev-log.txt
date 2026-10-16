@@ -3605,3 +3605,140 @@ the contact email and mailto come from SITE; Privacy and Terms show "Last
 updated: " + SITE.legalLastUpdated; Privacy states the date of birth is never
 sent or stored; Terms has the food-safety heading and a No warranty heading.
 No existing test needed changing for the footer's extra links.
+
+
+
+################################################################################
+################################################################################
+ PART 11 — SAVED RECIPES
+ Branch: feature/saved-recipes
+################################################################################
+################################################################################
+
+What was done
+-------------
+A signed-in user can save recipes with a bookmark on every recipe card and a
+Save button on the recipe page, and sees them in a "Saved" tab on their profile
+page, newest saved first. Backend and frontend. Built as seven tasks.
+
+Task 1 - saved_recipes table, entity and repository (0474d8f)
+-------------------------------------------------------------
+  - Migration V4__saved_recipes.sql creates saved_recipes: composite primary key
+    (user_id, recipe_id), foreign keys to the user and to the recipe with ON
+    DELETE CASCADE (deleting either side removes the saves), and an index on
+    (user_id, created_at DESC) for the newest-first list.
+  - SavedRecipe is the entity and SavedRecipeId the embedded key. The entity
+    uses @MapsId so the key columns and the user and recipe relations are the
+    same columns.
+  - SavedRecipeRepository.insertIgnore is a native INSERT ... ON CONFLICT DO
+    NOTHING, so saving the same recipe twice is not an error and is not a
+    duplicate row.
+  - SavedRecipeRepositoryDbTest (real Postgres, opt-in, writes only inside the
+    rolled-back @DataJpaTest transaction).
+
+Task 2 - save, unsave and list endpoints (72f43b4)
+--------------------------------------------------
+SavedRecipeService and SavedRecipeController at /api/users/me/saved. Identity
+comes from @CurrentUserId; all four need a signed-in user.
+  - PUT    /api/users/me/saved/{recipeId}   204, or 404 if the recipe is missing
+  - DELETE /api/users/me/saved/{recipeId}   204, always (also if not saved)
+  - GET    /api/users/me/saved?page=&size=  Page<RecipeDisplayDto>, newest saved
+                                            first, tie-break recipe_id
+  - GET    /api/users/me/saved/ids          string[] of saved recipe ids
+RecipeService.assemblePage became the public toDisplayPage so the saved list
+builds the same card data (photos, ratings, counts) as the browse list.
+Ruling R2 - row level security. The Task 1 review found saved_recipes had no
+Row Level Security, while every other public table has it on. The table was
+readable and deletable through Supabase's public (anon) key. Migration
+V5__saved_recipes_rls.sql turns RLS on with no policies. The backend connects
+as the table owner, which RLS does not apply to, so application behaviour is
+unchanged. SavedRecipeRepositoryDbTest now asserts relrowsecurity is true.
+Tests: SavedRecipeServiceTest (6) and SavedRecipeControllerTest (7).
+
+Task 3 - two-factor filter covers every /me/ path (da3772d)
+-----------------------------------------------------------
+MfaEnforcementFilter used to guard only non-GET requests. A saved list is
+private, so a half signed-in session (aal1, with a factor enrolled but not yet
+verified) must not read it either. The rule is now: guard when the method is
+not GET, OR the decoded path's "/"-split segments contain exactly "me". GETs on
+/api/users/me/saved and /api/users/me/saved/ids are therefore blocked until the
+code is entered; public GETs are untouched. The path is decoded before it is
+split, so a percent-encoded segment such as m%65 cannot bypass the check.
+MfaEnforcementFilterTest grew to 19 tests (53 lines added).
+
+Task 4 - saved API and useSavedIds hook (9ae00b4, 6001ad5)
+----------------------------------------------------------
+  - src/api/saved.ts: getSavedIds, getSavedRecipes(page), saveRecipe,
+    unsaveRecipe.
+  - features/saved/useSavedIds.ts: one query for the user's saved ids and a
+    toggle(recipeId). The toggle is optimistic: the id is added or removed in
+    the cache at once. On failure the cache is rolled back and the toast
+    "Couldn't update saved recipes. Please try again." is shown. A signed-out
+    user is sent to /login instead of calling the API.
+  - Review fix (6001ad5): the toggle awaits cancelQueries before the optimistic
+    write, so a refetch that is already in flight cannot land afterwards and
+    revert it.
+  - Ruling R3: toggle does nothing until the ids have loaded (otherwise the
+    first click could save a recipe that was already saved, or the reverse).
+    When a request settles, both ['savedIds'] and ['savedRecipes'] are
+    invalidated, so the profile list is refetched too.
+  - useSavedIds.test.tsx.
+
+Task 5 - bookmark on cards, Save on the recipe page (fea3f1b)
+-------------------------------------------------------------
+  - BookmarkButton on RecipeCard. Its accessible name is "Save {title}" or
+    "Remove {title} from saved". The card was restructured so the bookmark is a
+    sibling of the card's Link, never inside it (no button inside an anchor).
+    The hover lift moved from the Link to the wrapper so the whole card still
+    lifts.
+  - SaveRecipeButton on RecipeDetailPage, reading "Save" or "Saved".
+  - useSaveControl is shared by both. It disables the control while auth is
+    loading, while the saved ids are loading and while a request is pending.
+  - saveButtons.test.tsx.
+
+Task 6 - Saved tab on the profile page (5b78971, 5cbc0dc)
+---------------------------------------------------------
+  - ProfileTabs with the tabs "My recipes" and "Saved". The selected tab is
+    kept in the URL as ?tab=saved (My recipes is the default and has no
+    parameter); switching uses replace so Back does not step through tabs.
+    Keyboard: arrow keys, Home and End move between tabs. Modifier keys are
+    ignored by the key handler, so browser shortcuts keep working. The
+    tabpanel is focusable.
+  - SavedRecipesPanel: the paged list of saved cards, or the empty state "No
+    saved recipes yet. Tap the bookmark on any recipe to save it here." with a
+    "Browse recipes" button. Unsaving the last card of a page steps back a page.
+  - Ruling R1: the profile form and the two-factor section stay above the tabs;
+    only the recipe lists are tabbed.
+  - Review fix (ruling R4, 5cbc0dc): the saved list cache key was not tied to a
+    user, and nothing clears the query cache on sign-out. A second account
+    signing in on the same tab could briefly see the first account's private
+    saved list. The key is now ['savedRecipes', userId, page], and the query is
+    disabled until the profile is known. Invalidating the ['savedRecipes']
+    prefix still matches. A test seeds account A's cache and proves account B
+    never sees it.
+  - profileTabs.test.tsx.
+
+Task 7 - verification
+---------------------
+Safety check (no running backend with the Spoonacular profile): printed
+nothing, so it was safe to compile and test.
+Backend regression list plus SavedRecipeServiceTest and
+SavedRecipeControllerTest (26 classes): 187 tests, 0 failures, 0 errors, 0
+skipped. New classes: SavedRecipeServiceTest 6, SavedRecipeControllerTest 7;
+MfaEnforcementFilterTest 19.
+Backend *DbTest against the real database: 31 tests, 0 failures, 0 errors, 1
+skipped (7 classes; SavedRecipeRepositoryDbTest 6). The one skip is the known,
+data-caused skip in RecipeSortDbTest (6 tests, 1 skipped); it predates this
+branch.
+Frontend: npx vitest run, 30 files, 333 tests, all passed. npm run build
+succeeded (only the usual chunk-size warning).
+
+Known follow-ups
+----------------
+  - The save controls are disabled while a request is pending, which drops
+    keyboard focus from the button. aria-disabled would keep the focus.
+  - There is no global query-cache clear on sign-out (this predates the
+    feature). Saved data is protected by the user-scoped key, but other cached
+    data is not cleared.
+  - Owners also see Save on their own recipes. The spec allows it.
+  - The final whole-branch review is still to come.
