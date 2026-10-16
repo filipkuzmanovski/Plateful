@@ -26,6 +26,7 @@ import type { RecipeDisplay } from '@/lib/types';
 import { RatingBox } from './RatingBox';
 import { CommentsSection } from './CommentsSection';
 import { PhotoCollage } from './PhotoCollage';
+import { SaveRecipeButton } from '@/features/saved/SaveRecipeButton';
 
 /** One time/servings fact in the photo card: a terracotta icon, a value and a small label. */
 function Fact({ icon: Icon, value, label }: { icon: LucideIcon; value: ReactNode; label: string }) {
@@ -173,30 +174,33 @@ export default function RecipeDetailPage() {
             )
           ) : null}
         </div>
-        {isOwner && (
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link
-              to={`/recipes/${recipe.id}/edit`}
-              className="inline-flex items-center gap-2 rounded-full border border-olive/20 bg-paper px-4 py-2 text-sm font-semibold text-olive transition hover:border-olive/50 hover:bg-cream"
-            >
-              <Pencil aria-hidden="true" className="size-3.5" />
-              Edit
-            </Link>
-            <Button variant="danger" className="!px-4 !py-2" onClick={() => setConfirmDelete(true)}>
-              <Trash2 aria-hidden="true" className="size-3.5" />
-              Delete recipe
-            </Button>
-            <ConfirmDialog
-              open={confirmDelete}
-              title="Delete recipe?"
-              description="The recipe, its ratings and its comments will be permanently removed."
-              confirmLabel="Confirm"
-              busy={removeRecipe.isPending}
-              onConfirm={() => { if (!removeRecipe.isPending) removeRecipe.mutate(recipe.id); }}
-              onCancel={() => setConfirmDelete(false)}
-            />
-          </div>
-        )}
+        <div className="mt-5 flex flex-wrap gap-2">
+          <SaveRecipeButton recipeId={recipe.id} />
+          {isOwner && (
+            <>
+              <Link
+                to={`/recipes/${recipe.id}/edit`}
+                className="inline-flex items-center gap-2 rounded-full border border-olive/20 bg-paper px-4 py-2 text-sm font-semibold text-olive transition hover:border-olive/50 hover:bg-cream"
+              >
+                <Pencil aria-hidden="true" className="size-3.5" />
+                Edit
+              </Link>
+              <Button variant="danger" className="!px-4 !py-2" onClick={() => setConfirmDelete(true)}>
+                <Trash2 aria-hidden="true" className="size-3.5" />
+                Delete recipe
+              </Button>
+              <ConfirmDialog
+                open={confirmDelete}
+                title="Delete recipe?"
+                description="The recipe, its ratings and its comments will be permanently removed."
+                confirmLabel="Confirm"
+                busy={removeRecipe.isPending}
+                onConfirm={() => { if (!removeRecipe.isPending) removeRecipe.mutate(recipe.id); }}
+                onCancel={() => setConfirmDelete(false)}
+              />
+            </>
+          )}
+        </div>
 
         <SectionHeading>Ingredients</SectionHeading>
         <ul className="rounded-card bg-paper p-2 shadow-card ring-1 ring-sand/70">
