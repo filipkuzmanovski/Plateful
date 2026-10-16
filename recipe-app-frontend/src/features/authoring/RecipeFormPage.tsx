@@ -144,6 +144,7 @@ export default function RecipeFormPage() {
       queryClient.setQueryData(['recipe', saved.id], saved);
       void queryClient.invalidateQueries({ queryKey: ['recipes'] });
       void queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
+      void queryClient.invalidateQueries({ queryKey: ['savedRecipes'] });
       // Files the user took off the recipe go only once the update has succeeded; best-effort.
       const removed = id ? initialPaths.current.filter((p) => !values.photos.includes(p)) : [];
       if (removed.length > 0) void deletePhotos(removed);

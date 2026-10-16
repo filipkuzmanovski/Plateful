@@ -22,6 +22,7 @@ export function RatingBox({ recipeId }: { recipeId: string }) {
     void queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
     void queryClient.invalidateQueries({ queryKey: ['recipes'] });
     void queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
+    void queryClient.invalidateQueries({ queryKey: ['savedRecipes'] });
   };
   const onError = (e: unknown) => toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
   const rate = useMutation({ mutationFn: (n: number) => putMyRating(recipeId, n), onSuccess: invalidate, onError });

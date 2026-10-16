@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
-import { renderApp } from '@/test/utils';
+import { renderApp, newTestQueryClient } from '@/test/utils';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
 import { deletePhotos, publicPhotoUrl, uploadPhoto } from '@/api/photos';
@@ -159,6 +159,32 @@ test('edit: pre-fills, PUTs, and the detail page shows the updated recipe (cache
   expect(await screen.findByRole('heading', { name: /new pie/i })).toBeInTheDocument();
   expect(putBody.title).toBe('New Pie');
   expect(putBody.ingredients).toHaveLength(2); // fixture's ingredients carried through
+});
+
+test('saving an edit marks the saved list stale, so its card shows the new title', async () => {
+  stubMe();
+  server.use(
+    http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json(recipeFixture({ title: 'Old Pie', user: profileFixture }))),
+    http.put(`${BASE}/api/recipes/r-1`, async ({ request }) => {
+      const body: any = await request.json();
+      return HttpResponse.json(recipeFixture({ title: body.title, user: profileFixture }));
+    }),
+    http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-1/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+  );
+  const queryClient = newTestQueryClient();
+  queryClient.setQueryData(['savedRecipes', 'u-1', 0], pageOf([recipeFixture({ title: 'Old Pie' })]));
+  renderApp('/recipes/r-1/edit', queryClient);
+
+  const title = await screen.findByLabelText(/title/i);
+  await vi.waitFor(() => expect(title).toHaveValue('Old Pie'));
+  await userEvent.clear(title);
+  await userEvent.type(title, 'New Pie');
+  await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
+  expect(await screen.findByRole('heading', { name: /new pie/i })).toBeInTheDocument();
+  expect(queryClient.getQueryState(['savedRecipes', 'u-1', 0])?.isInvalidated).toBe(true);
 });
 
 test('a server error on a field without an inline slot is still shown', async () => {

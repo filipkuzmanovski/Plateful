@@ -77,6 +77,9 @@ export default function RecipeDetailPage() {
       queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
       void queryClient.invalidateQueries({ queryKey: ['recipes'] });
       void queryClient.invalidateQueries({ queryKey: ['userRecipes'] });
+      // A saved copy of the recipe is gone too (ON DELETE CASCADE): drop it from the Saved tab and the id set.
+      void queryClient.invalidateQueries({ queryKey: ['savedRecipes'] });
+      void queryClient.invalidateQueries({ queryKey: ['savedIds'] });
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.detail : "Couldn't delete the recipe"),
   });

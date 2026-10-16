@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
-import { renderApp } from '@/test/utils';
+import { renderApp, newTestQueryClient } from '@/test/utils';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
 import { deletePhotos, publicPhotoUrl } from '@/api/photos';
@@ -82,6 +82,20 @@ test('clicking a new star PUTs the rating', async () => {
   await vi.waitFor(() => expect(putBody).toEqual({ rating: 5 }));
 });
 
+test('rating a recipe marks the saved list stale (its card shows the average)', async () => {
+  stubDetail({ myRatingStatus: 404 });
+  server.use(
+    http.put(`${BASE}/api/recipes/r-1/ratings/me`, () => new HttpResponse(null, { status: 204 })),
+  );
+  const queryClient = newTestQueryClient();
+  queryClient.setQueryData(['savedRecipes', 'u-1', 0], pageOf([recipeFixture()]));
+  renderApp('/recipes/r-1', queryClient);
+  await userEvent.click(await screen.findByRole('button', { name: /rate 5 stars/i }));
+  await vi.waitFor(() =>
+    expect(queryClient.getQueryState(['savedRecipes', 'u-1', 0])?.isInvalidated).toBe(true),
+  );
+});
+
 test('unknown recipe id shows not-found message', async () => {
   server.use(
     http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profileFixture)),
@@ -144,6 +158,27 @@ test('deletingRecipeDeletesItsPhotos: after the delete resolves, the bucket phot
   await userEvent.click(await screen.findByRole('button', { name: /confirm/i }));
   await vi.waitFor(() => expect(deletePhotos).toHaveBeenCalledWith(['u-1/a.webp', 'u-1/b.png']));
   expect(log).toEqual(['api', 'photos']);
+});
+
+test('deleting a recipe marks the saved list stale, so no ghost card is served from cache', async () => {
+  server.use(
+    http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profileFixture)),
+    http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json(recipeFixture({ user: profileFixture }))),
+    http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-1/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+    http.delete(`${BASE}/api/recipes/r-1`, () => new HttpResponse(null, { status: 204 })),
+    http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))),
+  );
+  const queryClient = newTestQueryClient();
+  queryClient.setQueryData(['savedRecipes', 'u-1', 0], pageOf([recipeFixture()]));
+  renderApp('/recipes/r-1', queryClient);
+  await userEvent.click(await screen.findByRole('button', { name: /delete recipe/i }));
+  await userEvent.click(await screen.findByRole('button', { name: /confirm/i }));
+  await vi.waitFor(() =>
+    expect(queryClient.getQueryState(['savedRecipes', 'u-1', 0])?.isInvalidated).toBe(true),
+  );
 });
 
 test('a failed recipe delete leaves its photos alone', async () => {

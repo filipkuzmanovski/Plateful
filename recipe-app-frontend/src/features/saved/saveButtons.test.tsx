@@ -50,13 +50,14 @@ function signedIn() {
 }
 
 /** A tiny fake server for the saved endpoints; records the calls made. */
-function fakeSaved(ids: string[] = []) {
+function fakeSaved(ids: string[] = [], opts: { putGate?: Promise<void> } = {}) {
   const state = { ids: [...ids], puts: [] as string[], deletes: [] as string[] };
   server.use(
     http.get(`${BASE}/api/users/me/saved/ids`, () => HttpResponse.json([...state.ids])),
-    http.put(`${BASE}/api/users/me/saved/:id`, ({ params }) => {
+    http.put(`${BASE}/api/users/me/saved/:id`, async ({ params }) => {
       const id = params.id as string;
       state.puts.push(id);
+      if (opts.putGate) await opts.putGate;
       if (!state.ids.includes(id)) state.ids.push(id);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -176,6 +177,33 @@ describe('card bookmark', () => {
     await waitFor(() => expect(button).toBeEnabled());
   });
 
+  test('bookmarkKeepsFocusWhileSaving', async () => {
+    signedIn();
+    let release!: () => void;
+    const state = fakeSaved([], { putGate: new Promise<void>((r) => { release = r; }) });
+    stubBrowse();
+    renderAt('/');
+
+    const button = await screen.findByRole('button', { name: `Save ${TITLE}` });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+    await waitFor(() => expect(state.puts).toEqual(['r-1'])); // the PUT is held open
+
+    // Not `disabled` (that would drop focus to the body); announced as unavailable instead.
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).not.toBeDisabled();
+    expect(document.activeElement).toBe(button);
+
+    await userEvent.click(button);
+    expect(state.puts).toEqual(['r-1']);
+    expect(state.deletes).toEqual([]);
+
+    release();
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled'));
+    expect(document.activeElement).toBe(button);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
+
   test('signedOutBookmarkGoesToLogin', async () => {
     const state = fakeSaved();
     stubBrowse();
@@ -210,6 +238,32 @@ describe('recipe page save button', () => {
     await waitFor(() => expect(state.deletes).toEqual(['r-1']));
     expect(await screen.findByRole('button', { name: 'Save' })).toHaveAttribute('aria-pressed', 'false');
     expectNoEmoji();
+  });
+
+  test('detailSaveKeepsFocusWhileSaving', async () => {
+    signedIn();
+    let release!: () => void;
+    const state = fakeSaved([], { putGate: new Promise<void>((r) => { release = r; }) });
+    stubDetail();
+    renderAt('/recipes/r-1');
+
+    const save = await screen.findByRole('button', { name: 'Save' });
+    await waitFor(() => expect(save).toBeEnabled());
+    await userEvent.click(save);
+    await waitFor(() => expect(state.puts).toEqual(['r-1']));
+
+    const pending = screen.getByRole('button', { name: 'Saved' });
+    expect(pending).toHaveAttribute('aria-disabled', 'true');
+    expect(pending).not.toBeDisabled();
+    expect(document.activeElement).toBe(pending);
+
+    await userEvent.click(pending);
+    expect(state.puts).toEqual(['r-1']);
+    expect(state.deletes).toEqual([]);
+
+    release();
+    await waitFor(() => expect(pending).not.toHaveAttribute('aria-disabled'));
+    expect(document.activeElement).toBe(pending);
   });
 
   test('detailSignedOutSaveGoesToLogin', async () => {

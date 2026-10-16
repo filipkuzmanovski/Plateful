@@ -28,7 +28,11 @@ export function useSavedIds() {
   const toggle = useCallback(
     (id: string) => {
       if (!signedIn) {
-        navigate('/login', { state: { from: location.pathname + location.search } });
+        const from = location.pathname + location.search;
+        // Half signed-in users go where the rest of the app sends them, not back to the password form.
+        if (status === 'needs-mfa') navigate('/verify-2fa', { state: { from } });
+        else if (status === 'needs-profile') navigate('/complete-profile');
+        else navigate('/login', { state: { from } });
         return;
       }
       // Until the ids arrive an already-saved recipe would look unsaved, so do nothing.
@@ -61,7 +65,7 @@ export function useSavedIds() {
         }
       })();
     },
-    [signedIn, navigate, location.pathname, location.search, queryClient, key],
+    [signedIn, status, navigate, location.pathname, location.search, queryClient, key],
   );
 
   return { isSaved, isPending, toggle, ready: signedIn && data !== undefined };

@@ -49,7 +49,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
           )}
         </div>
       </Link>
-    <BookmarkButton recipeId={recipe.id} title={recipe.title} />
+      <BookmarkButton recipeId={recipe.id} title={recipe.title} />
     </div>
   );
 }
