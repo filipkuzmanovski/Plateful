@@ -51,6 +51,16 @@ class SavedRecipeRepositoryDbTest {
         return users.get(0).getId();
     }
 
+    // users.id references auth.users(id), so a throwaway user needs a row in both; the enclosing
+    // test transaction rolls both back.
+    private UUID newUser(String name) {
+        UUID id = UUID.randomUUID();
+        em.createNativeQuery("INSERT INTO auth.users (id) VALUES (:id)").setParameter("id", id).executeUpdate();
+        userRepository.saveAndFlush(User.builder()
+                .id(id).firstName(name).lastName("Saver").email(name + "-" + id + "@example.test").build());
+        return id;
+    }
+
     private Recipe seed(String title) {
         return recipeRepository.saveAndFlush(Recipe.builder().title(title).build());
     }
@@ -164,6 +174,44 @@ class SavedRecipeRepositoryDbTest {
         List<UUID> ids = savedRepository.findAllRecipeIdsByUserId(u);
         assertThat(ids).doesNotContain(r1.getId());
         assertThat(ids).contains(r2.getId());
+    }
+
+    @Test
+    void savesAreIsolatedPerUser() {
+        UUID a = newUser("a");
+        UUID b = newUser("b");
+        Recipe shared = seed("saved-shared");
+        Recipe onlyA = seed("saved-only-a");
+        Recipe onlyB = seed("saved-only-b");
+        savedRepository.insertIgnore(a, shared.getId());
+        savedRepository.insertIgnore(a, onlyA.getId());
+        savedRepository.insertIgnore(b, shared.getId());
+        savedRepository.insertIgnore(b, onlyB.getId());
+        // now() is constant inside one transaction, so force a distinct, ordered save time.
+        setSavedAt(a, shared.getId(), 1);
+        setSavedAt(a, onlyA.getId(), 2);
+        setSavedAt(b, shared.getId(), 1);
+        setSavedAt(b, onlyB.getId(), 2);
+        em.flush();
+        em.clear();
+
+        // The users are brand new, so each list holds exactly their own saves, newest first.
+        Page<UUID> pageA = savedRepository.findRecipeIdsByUserId(a, PageRequest.of(0, 10));
+        assertThat(pageA.getContent()).containsExactly(shared.getId(), onlyA.getId());
+        assertThat(pageA.getTotalElements()).isEqualTo(2);
+        Page<UUID> pageB = savedRepository.findRecipeIdsByUserId(b, PageRequest.of(0, 10));
+        assertThat(pageB.getContent()).containsExactly(shared.getId(), onlyB.getId());
+        assertThat(pageB.getTotalElements()).isEqualTo(2);
+        assertThat(savedRepository.findAllRecipeIdsByUserId(a)).containsExactly(shared.getId(), onlyA.getId());
+        assertThat(savedRepository.findAllRecipeIdsByUserId(b)).containsExactly(shared.getId(), onlyB.getId());
+
+        // A unsaving the shared recipe leaves B's save of it alone.
+        savedRepository.deleteByIdUserIdAndIdRecipeId(a, shared.getId());
+        em.flush();
+        em.clear();
+
+        assertThat(savedRepository.findAllRecipeIdsByUserId(a)).containsExactly(onlyA.getId());
+        assertThat(savedRepository.findAllRecipeIdsByUserId(b)).containsExactly(shared.getId(), onlyB.getId());
     }
 
     // V5: without row level security the public anon key could read or delete everyone's saves.
