@@ -3628,8 +3628,9 @@ Task 1 - saved_recipes table, entity and repository (0474d8f)
     DELETE CASCADE (deleting either side removes the saves), and an index on
     (user_id, created_at DESC) for the newest-first list.
   - SavedRecipe is the entity and SavedRecipeId the embedded key. The entity
-    uses @MapsId so the key columns and the user and recipe relations are the
-    same columns.
+    uses @MapsId so the recipe_id key column and the recipe relation are the
+    same column. (The entity has a recipe relation only; there is no user
+    relation.)
   - SavedRecipeRepository.insertIgnore is a native INSERT ... ON CONFLICT DO
     NOTHING, so saving the same recipe twice is not an error and is not a
     duplicate row.
@@ -3657,14 +3658,16 @@ Tests: SavedRecipeServiceTest (6) and SavedRecipeControllerTest (7).
 
 Task 3 - two-factor filter covers every /me/ path (da3772d)
 -----------------------------------------------------------
-MfaEnforcementFilter used to guard only non-GET requests. A saved list is
-private, so a half signed-in session (aal1, with a factor enrolled but not yet
-verified) must not read it either. The rule is now: guard when the method is
+MfaEnforcementFilter used to guard non-GET requests and GETs whose path ENDS
+with /me; /api/users/me/saved and /saved/ids slipped past. A saved list is
+private, so a half signed-in session (aal1: password entered, the second-factor
+code not yet entered this session, for a user with a verified factor) must not
+read it either. The rule is now: guard when the method is
 not GET, OR the decoded path's "/"-split segments contain exactly "me". GETs on
 /api/users/me/saved and /api/users/me/saved/ids are therefore blocked until the
 code is entered; public GETs are untouched. The path is decoded before it is
 split, so a percent-encoded segment such as m%65 cannot bypass the check.
-MfaEnforcementFilterTest grew to 19 tests (53 lines added).
+MfaEnforcementFilterTest grew to 19 tests (51 insertions and 2 deletions).
 
 Task 4 - saved API and useSavedIds hook (9ae00b4, 6001ad5)
 ----------------------------------------------------------
@@ -3733,12 +3736,44 @@ branch.
 Frontend: npx vitest run, 30 files, 333 tests, all passed. npm run build
 succeeded (only the usual chunk-size warning).
 
+Final review fixes (e28addd, 00fc462)
+-------------------------------------
+A whole-branch review (6f8ab9f..c344130) found no critical issues. Fixed:
+  - Focus (I1): the save controls were `disabled` while a request was pending,
+    which drops keyboard focus to the page body on every toggle. They now stay
+    focusable and render aria-disabled="true" while pending; the click is a
+    no-op (useSaveControl returns early, and the in-flight guard in useSavedIds
+    still holds). `disabled` is kept only while auth or the saved ids are
+    loading. The pending look is a wait cursor, so the saffron fill is no
+    longer dimmed.
+  - Stale Saved tab (I2): deleting a recipe invalidates ['savedRecipes'] and
+    ['savedIds']; saving an edit and rating a recipe invalidate
+    ['savedRecipes']. Before, a saved copy of a just-deleted, edited or rated
+    recipe could be served from the 30 second cache.
+  - Half signed-in users (M2): toggling a save in the needs-mfa state goes to
+    /verify-2fa (not /login); needs-profile goes to /complete-profile, as
+    AppShell and ProtectedRoute already do.
+  - Deep link (M3): ProtectedRoute keeps the query string in "from", so
+    /me?tab=saved survives sign-in.
+  - Isolation test (M6): SavedRecipeRepositoryDbTest.savesAreIsolatedPerUser
+    creates two throwaway users inside the rolled-back transaction; each user's
+    paged and full id lists hold only their own saves, and one user unsaving a
+    shared recipe leaves the other's save.
+  - RecipeCard indentation (M7) and the three factual errors in this PART (M1).
+Totals after the fixes: backend regression list plus the saved classes, 187
+tests, all passing; *DbTest 32 tests, 0 failures, 1 skipped (the known
+RecipeSortDbTest skip). Frontend: 32 files, 341 tests passed; npm run build
+succeeded.
+
 Known follow-ups
 ----------------
-  - The save controls are disabled while a request is pending, which drops
-    keyboard focus from the button. aria-disabled would keep the focus.
   - There is no global query-cache clear on sign-out (this predates the
     feature). Saved data is protected by the user-scoped key, but other cached
     data is not cleared.
   - Owners also see Save on their own recipes. The spec allows it.
-  - The final whole-branch review is still to come.
+  - A save that races a delete of the same recipe returns 500 instead of 404
+    (SavedRecipeService checks existence and inserts in separate
+    transactions). The frontend rolls back and shows the toast, so the user
+    impact is nil.
+  - Unsaving a card on the Saved tab removes the card, so keyboard focus is
+    lost to the page body. The tabpanel could take focus after the unsave.
