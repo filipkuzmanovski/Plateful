@@ -6,9 +6,11 @@ import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeIngredientDisplayDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeReviewDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeIngredient;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipePhoto;
@@ -60,6 +62,7 @@ public class RecipeService {
     private final CuisineCatalog cuisineCatalog;
     private final RecipePhotoRepository photoRepository;
     private final RecipePhotoPaths photoPaths;
+    private final RecipeVisibility visibility;
 
     public RecipeService(RecipeRepository recipeRepository,
                          RecipeIngredientRepository ingredientRepository,
@@ -68,7 +71,8 @@ public class RecipeService {
                          UserRepository userRepository,
                          CuisineCatalog cuisineCatalog,
                          RecipePhotoRepository photoRepository,
-                         RecipePhotoPaths photoPaths) {
+                         RecipePhotoPaths photoPaths,
+                         RecipeVisibility visibility) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.ratingRepository = ratingRepository;
@@ -77,6 +81,7 @@ public class RecipeService {
         this.cuisineCatalog = cuisineCatalog;
         this.photoRepository = photoRepository;
         this.photoPaths = photoPaths;
+        this.visibility = visibility;
     }
 
     /**
@@ -105,14 +110,20 @@ public class RecipeService {
         return toDisplayDto(saved, ingredients, savedPhotos);
     }
 
-    /** Recipe detail page: recipe + ordered ingredients + aggregates. */
+    /**
+     * Recipe detail page: recipe + ordered ingredients + aggregates. viewerId is null for an
+     * anonymous request. A recipe the viewer may not see is a 404 (see RecipeVisibility); the
+     * review block is attached only for the author and admins.
+     */
     @Transactional(readOnly = true)
-    public RecipeDisplayDto getById(UUID recipeId) {
+    public RecipeDisplayDto getById(UUID recipeId, UUID viewerId) {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
-        return toDisplayDto(recipe,
+        visibility.requireVisible(recipe, viewerId);
+        RecipeDisplayDto dto = toDisplayDto(recipe,
                 ingredientRepository.findByRecipeIdOrderBySortOrderAsc(recipeId),
                 photoRepository.findByRecipeIdOrderByPositionAsc(recipeId));
+        return visibility.showsReview(recipe, viewerId) ? dto.withReview(RecipeReviewDto.of(recipe)) : dto;
     }
 
     /**
@@ -138,15 +149,23 @@ public class RecipeService {
         // applies with or without a filter.
         Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
         return toDisplayPage(recipeRepository.findAll(
-                RecipeSpecifications.withFilter(effective, cuisineKeys)
+                RecipeSpecifications.approvedOnly()
+                        .and(RecipeSpecifications.withFilter(effective, cuisineKeys))
                         .and(RecipeSpecifications.withSort(sort)),
                 unsorted));
     }
 
-    /** "Recipes by this user" — profile page, same batched assembly. */
+    /**
+     * "Recipes by this user" — profile page, same batched assembly. The author and admins see every
+     * status, each with its review block; everyone else (viewerId may be null) sees approved only.
+     */
     @Transactional(readOnly = true)
-    public Page<RecipeDisplayDto> getByAuthor(UUID authorId, Pageable pageable) {
-        return toDisplayPage(recipeRepository.findByUserId(authorId, pageable));
+    public Page<RecipeDisplayDto> getByAuthor(UUID authorId, UUID viewerId, Pageable pageable) {
+        boolean seesAll = authorId.equals(viewerId) || visibility.isAdmin(viewerId);
+        if (!seesAll) {
+            return toDisplayPage(recipeRepository.findByUserIdAndStatus(authorId, RecipeStatus.APPROVED, pageable));
+        }
+        return toDisplayPage(recipeRepository.findByUserId(authorId, pageable), true);
     }
 
     /**
@@ -276,6 +295,11 @@ public class RecipeService {
      * the batched repository methods — see the N+1 BUGFIX comments there).
      */
     public Page<RecipeDisplayDto> toDisplayPage(Page<Recipe> page) {
+        return toDisplayPage(page, false);
+    }
+
+    /** As above; withReview attaches each recipe's review block (only for the author's or an admin's view). */
+    private Page<RecipeDisplayDto> toDisplayPage(Page<Recipe> page, boolean withReview) {
         List<UUID> ids = page.getContent().stream().map(Recipe::getId).toList();
         if (ids.isEmpty()) {
             return page.map(r -> null); // empty page, keep pagination metadata
@@ -310,7 +334,7 @@ public class RecipeService {
 
         return page.map(recipe -> {
             RecipeRatingSummary summary = ratingsByRecipe.get(recipe.getId());
-            return RecipeDisplayDto.fromEntity(
+            RecipeDisplayDto dto = RecipeDisplayDto.fromEntity(
                     recipe,
                     ingredientsByRecipe.getOrDefault(recipe.getId(), List.of()).stream()
                             .map(RecipeIngredientDisplayDto::fromEntity).toList(),
@@ -320,6 +344,7 @@ public class RecipeService {
                     summary != null ? summary.ratingCount() : 0L,
                     commentCounts.getOrDefault(recipe.getId(), 0L)
             );
+            return withReview ? dto.withReview(RecipeReviewDto.of(recipe)) : dto;
         });
     }
 }

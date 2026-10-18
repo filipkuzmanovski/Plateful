@@ -51,7 +51,8 @@ class SavedRecipeServiceTest {
                 mock(UserRepository.class),
                 new CuisineCatalog(),
                 mock(RecipePhotoRepository.class),
-                new RecipePhotoPaths("https://x/recipe-photos"));
+                new RecipePhotoPaths("https://x/recipe-photos"),
+                mock(RecipeVisibility.class));
         service = new SavedRecipeService(savedRepository, recipeRepository, recipeService);
     }
 

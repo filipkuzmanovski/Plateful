@@ -6,6 +6,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
+import mk.ukim.finki.wp.recipeappbackend.security.OptionalCurrentUserId;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -55,8 +56,8 @@ public class RecipeController {
     }
 
     @GetMapping("/{id}")
-    public RecipeDisplayDto getById(@PathVariable UUID id) {
-        return recipeService.getById(id);
+    public RecipeDisplayDto getById(@OptionalCurrentUserId UUID viewerId, @PathVariable UUID id) {
+        return recipeService.getById(id, viewerId);
     }
 
     @PutMapping("/{id}")

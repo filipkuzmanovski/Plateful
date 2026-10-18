@@ -6,6 +6,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.MyProfileDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.UserDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
+import mk.ukim.finki.wp.recipeappbackend.security.OptionalCurrentUserId;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import mk.ukim.finki.wp.recipeappbackend.service.UserService;
 import org.springframework.data.domain.Page;
@@ -64,7 +65,8 @@ public class UserController {
     }
 
     @GetMapping("/{id}/recipes")
-    public Page<RecipeDisplayDto> recipesByUser(@PathVariable UUID id, Pageable pageable) {
-        return recipeService.getByAuthor(id, pageable);
+    public Page<RecipeDisplayDto> recipesByUser(@OptionalCurrentUserId UUID viewerId,
+                                                @PathVariable UUID id, Pageable pageable) {
+        return recipeService.getByAuthor(id, viewerId, pageable);
     }
 }

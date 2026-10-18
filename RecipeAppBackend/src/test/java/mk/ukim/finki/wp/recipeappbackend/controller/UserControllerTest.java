@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -160,10 +161,21 @@ class UserControllerTest {
     @Test
     void getUserRecipes_anonymous_is200() throws Exception {
         UUID otherId = UUID.randomUUID();
-        when(recipeService.getByAuthor(eq(otherId), any())).thenReturn(Page.empty());
+        when(recipeService.getByAuthor(eq(otherId), isNull(), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/users/" + otherId + "/recipes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void getUserRecipes_withToken_passesViewerToService() throws Exception {
+        UUID otherId = UUID.randomUUID();
+        when(recipeService.getByAuthor(eq(otherId), eq(USER_ID), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/users/" + otherId + "/recipes").with(authed()))
+                .andExpect(status().isOk());
+
+        verify(recipeService).getByAuthor(eq(otherId), eq(USER_ID), any());
     }
 }

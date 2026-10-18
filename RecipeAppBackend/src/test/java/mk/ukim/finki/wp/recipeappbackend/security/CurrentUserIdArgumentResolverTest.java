@@ -3,6 +3,8 @@ package mk.ukim.finki.wp.recipeappbackend.security;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -16,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CurrentUserIdArgumentResolverTest {
 
     private final CurrentUserIdArgumentResolver resolver = new CurrentUserIdArgumentResolver();
+    private final OptionalCurrentUserIdArgumentResolver optionalResolver =
+            new OptionalCurrentUserIdArgumentResolver();
 
     @AfterEach
     void clearContext() {
@@ -45,6 +49,38 @@ class CurrentUserIdArgumentResolverTest {
         authenticateWithSub("not-a-uuid");
 
         assertThatThrownBy(() -> resolver.resolveArgument(null, null, null, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.UNAUTHORIZED));
+    }
+
+    @Test
+    void optionalIsNullWithoutToken() {
+        // no authentication set at all
+        assertThat(optionalResolver.resolveArgument(null, null, null, null)).isNull();
+    }
+
+    @Test
+    void optionalIsNullForAnonymousAuthentication() {
+        SecurityContextHolder.getContext().setAuthentication(new AnonymousAuthenticationToken(
+                "key", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
+
+        assertThat(optionalResolver.resolveArgument(null, null, null, null)).isNull();
+    }
+
+    @Test
+    void optionalIsSubWithToken() {
+        UUID id = UUID.randomUUID();
+        authenticateWithSub(id.toString());
+
+        assertThat(optionalResolver.resolveArgument(null, null, null, null)).isEqualTo(id);
+    }
+
+    @Test
+    void optionalWithNonUuidSubjectStillThrows401() {
+        authenticateWithSub("not-a-uuid");
+
+        assertThatThrownBy(() -> optionalResolver.resolveArgument(null, null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.UNAUTHORIZED));

@@ -8,6 +8,7 @@ import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeComment;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeIngredient;
@@ -58,6 +59,11 @@ import java.util.Set;
 public final class RecipeSpecifications {
 
     private RecipeSpecifications() {
+    }
+
+    /** Only approved recipes: what browse and search show to everyone, authors and admins included. */
+    public static Specification<Recipe> approvedOnly() {
+        return (root, query, cb) -> cb.equal(root.get("status"), RecipeStatus.APPROVED);
     }
 
     /**

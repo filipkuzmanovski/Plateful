@@ -3,9 +3,13 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
+import mk.ukim.finki.wp.recipeappbackend.exception.RecipeHiddenException;
+import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeReviewDto;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -235,12 +240,59 @@ class RecipeControllerTest {
     @Test
     void getById_anonymous_is200() throws Exception {
         UUID recipeId = UUID.randomUUID();
-        when(recipeService.getById(recipeId)).thenReturn(sampleRecipe(recipeId));
+        when(recipeService.getById(recipeId, null)).thenReturn(sampleRecipe(recipeId));
 
         mockMvc.perform(get("/api/recipes/" + recipeId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(recipeId.toString()))
                 .andExpect(jsonPath("$.photos[0]").value("https://x/recipe-photos/u/p.webp"));
+    }
+
+    @Test
+    void getUnderReviewIs404WithCode() throws Exception {
+        UUID recipeId = UUID.randomUUID();
+        when(recipeService.getById(recipeId, null))
+                .thenThrow(new RecipeHiddenException(recipeId, "Old Title", RecipeStatus.PENDING));
+
+        mockMvc.perform(get("/api/recipes/" + recipeId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("under_review"))
+                .andExpect(jsonPath("$.approvedTitle").value("Old Title"));
+    }
+
+    @Test
+    void getRejectedEverApprovedIs404Unavailable() throws Exception {
+        UUID recipeId = UUID.randomUUID();
+        when(recipeService.getById(recipeId, null))
+                .thenThrow(new RecipeHiddenException(recipeId, "Old Title", RecipeStatus.REJECTED));
+
+        mockMvc.perform(get("/api/recipes/" + recipeId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("unavailable"))
+                .andExpect(jsonPath("$.approvedTitle").value("Old Title"));
+    }
+
+    @Test
+    void getNeverApprovedIsPlain404() throws Exception {
+        UUID recipeId = UUID.randomUUID();
+        when(recipeService.getById(recipeId, null))
+                .thenThrow(new ResourceNotFoundException("Recipe", recipeId));
+
+        mockMvc.perform(get("/api/recipes/" + recipeId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").doesNotExist());
+    }
+
+    @Test
+    void authorGetsReviewBlock() throws Exception {
+        UUID recipeId = UUID.randomUUID();
+        RecipeReviewDto review = new RecipeReviewDto("pending", null, true, 3, OffsetDateTime.now());
+        when(recipeService.getById(recipeId, USER_ID)).thenReturn(sampleRecipe(recipeId).withReview(review));
+
+        mockMvc.perform(get("/api/recipes/" + recipeId).with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.review.status").value("pending"))
+                .andExpect(jsonPath("$.review.revision").value(3));
     }
 
     @Test

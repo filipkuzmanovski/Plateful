@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.exception;
 
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -81,6 +82,28 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getDetail()).isEqualTo("Validation failed");
         assertThat(problem.getProperties())
                 .containsEntry("errors", Map.of("photos", "At most 6 photos"));
+    }
+
+    @Test
+    void hiddenPendingMapsTo404UnderReviewWithApprovedTitle() {
+        ProblemDetail problem = handler.handleRecipeHidden(
+                new RecipeHiddenException(UUID.randomUUID(), "Old Title", RecipeStatus.PENDING));
+
+        assertThat(problem.getStatus()).isEqualTo(404);
+        assertThat(problem.getProperties())
+                .containsEntry("code", "under_review")
+                .containsEntry("approvedTitle", "Old Title");
+    }
+
+    @Test
+    void hiddenRejectedMapsTo404UnavailableWithApprovedTitle() {
+        ProblemDetail problem = handler.handleRecipeHidden(
+                new RecipeHiddenException(UUID.randomUUID(), "Old Title", RecipeStatus.REJECTED));
+
+        assertThat(problem.getStatus()).isEqualTo(404);
+        assertThat(problem.getProperties())
+                .containsEntry("code", "unavailable")
+                .containsEntry("approvedTitle", "Old Title");
     }
 
     @Test

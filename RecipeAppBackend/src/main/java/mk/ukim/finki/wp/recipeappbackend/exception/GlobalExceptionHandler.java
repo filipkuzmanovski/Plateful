@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.exception;
 
 import mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.photo.InvalidPhotoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     ProblemDetail handleNotFound(ResourceNotFoundException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    /**
+     * A recipe that was approved once but is hidden from this viewer: 404 with a machine-readable code
+     * ("under_review" while pending, "unavailable" once rejected) and the last approved title.
+     */
+    @ExceptionHandler(RecipeHiddenException.class)
+    ProblemDetail handleRecipeHidden(RecipeHiddenException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setProperty("code", ex.getStatus() == RecipeStatus.PENDING ? "under_review" : "unavailable");
+        problem.setProperty("approvedTitle", ex.getApprovedTitle());
+        return problem;
     }
 
     @ExceptionHandler(ForbiddenOperationException.class)

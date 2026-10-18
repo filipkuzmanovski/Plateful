@@ -52,7 +52,8 @@ class RecipeServiceCuisineValidationTest {
                 userRepository,
                 catalog,
                 mock(RecipePhotoRepository.class),
-                new RecipePhotoPaths("https://x/recipe-photos"));
+                new RecipePhotoPaths("https://x/recipe-photos"),
+                mock(RecipeVisibility.class));
         owner = User.builder().id(userId).build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(owner));
         when(recipeRepository.save(any(Recipe.class))).thenAnswer(inv -> inv.getArgument(0));

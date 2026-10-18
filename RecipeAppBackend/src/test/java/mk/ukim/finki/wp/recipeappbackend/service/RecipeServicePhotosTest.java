@@ -69,7 +69,8 @@ class RecipeServicePhotosTest {
                 userRepository,
                 new CuisineCatalog(),
                 photoRepository,
-                paths);
+                paths,
+                mock(RecipeVisibility.class));
         owner = User.builder().id(userId).build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(owner));
         when(recipeRepository.save(any(Recipe.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -189,8 +190,8 @@ class RecipeServicePhotosTest {
                 .thenReturn(Optional.of(Recipe.builder().id(without).title("B").build()));
         when(photoRepository.findByRecipeIdOrderByPositionAsc(any())).thenReturn(List.of());
 
-        assertThat(service.getById(withImage).photos()).containsExactly("https://img/x.jpg");
-        assertThat(service.getById(without).photos()).isEmpty();
+        assertThat(service.getById(withImage, null).photos()).containsExactly("https://img/x.jpg");
+        assertThat(service.getById(without, null).photos()).isEmpty();
     }
 
     @Test

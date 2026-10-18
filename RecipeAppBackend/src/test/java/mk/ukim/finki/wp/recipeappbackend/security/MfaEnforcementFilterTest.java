@@ -220,7 +220,7 @@ class MfaEnforcementFilterTest {
     void publicUserRecipesGetAal1WithFactorPasses() throws Exception {
         when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
         UUID other = UUID.randomUUID();
-        when(recipeService.getByAuthor(any(), any())).thenReturn(Page.empty());
+        when(recipeService.getByAuthor(any(), any(), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/users/" + other + "/recipes").with(token("aal1")))
                 .andExpect(status().isOk());

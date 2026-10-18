@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.config;
 
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserIdArgumentResolver;
+import mk.ukim.finki.wp.recipeappbackend.security.OptionalCurrentUserIdArgumentResolver;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -23,5 +24,6 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(new CurrentUserIdArgumentResolver());
+        resolvers.add(new OptionalCurrentUserIdArgumentResolver());
     }
 }
