@@ -36,4 +36,17 @@ class SmtpReviewEmailSenderTest {
         assertThat(sent.getContent()).isEqualTo("Body text\n\n— The Plateful team\n");
         assertThat(sent.getContentType()).startsWith("text/plain");
     }
+
+    @Test
+    void stripsLineBreaksFromSubject() throws Exception {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        when(mailSender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
+
+        new SmtpReviewEmailSender(mailSender, "plateful@example.com")
+                .send("author@example.com", "Hi\r\nBcc: x@y", "body");
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(mailSender).send(captor.capture());
+        assertThat(captor.getValue().getSubject()).isEqualTo("HiBcc: x@y");
+    }
 }

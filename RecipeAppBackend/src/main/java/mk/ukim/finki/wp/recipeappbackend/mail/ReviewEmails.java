@@ -6,7 +6,7 @@ final class ReviewEmails {
     record Email(String subject, String body) {
     }
 
-    private static final String SIGN_OFF = "— The Plateful team\n";
+    private static final String SIGN_OFF = "— The Plateful team";
 
     private ReviewEmails() {
     }

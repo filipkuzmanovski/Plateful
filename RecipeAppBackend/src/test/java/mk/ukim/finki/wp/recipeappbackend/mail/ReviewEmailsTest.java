@@ -16,7 +16,7 @@ class ReviewEmailsTest {
                         + "\n"
                         + "View it: http://localhost:5173/recipes/abc\n"
                         + "\n"
-                        + "— The Plateful team\n");
+                        + "— The Plateful team");
     }
 
     @Test
@@ -32,7 +32,7 @@ class ReviewEmailsTest {
                         + "\n"
                         + "You can edit the recipe and resubmit it here: http://localhost:5173/recipes/abc/edit\n"
                         + "\n"
-                        + "— The Plateful team\n");
+                        + "— The Plateful team");
     }
 
     @Test

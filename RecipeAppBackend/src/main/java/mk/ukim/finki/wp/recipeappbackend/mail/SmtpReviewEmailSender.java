@@ -29,7 +29,7 @@ public class SmtpReviewEmailSender implements ReviewEmailSender {
             MimeMessageHelper helper = new MimeMessageHelper(message, StandardCharsets.UTF_8.name());
             helper.setFrom(fromAddress, DISPLAY_NAME);
             helper.setTo(to);
-            helper.setSubject(subject);
+            helper.setSubject(subject.replace("\r", "").replace("\n", "")); // header-injection guard
             helper.setText(body, false);
             mailSender.send(message);
         } catch (MessagingException | UnsupportedEncodingException e) {
