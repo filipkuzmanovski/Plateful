@@ -114,7 +114,8 @@ public class RecipeService {
                 ? List.of()
                 : photoRepository.saveAll(toPhotoEntities(saved, photos));
 
-        return toDisplayDto(saved, ingredients, savedPhotos);
+        // The caller is the author, so the response carries the review block (the form caches it as the recipe page).
+        return toDisplayDto(saved, ingredients, savedPhotos).withReview(RecipeReviewDto.of(saved));
     }
 
     /**
@@ -243,7 +244,7 @@ public class RecipeService {
             recipe.setImage(coverUrl(photos));
         }
 
-        return toDisplayDto(recipe, ingredients, savedPhotos);
+        return toDisplayDto(recipe, ingredients, savedPhotos).withReview(RecipeReviewDto.of(recipe));
     }
 
     /** Delete own recipe. Ratings/comments/ingredients go via ON DELETE CASCADE. */

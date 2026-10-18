@@ -6,6 +6,7 @@ import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeIngredientCreateDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
@@ -155,6 +156,56 @@ class RecipeServiceReviewStatusTest {
         assertThat(saved.getReviewedBy()).isSameAs(owner);
         assertThat(saved.getReviewedAt()).isNotNull();
         assertThat(saved.getRejectionReason()).isNull();
+    }
+
+    @Test
+    void createResponseCarriesThePendingReviewBlock() {
+        when(visibility.isAdmin(userId)).thenReturn(false);
+
+        RecipeDisplayDto result = service.create(userId, dto("Soup"));
+
+        assertThat(result.review()).isNotNull();
+        assertThat(result.review().status()).isEqualTo("pending");
+        assertThat(result.review().everApproved()).isFalse();
+    }
+
+    @Test
+    void adminCreateResponseCarriesTheApprovedReviewBlock() {
+        when(visibility.isAdmin(userId)).thenReturn(true);
+
+        RecipeDisplayDto result = service.create(userId, dto("Soup"));
+
+        assertThat(result.review()).isNotNull();
+        assertThat(result.review().status()).isEqualTo("approved");
+        assertThat(result.review().everApproved()).isTrue();
+    }
+
+    @Test
+    void updateResponseCarriesThePendingReviewBlock() {
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
+        recipe.setEverApproved(true);
+        when(visibility.isAdmin(userId)).thenReturn(false);
+
+        RecipeDisplayDto result = service.update(userId, recipeId, dto("Edited"));
+
+        assertThat(result.review()).isNotNull();
+        assertThat(result.review().status()).isEqualTo("pending");
+        assertThat(result.review().everApproved()).isTrue();
+        assertThat(result.review().revision()).isEqualTo(4);
+    }
+
+    @Test
+    void adminUpdateResponseCarriesTheApprovedReviewBlock() {
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
+        recipe.setEverApproved(true);
+        when(visibility.isAdmin(userId)).thenReturn(true);
+
+        RecipeDisplayDto result = service.update(userId, recipeId, dto("Edited"));
+
+        assertThat(result.review()).isNotNull();
+        assertThat(result.review().status()).isEqualTo("approved");
     }
 
     @Test

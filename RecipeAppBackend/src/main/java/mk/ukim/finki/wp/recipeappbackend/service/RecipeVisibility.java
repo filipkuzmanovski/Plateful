@@ -6,14 +6,17 @@ import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
 /**
  * The one visibility rule for recipe reads: a recipe is visible to viewer V when it is approved,
- * or V is its author, or V is an admin. Admin status is read from users.is_admin on every call,
- * never from the JWT. A null viewer is an anonymous request.
+ * or V is its author, or V is an admin. Admin status is read from users.is_admin on every call
+ * (the JWT only supplies the aal2 requirement, see {@link #isAdmin}). A null viewer is an anonymous request.
  * <p>
  * Listing queries (browse, cuisine counts) use the approved-only specification instead, because
  * they are approved-only even for authors and admins.
@@ -27,8 +30,23 @@ public class RecipeVisibility {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Admin rights for the current request: users.is_admin AND an aal2 session. An admin on an aal1
+     * token (password only, or no second factor yet) is treated like any other user, so a stolen
+     * password never exposes unpublished recipes and an admin without 2FA cannot self-approve.
+     */
     public boolean isAdmin(UUID viewerId) {
-        return viewerId != null && userRepository.isAdmin(viewerId);
+        return viewerId != null && currentSessionIsAal2() && userRepository.isAdmin(viewerId);
+    }
+
+    /** users.is_admin alone, whatever the session level. Only the admin guard needs this. */
+    public boolean hasAdminFlag(UUID userId) {
+        return userId != null && userRepository.isAdmin(userId);
+    }
+
+    private static boolean currentSessionIsAal2() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getPrincipal() instanceof Jwt jwt && "aal2".equals(jwt.getClaimAsString("aal"));
     }
 
     public boolean canSee(Recipe recipe, UUID viewerId) {

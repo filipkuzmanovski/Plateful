@@ -8,7 +8,8 @@ import java.util.UUID;
 
 /**
  * Called first by every admin route. Admin status is read from users.is_admin on every call (never
- * from the JWT), and an admin must also have a verified second factor. A failing factor lookup
+ * from the JWT; the flag alone, because the aal2 requirement is the filter's job here and a missing
+ * factor must still answer admin_mfa_setup_required), and an admin must also have a verified second factor. A failing factor lookup
  * propagates, so the request fails closed.
  */
 @Component
@@ -23,7 +24,7 @@ public class AdminGuard {
     }
 
     public void requireAdmin(UUID userId) {
-        if (!visibility.isAdmin(userId)) {
+        if (!visibility.hasAdminFlag(userId)) {
             throw AdminForbiddenException.forbidden();
         }
         if (!mfaFactorLookup.hasVerifiedFactor(userId)) {

@@ -7,8 +7,14 @@ import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.time.Instant;
 
 import java.util.UUID;
 
@@ -35,6 +41,23 @@ class RecipeVisibilityTest {
         userRepository = mock(UserRepository.class);
         when(userRepository.isAdmin(adminId)).thenReturn(true);
         visibility = new RecipeVisibility(userRepository);
+        signIn("aal2"); // admin rights need an aal2 session; most tests below are about visibility, not 2FA
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private static void signIn(String aal) {
+        Jwt.Builder builder = Jwt.withTokenValue("t").header("alg", "none")
+                .subject(UUID.randomUUID().toString())
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60));
+        if (aal != null) {
+            builder.claim("aal", aal);
+        }
+        Jwt jwt = builder.build();
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(jwt, jwt));
     }
 
     private Recipe recipe(RecipeStatus status, boolean everApproved, UUID owner) {
@@ -58,6 +81,42 @@ class RecipeVisibilityTest {
     void isAdminReadsTheFlag() {
         assertThat(visibility.isAdmin(adminId)).isTrue();
         assertThat(visibility.isAdmin(otherId)).isFalse();
+    }
+
+    @Test
+    void aal2AdminGetsAdminRights() {
+        signIn("aal2");
+
+        assertThat(visibility.isAdmin(adminId)).isTrue();
+        assertThat(visibility.canSee(recipe(RecipeStatus.PENDING, false, authorId), adminId)).isTrue();
+        assertThat(visibility.showsReview(recipe(RecipeStatus.APPROVED, true, authorId), adminId)).isTrue();
+    }
+
+    @Test
+    void aal1AdminGetsNoAdminRights() {
+        signIn("aal1");
+
+        assertThat(visibility.isAdmin(adminId)).isFalse();
+        assertThat(visibility.canSee(recipe(RecipeStatus.PENDING, false, authorId), adminId)).isFalse();
+        assertThat(visibility.showsReview(recipe(RecipeStatus.APPROVED, true, authorId), adminId)).isFalse();
+    }
+
+    @Test
+    void adminWithoutAalClaimOrJwtGetsNoAdminRights() {
+        signIn(null);
+        assertThat(visibility.isAdmin(adminId)).isFalse();
+
+        SecurityContextHolder.clearContext();
+        assertThat(visibility.isAdmin(adminId)).isFalse();
+    }
+
+    @Test
+    void adminFlagIgnoresTheSessionLevel() {
+        signIn("aal1");
+
+        assertThat(visibility.hasAdminFlag(adminId)).isTrue();
+        assertThat(visibility.hasAdminFlag(otherId)).isFalse();
+        assertThat(visibility.hasAdminFlag(null)).isFalse();
     }
 
     @Test
