@@ -29,8 +29,14 @@ class FakeIntersectionObserver {
   takeRecords() { return []; }
   /** Report `ratio` of every watched element as visible. */
   show(ratio: number) {
-    const entries = [...this.targets].map(
-      (target) => ({ target, isIntersecting: ratio > 0, intersectionRatio: ratio }) as IntersectionObserverEntry,
+    this.showSequence([ratio]);
+  }
+  /** Deliver several readings in one callback, oldest first, as a browser does when it batches them. */
+  showSequence(ratios: number[]) {
+    const entries = ratios.flatMap((ratio) =>
+      [...this.targets].map(
+        (target) => ({ target, isIntersecting: ratio > 0, intersectionRatio: ratio }) as IntersectionObserverEntry,
+      ),
     );
     act(() => this.callback(entries, this as unknown as IntersectionObserver));
   }
@@ -243,6 +249,88 @@ test('the viewer says so when the clip fails to load', async () => {
   expect(within(dialog).getByText("This video couldn't be played.")).toBeInTheDocument();
   expect(dialog.querySelector('video')).not.toBeInTheDocument();
   expectNoEmoji();
+});
+
+test('the arrow keys on the playing video are left to the player for seeking', async () => {
+  const { dialog, el } = await openViewerOnVideo();
+  fireEvent.keyDown(el, { key: 'ArrowRight' });
+  fireEvent.keyDown(el, { key: 'ArrowLeft' });
+  expect(within(dialog).getByText('2 / 3')).toBeInTheDocument();
+  expect(dialog.querySelector('video')).toBe(el);
+});
+
+test('the viewer video is named', async () => {
+  const { el } = await openViewerOnVideo();
+  expect(el).toHaveAttribute('aria-label', 'Pasta, video');
+});
+
+test('a one second clip is labelled in the singular', () => {
+  render(<PhotoCollage photos={[]} video={{ ...video, durationSeconds: 1 }} title="Pasta" />);
+  expect(within(screen.getByTestId('collage-desktop')).getByRole('button', { name: 'Play video, 1 second' })).toBeInTheDocument();
+});
+
+test('with several readings in one callback, the latest one decides', () => {
+  const { wide } = renderCollage(1);
+  const observer = observerOf(wide.getByRole('button', { name: 'Play video, 42 seconds' }));
+  observer.showSequence([0, 1]);
+  expect(play).toHaveBeenCalledTimes(1);
+  expect(pause).not.toHaveBeenCalled();
+
+  play.mockClear();
+  observer.showSequence([1, 0]);
+  expect(play).not.toHaveBeenCalled();
+  expect(pause).toHaveBeenCalledTimes(1);
+});
+
+describe('the tile while the viewer is open', () => {
+  const tileVideo = (wide: ReturnType<typeof renderCollage>['wide']) =>
+    wide.getByRole('button', { name: 'Play video, 42 seconds' }).querySelector('video')!;
+  const playsOf = (el: Element) => play.mock.contexts.filter((c: unknown) => c === el).length;
+  const pausesOf = (el: Element) => pause.mock.contexts.filter((c: unknown) => c === el).length;
+
+  test('opening the viewer pauses the tile, and it is not played again while open', async () => {
+    const user = userEvent.setup();
+    const { wide } = renderCollage(1);
+    const tile = wide.getByRole('button', { name: 'Play video, 42 seconds' });
+    const el = tileVideo(wide);
+    const observer = observerOf(tile);
+    observer.show(1);
+    expect(playsOf(el)).toBe(1);
+
+    await user.click(tile);
+    await screen.findByRole('dialog');
+    expect(pausesOf(el)).toBe(1);
+
+    observer.show(0.1);
+    observer.show(1); // scrolled back into view behind the overlay
+    expect(playsOf(el)).toBe(1);
+  });
+
+  test('closing it while the tile is visible resumes playback', async () => {
+    const user = userEvent.setup();
+    const { wide } = renderCollage(1);
+    const tile = wide.getByRole('button', { name: 'Play video, 42 seconds' });
+    const el = tileVideo(wide);
+    observerOf(tile).show(1);
+    await user.click(tile);
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(playsOf(el)).toBe(2);
+  });
+
+  test('closing it while the tile is out of view does not play', async () => {
+    const user = userEvent.setup();
+    const { wide } = renderCollage(1);
+    const tile = wide.getByRole('button', { name: 'Play video, 42 seconds' });
+    const el = tileVideo(wide);
+    const observer = observerOf(tile);
+    observer.show(1);
+    await user.click(tile);
+    await screen.findByRole('dialog');
+    observer.show(0); // scrolled away while the viewer was open
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(playsOf(el)).toBe(1);
+  });
 });
 
 describe('RecipeCard', () => {

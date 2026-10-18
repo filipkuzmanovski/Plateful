@@ -93,11 +93,11 @@ export function PhotoCollage({
     setIndex(i);
     setOpen(true);
   };
-  const tile = (i: number, className: string, children?: ReactNode) => {
+  const tile = (i: number, className: string, children?: ReactNode, compact = false) => {
     const item = media[i];
     if (item.kind === 'video') {
       return (
-        <VideoTile key={i} video={item} className={className} onOpen={show(i)}>
+        <VideoTile key={i} video={item} compact={compact} suspended={open} className={className} onOpen={show(i)}>
           {children}
         </VideoTile>
       );
@@ -128,7 +128,7 @@ export function PhotoCollage({
         {tile(0, 'aspect-[4/3] w-full')}
         {total > 1 && (
           <div className="grid grid-cols-5 gap-1">
-            {media.slice(1).map((_, i) => tile(i + 1, 'aspect-square'))}
+            {media.slice(1).map((_, i) => tile(i + 1, 'aspect-square', undefined, true))}
           </div>
         )}
       </div>
@@ -175,7 +175,7 @@ const VIDEO_ERROR = "This video couldn't be played.";
  * The viewer's player: controls on, sound on (the visitor just asked for it) and no loop. Pausing is explicit
  * because a removed `<video>` isn't guaranteed to stop: it pauses when the viewer closes or moves to another item.
  */
-function ViewerVideo({ video, open }: { video: RecipeVideo; open: boolean }) {
+function ViewerVideo({ video, title, open }: { video: RecipeVideo; title: string; open: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -197,6 +197,7 @@ function ViewerVideo({ video, open }: { video: RecipeVideo; open: boolean }) {
       ref={ref}
       src={video.url}
       poster={video.posterUrl}
+      aria-label={`${title}, video`}
       controls
       autoPlay
       playsInline
@@ -239,6 +240,8 @@ export function PhotoViewer({
 
   function onKeyDown(e: KeyboardEvent) {
     if (!many) return;
+    // The video's own controls use the arrows to seek; leave them alone.
+    if (e.target instanceof HTMLMediaElement) return;
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       go(-1);
@@ -277,7 +280,7 @@ export function PhotoViewer({
           </Dialog.Description>
 
           {item?.kind === 'video' ? (
-            <ViewerVideo key={index} video={item} open={open} />
+            <ViewerVideo key={index} video={item} title={title} open={open} />
           ) : (
             item && (
               <img
