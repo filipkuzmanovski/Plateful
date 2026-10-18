@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.exception;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.photo.InvalidPhotoException;
+import mk.ukim.finki.wp.recipeappbackend.photo.InvalidVideoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -115,6 +116,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail handleInvalidPhoto(InvalidPhotoException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
         problem.setProperty("errors", Map.of("photos", ex.getMessage()));
+        return problem;
+    }
+
+    /** Bad video paths (foreign folder, wrong type, bad duration) -> 400 in the bean-validation shape. */
+    @ExceptionHandler(InvalidVideoException.class)
+    ProblemDetail handleInvalidVideo(InvalidVideoException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        problem.setProperty("errors", Map.of("video", ex.getMessage()));
         return problem;
     }
 

@@ -74,7 +74,7 @@ class RecipeServiceReviewStatusTest {
     private static RecipeCreateDto dto(String title, List<String> photos, List<String> cuisines) {
         return new RecipeCreateDto(title, 2, null, null, null, null, null,
                 false, false, false, false, cuisines, photos,
-                List.of(new RecipeIngredientCreateDto("salt", "1 tsp salt")));
+                List.of(new RecipeIngredientCreateDto("salt", "1 tsp salt")), null);
     }
 
     private static RecipeCreateDto dto(String title) {

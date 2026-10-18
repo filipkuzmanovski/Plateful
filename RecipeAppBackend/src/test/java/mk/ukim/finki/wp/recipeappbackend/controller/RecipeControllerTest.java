@@ -10,6 +10,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeReviewDto;
+import mk.ukim.finki.wp.recipeappbackend.photo.InvalidVideoException;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -69,11 +70,11 @@ class RecipeControllerTest {
              "ingredients":[{"ingredientName":"Flour","originalText":"2 cups flour"}]}
             """;
 
-    /** RecipeDisplayDto has 30 components; tests only care about id/title/photos. */
+    /** RecipeDisplayDto has 31 components; tests only care about id/title/photos. */
     private static RecipeDisplayDto sampleRecipe(UUID id) {
         return new RecipeDisplayDto(id, "user", null, "Pancakes", null, List.of("https://x/recipe-photos/u/p.webp"), null, null, null, null,
                 null, null, null, List.of(), false, false, false, false, List.of(),
-                null, null, null, null, null, List.of(), null, 0L, 0L, null, null);
+                null, null, null, null, null, List.of(), null, 0L, 0L, null, null, null);
     }
 
     @Test
@@ -235,6 +236,19 @@ class RecipeControllerTest {
                         .content("{\"title\":\"Pancakes\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.ingredients").exists());
+    }
+
+    @Test
+    void invalidVideoIs400() throws Exception {
+        when(recipeService.create(eq(USER_ID), any()))
+                .thenThrow(new InvalidVideoException("Video must be an uploaded file in your folder."));
+
+        mockMvc.perform(post("/api/recipes")
+                        .with(authed())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_RECIPE_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.video").value("Video must be an uploaded file in your folder."));
     }
 
     @Test

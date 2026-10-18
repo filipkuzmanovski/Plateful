@@ -81,7 +81,7 @@ class RecipeServicePhotosTest {
     private static RecipeCreateDto dto(List<String> photos) {
         return new RecipeCreateDto("Title", 2, null, null, null, null, null,
                 false, false, false, false, null, photos,
-                List.of(new RecipeIngredientCreateDto("salt", "1 tsp salt")));
+                List.of(new RecipeIngredientCreateDto("salt", "1 tsp salt")), null);
     }
 
     private Recipe existing(UUID recipeId, String image) {

@@ -60,7 +60,9 @@ public record RecipeCreateDto(
         // Storage paths ({userId}/{uuid}.{ext}) of photos already uploaded to Supabase Storage;
         // position 0 is the cover. Ownership/format is checked by RecipePhotoPaths in the service.
         @Size(max = 6) List<@NotBlank @Size(max = 200) String> photos,
-        @NotEmpty @Size(max = 100) @Valid List<RecipeIngredientCreateDto> ingredients
+        @NotEmpty @Size(max = 100) @Valid List<RecipeIngredientCreateDto> ingredients,
+        // Optional video already uploaded to Storage; null means none. Checked by RecipeVideoPaths.
+        @Valid RecipeVideoCreateDto video
 ) {
     public Recipe toEntity(User owner) {
         return Recipe.builder()

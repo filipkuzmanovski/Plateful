@@ -57,6 +57,8 @@ public record RecipeDisplayDto(
         long ratingCount,
         long commentCount,
         OffsetDateTime createdAt,
+        // Null when the recipe has no video.
+        RecipeVideoDto video,
         // Present only when the viewer is the author or an admin; null for everyone else.
         RecipeReviewDto review
 ) {
@@ -66,7 +68,8 @@ public record RecipeDisplayDto(
             List<String> photos,
             Double averageRating,
             long ratingCount,
-            long commentCount
+            long commentCount,
+            RecipeVideoDto video
     ) {
         return new RecipeDisplayDto(
                 recipe.getId(),
@@ -98,6 +101,7 @@ public record RecipeDisplayDto(
                 ratingCount,
                 commentCount,
                 recipe.getCreatedAt(),
+                video,
                 null
         );
     }
@@ -106,6 +110,6 @@ public record RecipeDisplayDto(
         return new RecipeDisplayDto(id, source, user, title, image, photos, servings, readyInMinutes,
                 cookingMinutes, preparationMinutes, sourceName, sourceUrl, instructions, instructionsSteps,
                 dairyFree, glutenFree, vegan, vegetarian, cuisines, calories, proteinGrams, fatGrams,
-                carbsGrams, nutrition, ingredients, averageRating, ratingCount, commentCount, createdAt, review);
+                carbsGrams, nutrition, ingredients, averageRating, ratingCount, commentCount, createdAt, video, review);
     }
 }

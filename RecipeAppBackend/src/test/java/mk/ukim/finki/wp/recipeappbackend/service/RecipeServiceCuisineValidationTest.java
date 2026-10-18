@@ -63,7 +63,7 @@ class RecipeServiceCuisineValidationTest {
     private static RecipeCreateDto dto(List<String> cuisines) {
         return new RecipeCreateDto("Title", 2, null, null, null, null, null,
                 false, false, false, false, cuisines, null,
-                List.of(new RecipeIngredientCreateDto("salt", "1 tsp salt")));
+                List.of(new RecipeIngredientCreateDto("salt", "1 tsp salt")), null);
     }
 
     @Test

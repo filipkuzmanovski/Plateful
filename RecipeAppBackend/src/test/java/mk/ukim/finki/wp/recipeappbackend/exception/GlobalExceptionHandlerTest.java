@@ -85,6 +85,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void invalidVideoMapsTo400WithVideoFieldError() {
+        ProblemDetail problem = handler.handleInvalidVideo(
+                new mk.ukim.finki.wp.recipeappbackend.photo.InvalidVideoException("Videos can be up to 60 seconds long."));
+
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getDetail()).isEqualTo("Validation failed");
+        assertThat(problem.getProperties())
+                .containsEntry("errors", Map.of("video", "Videos can be up to 60 seconds long."));
+    }
+
+    @Test
     void hiddenPendingMapsTo404UnderReviewWithApprovedTitle() {
         ProblemDetail problem = handler.handleRecipeHidden(
                 new RecipeHiddenException(UUID.randomUUID(), "Old Title", RecipeStatus.PENDING));

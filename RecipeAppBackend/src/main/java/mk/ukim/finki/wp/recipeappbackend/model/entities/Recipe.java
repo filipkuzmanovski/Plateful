@@ -166,6 +166,19 @@ public class Recipe {
     @Column(name = "revision", nullable = false)
     private int revision;
 
+    // Recipe video (V7). All three are set together or all null (recipes_video_all_or_none).
+    @Column(name = "video_path", columnDefinition = "text")
+    private String videoPath;
+
+    @Column(name = "video_poster_path", columnDefinition = "text")
+    private String videoPosterPath;
+
+    // The column is SMALLINT (1-60). Without the JDBC type hint, ddl-auto=validate expects INTEGER for
+    // an Integer field and fails at startup.
+    @JdbcTypeCode(SqlTypes.SMALLINT)
+    @Column(name = "video_duration_seconds")
+    private Integer videoDurationSeconds;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

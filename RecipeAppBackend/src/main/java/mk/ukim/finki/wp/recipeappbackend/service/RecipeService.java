@@ -318,7 +318,8 @@ public class RecipeService {
                 photoUrls(recipe, photos),
                 ratingRepository.findAverageRatingByRecipeId(recipe.getId()),
                 ratingRepository.countByRecipeId(recipe.getId()),
-                commentRepository.countByRecipeId(recipe.getId())
+                commentRepository.countByRecipeId(recipe.getId()),
+                null // video: wired in the service in the next task
         );
     }
 
@@ -403,7 +404,8 @@ public class RecipeService {
                     // absent from GROUP BY result = zero ratings/comments
                     summary != null ? summary.averageRating() : null,
                     summary != null ? summary.ratingCount() : 0L,
-                    commentCounts.getOrDefault(recipe.getId(), 0L)
+                    commentCounts.getOrDefault(recipe.getId(), 0L),
+                    null // video: wired in the service in the next task
             );
             return withReview ? dto.withReview(RecipeReviewDto.of(recipe)) : dto;
         });
