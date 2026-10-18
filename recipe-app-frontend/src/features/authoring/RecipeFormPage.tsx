@@ -100,7 +100,7 @@ export default function RecipeFormPage() {
   const { id } = useParams<{ id: string }>(); // present in edit mode only
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const hydratedFor = useRef<string | null>(null); // recipe id the form was last filled from
   const initialPaths = useRef<string[]>([]); // bucket photos the recipe had when the form was filled
   const [photosBusy, setPhotosBusy] = useState(false);
@@ -148,6 +148,9 @@ export default function RecipeFormPage() {
       // Files the user took off the recipe go only once the update has succeeded; best-effort.
       const removed = id ? initialPaths.current.filter((p) => !values.photos.includes(p)) : [];
       if (removed.length > 0) void deletePhotos(removed);
+      // A save can change how many of the author's recipes are rejected; keep the profile tab label current.
+      void refreshProfile();
+      if (!id && !profile?.isAdmin) toast.success("Submitted for review. We'll email you when it's approved.");
       navigate(`/recipes/${saved.id}`);
     } catch (e) {
       if (e instanceof ApiError && e.errors) {
@@ -174,6 +177,10 @@ export default function RecipeFormPage() {
   if (id && existing.data && existing.data.user?.id !== profile?.id) {
     return <EmptyState icon={LockKeyhole}>You can only edit your own recipes.</EmptyState>;
   }
+
+  // Non-admins' edits to a decided recipe go back to the queue; a pending one is already there.
+  const reviewStatus = existing.data?.review?.status;
+  const needsReviewNotice = !!id && !profile?.isAdmin && (reviewStatus === 'approved' || reviewStatus === 'rejected');
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-3xl">
@@ -336,6 +343,12 @@ export default function RecipeFormPage() {
       </div>
 
       {/* Save stays within reach on long forms. */}
+      {needsReviewNotice && (
+        <p className="mt-6 rounded-2xl border border-saffron/40 bg-saffron/15 px-4 py-3 text-sm font-medium text-saffron-deep">
+          Saving changes sends this recipe back for review. It will be hidden from others until it's approved.
+        </p>
+      )}
+
       <div className="sticky bottom-4 z-10 mt-8 flex items-center justify-end gap-3">
         {photosBusy && <p className="rounded-full bg-paper/90 px-3 py-1.5 text-xs text-olive/70 ring-1 ring-sand">Waiting for photos to finish uploading</p>}
         <div className="rounded-full bg-paper/90 p-1.5 shadow-lift ring-1 ring-sand backdrop-blur-md">

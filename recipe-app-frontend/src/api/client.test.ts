@@ -55,6 +55,23 @@ test('throws typed ApiError from a ProblemDetail body', async () => {
   }
 });
 
+test('ApiError carries code and approvedTitle from a hidden-recipe 404', async () => {
+  server.use(
+    http.get(`${BASE}/api/ping`, () =>
+      HttpResponse.json(
+        { status: 404, detail: 'Under review', code: 'under_review', approvedTitle: 'Old Pie' },
+        { status: 404 },
+      ),
+    ),
+  );
+  const err = await api('/api/ping').catch((e) => e as unknown);
+  expect(err).toBeInstanceOf(ApiError);
+  if (err instanceof ApiError) {
+    expect(err.code).toBe('under_review');
+    expect(err.approvedTitle).toBe('Old Pie');
+  }
+});
+
 test('browseRecipes serializes only the set filters and pagination', async () => {
   let url = '';
   server.use(

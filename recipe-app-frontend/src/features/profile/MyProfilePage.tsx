@@ -99,6 +99,7 @@ export default function MyProfilePage() {
           </>
         }
         saved={<SavedRecipesPanel />}
+        needsAttention={profile.rejectedCount}
       />
     </div>
   );

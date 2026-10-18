@@ -16,7 +16,16 @@ const panelId = (key: TabKey) => `profile-panel-${key}`;
  * (`?tab=saved`; anything else is "My recipes"). Arrow keys move focus and select (automatic activation).
  * Only the selected panel's content is rendered, so the Saved list is not fetched until it is opened.
  */
-export function ProfileTabs({ mine, saved }: { mine: ReactNode; saved: ReactNode }) {
+export function ProfileTabs({
+  mine,
+  saved,
+  needsAttention = 0,
+}: {
+  mine: ReactNode;
+  saved: ReactNode;
+  /** Rejected recipes the author should look at; shown in the "My recipes" label when above 0. */
+  needsAttention?: number;
+}) {
   const [params, setParams] = useSearchParams();
   const selected: TabKey = params.get('tab') === 'saved' ? 'saved' : 'mine';
   const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ mine: null, saved: null });
@@ -73,7 +82,7 @@ export function ProfileTabs({ mine, saved }: { mine: ReactNode; saved: ReactNode
                   active ? 'bg-olive text-cream shadow-button' : 'text-olive hover:bg-sand/60'
                 }`}
               >
-                {label}
+                {key === 'mine' && needsAttention > 0 ? `${label} · ${needsAttention} needs attention` : label}
               </button>
             );
           })}

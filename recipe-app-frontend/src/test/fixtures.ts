@@ -1,6 +1,8 @@
-import type { CommentDisplay, Page, RecipeDisplay, UserDisplay } from '@/lib/types';
+import type { CommentDisplay, MyProfile, Page, RecipeDisplay } from '@/lib/types';
 
-export const profileFixture: UserDisplay = { id: 'u-1', firstName: 'Jane', lastName: 'Doe' };
+export const profileFixture: MyProfile = {
+  id: 'u-1', firstName: 'Jane', lastName: 'Doe', isAdmin: false, rejectedCount: 0,
+};
 
 export function recipeFixture(overrides: Partial<RecipeDisplay> = {}): RecipeDisplay {
   return {
@@ -18,7 +20,7 @@ export function recipeFixture(overrides: Partial<RecipeDisplay> = {}): RecipeDis
       { ingredientName: 'pork chops', originalText: '2 boneless pork chops' },
     ],
     averageRating: 4.6, ratingCount: 28, commentCount: 2, createdAt: '2026-07-14T00:00:00Z',
-    photos: [],
+    photos: [], review: null,
     ...overrides,
   };
 }

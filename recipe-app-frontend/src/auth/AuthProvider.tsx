@@ -4,23 +4,25 @@ import { supabase } from './supabaseClient';
 import { getMe } from '@/api/users';
 import { ApiError, setMfaRequiredHandler } from '@/api/client';
 import { aalOf } from './aal';
-import type { UserDisplay } from '@/lib/types';
+import type { MyProfile } from '@/lib/types';
 
 type Status = 'loading' | 'anonymous' | 'needs-profile' | 'needs-mfa' | 'ready';
 
 interface AuthState {
   session: Session | null;
-  profile: UserDisplay | null;
+  profile: MyProfile | null;
   status: Status;
   signOut: () => Promise<void>;
-  setProfile: (p: UserDisplay) => void;
+  setProfile: (p: MyProfile) => void;
+  /** Re-reads /api/users/me, e.g. after a recipe save changed the rejected count. Never throws. */
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfileState] = useState<UserDisplay | null>(null);
+  const [profile, setProfileState] = useState<MyProfile | null>(null);
   const [status, setStatus] = useState<Status>('loading');
 
   useEffect(() => {
@@ -125,6 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     status,
     signOut: async () => { await supabase.auth.signOut(); },
     setProfile: (p) => { setProfileState(p); setStatus('ready'); },
+    refreshProfile: async () => {
+      try {
+        setProfileState(await getMe());
+      } catch {
+        // Keep the profile we have; the next load corrects the count.
+      }
+    },
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

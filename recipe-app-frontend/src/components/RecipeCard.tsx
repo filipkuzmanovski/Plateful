@@ -4,6 +4,7 @@ import type { RecipeDisplay } from '@/lib/types';
 import { StarDisplay } from './StarDisplay';
 import { Pill } from './ui';
 import { BookmarkButton } from '@/features/saved/BookmarkButton';
+import { StatusBadge } from '@/features/review/StatusBadge';
 
 export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
   return (
@@ -40,6 +41,9 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
               </span>
             )}
           </div>
+          {recipe.review && recipe.review.status !== 'approved' && (
+            <div><StatusBadge status={recipe.review.status} /></div>
+          )}
           {recipe.cuisines.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {recipe.cuisines.map((c) => (

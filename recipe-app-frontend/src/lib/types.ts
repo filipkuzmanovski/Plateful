@@ -1,6 +1,14 @@
 export interface UserDisplay { id: string; firstName: string; lastName: string; }
+/** The signed-in user's own profile: the public fields plus what only they (and the review flow) need. */
+export interface MyProfile extends UserDisplay { isAdmin: boolean; rejectedCount: number; }
 export interface IngredientDisplay { ingredientName: string; originalText: string; }
 export interface InstructionStep { number: number; step: string; ingredients: string[]; equipment: string[]; }
+
+export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+export interface RecipeReview {
+  status: ReviewStatus; rejectionReason: string | null; everApproved: boolean;
+  revision: number; submittedAt: string;
+}
 
 export interface RecipeDisplay {
   id: string; source: string; user: UserDisplay | null; title: string;
@@ -14,6 +22,8 @@ export interface RecipeDisplay {
   ingredients: IngredientDisplay[]; averageRating: number | null;
   ratingCount: number; commentCount: number; createdAt: string | null;
   photos: string[];
+  /** Null for anyone but the author or an admin. */
+  review?: RecipeReview | null;
 }
 
 export interface CommentDisplay { id: string; user: UserDisplay; body: string; likeCount: number; dislikeCount: number; createdAt: string | null; }

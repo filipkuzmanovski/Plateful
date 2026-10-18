@@ -44,7 +44,7 @@ test('my profile edits names via PUT', async () => {
     http.get(`${BASE}/api/users/u-1/recipes`, () => HttpResponse.json(pageOf([]))),
     http.put(`${BASE}/api/users/me`, async ({ request }) => {
       putBody = await request.json();
-      return HttpResponse.json({ id: 'u-1', firstName: 'Janet', lastName: 'Doe' });
+      return HttpResponse.json({ ...profileFixture, firstName: 'Janet' });
     }),
   );
   renderApp('/me');

@@ -27,6 +27,7 @@ import { RatingBox } from './RatingBox';
 import { CommentsSection } from './CommentsSection';
 import { PhotoCollage } from './PhotoCollage';
 import { SaveRecipeButton } from '@/features/saved/SaveRecipeButton';
+import { ReviewStatusBanner } from '@/features/review/ReviewStatusBanner';
 
 /** One time/servings fact in the photo card: a terracotta icon, a value and a small label. */
 function Fact({ icon: Icon, value, label }: { icon: LucideIcon; value: ReactNode; label: string }) {
@@ -63,7 +64,7 @@ function DietBadges({ recipe }: { recipe: RecipeDisplay }) {
 export default function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const query = useQuery({ queryKey: ['recipe', id], queryFn: () => getRecipe(id!), retry: false });
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -80,6 +81,7 @@ export default function RecipeDetailPage() {
       // A saved copy of the recipe is gone too (ON DELETE CASCADE): drop it from the Saved tab and the id set.
       void queryClient.invalidateQueries({ queryKey: ['savedRecipes'] });
       void queryClient.invalidateQueries({ queryKey: ['savedIds'] });
+      void refreshProfile(); // deleting a rejected recipe lowers the needs-attention count
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.detail : "Couldn't delete the recipe"),
   });
@@ -102,6 +104,8 @@ export default function RecipeDetailPage() {
   }
   const recipe = query.data;
   const isOwner = !!profile && recipe.user?.id === profile.id;
+  // Only an approved recipe is open to feedback; the API refuses writes on the others (409 recipe_not_approved).
+  const acceptsFeedback = !recipe.review || recipe.review.status === 'approved';
   const hasFacts = recipe.readyInMinutes !== null || recipe.cookingMinutes !== null || recipe.servings !== null;
 
   return (
@@ -133,15 +137,18 @@ export default function RecipeDetailPage() {
                 <Pill className="py-1 tabular-nums">{recipe.carbsGrams ?? '–'}g carbs</Pill>
               </div>
             )}
-            <div className="border-t border-sand pt-5">
-              <RatingBox recipeId={recipe.id} />
-            </div>
+            {acceptsFeedback && (
+              <div className="border-t border-sand pt-5">
+                <RatingBox recipeId={recipe.id} />
+              </div>
+            )}
           </div>
         </div>
       </aside>
 
       {/* Right: content */}
       <article className="min-w-0">
+        {isOwner && recipe.review && <ReviewStatusBanner review={recipe.review} recipeId={recipe.id} />}
         {recipe.cuisines.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {recipe.cuisines.map((c) => (
@@ -249,12 +256,16 @@ export default function RecipeDetailPage() {
           <p className="text-sm text-olive/70 italic">No instructions provided.</p>
         )}
 
-        <SectionHeading>
-          Comments <span className="font-sans text-base font-medium text-olive/70 tabular-nums">({recipe.commentCount})</span>
-        </SectionHeading>
-        <section aria-label="comments">
-          <CommentsSection recipeId={recipe.id} recipeOwnerId={recipe.user?.id ?? null} />
-        </section>
+        {acceptsFeedback && (
+          <>
+            <SectionHeading>
+              Comments <span className="font-sans text-base font-medium text-olive/70 tabular-nums">({recipe.commentCount})</span>
+            </SectionHeading>
+            <section aria-label="comments">
+              <CommentsSection recipeId={recipe.id} recipeOwnerId={recipe.user?.id ?? null} />
+            </section>
+          </>
+        )}
       </article>
     </div>
   );
