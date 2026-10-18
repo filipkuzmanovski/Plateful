@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from './supabaseClient';
 import { getMe } from '@/api/users';
 import { ApiError, setMfaRequiredHandler } from '@/api/client';
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfileState] = useState<MyProfile | null>(null);
   const [status, setStatus] = useState<Status>('loading');
+  const queryClient = useQueryClient();
   // Latest signed-in user id and status, readable from async callbacks that must not act on stale state.
   const liveUserId = useRef<string | null>(null);
   const liveStatus = useRef<Status>('loading');
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     let lastUserKey: string | null | undefined; // undefined = nothing resolved yet
+    let lastUserId: string | null | undefined; // the user id alone (no aal), to spot sign-out and user switches
     let latest = 0; // id of the newest resolution; results from older ones are dropped
     let readyUserId: string | null = null; // user whose profile is loaded; same-user re-resolves stay 'ready'
 
@@ -41,6 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const key = s ? `${s.user.id}:${aalOf(s) ?? 'none'}` : null;
       if (key === lastUserKey) return; // dedupes INITIAL_SESSION/getSession double-fire and token refreshes
       lastUserKey = key;
+      // Cached responses depend on who is viewing (an author's pending recipes, the review block), and
+      // their query keys do not include the viewer. Drop them all when the user changes, never on a
+      // token refresh or an aal upgrade (same id) and not for the very first resolution.
+      const userId = s?.user.id ?? null;
+      if (lastUserId !== undefined && lastUserId !== userId) queryClient.removeQueries();
+      lastUserId = userId;
       const run = ++latest;
       const isCurrent = () => !cancelled && run === latest;
 
@@ -124,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMfaRequiredHandler(null);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   const refreshProfile = useCallback(async () => {
     const userId = liveUserId.current;

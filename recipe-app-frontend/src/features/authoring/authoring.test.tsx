@@ -10,6 +10,12 @@ import { prepareImage } from '@/lib/resizeImage';
 
 const BASE = 'http://localhost:8080';
 
+/** The review block the backend attaches to an author's create/edit response (a non-admin's save is pending). */
+const PENDING = {
+  status: 'pending' as const, rejectionReason: null, everApproved: false, revision: 1,
+  submittedAt: '2026-10-18T10:00:00Z',
+};
+
 // Storage is never reached: uploads and deletes are mocked, the URL helpers stay real.
 vi.mock('@/api/photos', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/photos')>()),
@@ -52,7 +58,7 @@ function stubMe() {
 test('create: fills the form, adds an ingredient row, POSTs, navigates to the new recipe', async () => {
   stubMe();
   let posted: any = null;
-  const created = recipeFixture({ id: 'r-new', title: 'My Pie', user: profileFixture });
+  const created = recipeFixture({ id: 'r-new', title: 'My Pie', user: profileFixture, review: PENDING });
   server.use(
     http.post(`${BASE}/api/recipes`, async ({ request }) => {
       posted = await request.json();
@@ -140,7 +146,7 @@ test('edit: pre-fills, PUTs, and the detail page shows the updated recipe (cache
     http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json(current)),
     http.put(`${BASE}/api/recipes/r-1`, async ({ request }) => {
       putBody = await request.json();
-      current = { ...current, title: putBody.title };
+      current = { ...current, title: putBody.title, review: PENDING };
       return HttpResponse.json(current);
     }),
     http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
@@ -167,7 +173,7 @@ test('saving an edit marks the saved list stale, so its card shows the new title
     http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json(recipeFixture({ title: 'Old Pie', user: profileFixture }))),
     http.put(`${BASE}/api/recipes/r-1`, async ({ request }) => {
       const body: any = await request.json();
-      return HttpResponse.json(recipeFixture({ title: body.title, user: profileFixture }));
+      return HttpResponse.json(recipeFixture({ title: body.title, user: profileFixture, review: PENDING }));
     }),
     http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
     http.get(`${BASE}/api/recipes/r-1/ratings/me`, () =>
@@ -236,7 +242,7 @@ async function fillRequired() {
 test('pickerSearchesAndAddsCuisine: typing filters by label and the chosen key is POSTed', async () => {
   stubMe();
   let posted: any = null;
-  const created = recipeFixture({ id: 'r-new', title: 'X', user: profileFixture });
+  const created = recipeFixture({ id: 'r-new', title: 'X', user: profileFixture, review: PENDING });
   server.use(
     http.post(`${BASE}/api/recipes`, async ({ request }) => {
       posted = await request.json();
@@ -394,7 +400,7 @@ test('createBodyCarriesPhotosNotSourceFields: an uploaded photo is POSTed in pho
   stubMe();
   vi.mocked(uploadPhoto).mockResolvedValue('u-1/new.webp');
   let posted: any = null;
-  const created = recipeFixture({ id: 'r-new', title: 'X', user: profileFixture });
+  const created = recipeFixture({ id: 'r-new', title: 'X', user: profileFixture, review: PENDING });
   server.use(
     http.post(`${BASE}/api/recipes`, async ({ request }) => {
       posted = await request.json();
@@ -433,7 +439,7 @@ function stubEditWithPhotos() {
     http.put(`${BASE}/api/recipes/r-1`, async ({ request }) => {
       state.putBody = await request.json();
       log.push('put');
-      current = { ...current, photos: (state.putBody.photos as string[]).map(publicPhotoUrl) };
+      current = { ...current, photos: (state.putBody.photos as string[]).map(publicPhotoUrl), review: PENDING };
       return HttpResponse.json(current);
     }),
     http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),

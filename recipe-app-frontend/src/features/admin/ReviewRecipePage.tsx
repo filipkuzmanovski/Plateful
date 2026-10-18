@@ -47,7 +47,9 @@ function ReviewRecipeView({ id }: { id: string }) {
     retry: false,
     // The revision the admin read is what a decision sends. Only Reload (or a 409) may change it, never a focus or
     // reconnect refetch: that would swap in the author's newer edit and defeat the recipe_changed guard.
+    // gcTime 0: leaving the page drops it, so reopening within the usual 5 minutes cannot show a stale revision.
     staleTime: Infinity,
+    gcTime: 0,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

@@ -77,6 +77,9 @@ describe('saved stub cards', () => {
 
     const goneCard = screen.getByRole('heading', { name: 'Gone Gratin' }).closest('a') as HTMLElement;
     expect(within(goneCard).getByText('Unavailable')).toBeInTheDocument();
+    // Small text on sand needs full-strength olive to reach 4.5:1.
+    expect(within(goneCard).getByText('Unavailable')).toHaveClass('text-olive');
+    expect(within(goneCard).getByText('Unavailable')).not.toHaveClass('text-olive/70');
     expect(goneCard).toHaveAttribute('href', '/recipes/h-2');
     expect(goneCard.querySelector('img')).toBeNull();
 
@@ -141,7 +144,20 @@ describe('hidden recipe pages', () => {
     await waitFor(() => expect(saved).toBeEnabled());
     await userEvent.click(saved);
     await waitFor(() => expect(state.deletes).toEqual(['h-1']));
-    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument();
+    // Nothing left to unsave, and a Save would be refused while the recipe is hidden.
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Save/ })).not.toBeInTheDocument());
+  });
+
+  test('hiddenPageHasNoSaveButtonWhenNotSaved', async () => {
+    signedIn();
+    fakeSavedStubs([]);
+    hidden('h-1', 'under_review');
+    renderApp('/recipes/h-1');
+
+    expect(await screen.findByRole('heading', { name: 'Grandma Goulash' })).toBeInTheDocument();
+    // Give a wrongly rendered button time to appear once the saved ids have loaded.
+    await new Promise((r) => setTimeout(r, 150));
+    expect(screen.queryByRole('button', { name: /^Save/ })).not.toBeInTheDocument();
   });
 
   test('signedOutVisitorSeesUnderReviewPage', async () => {
@@ -150,7 +166,8 @@ describe('hidden recipe pages', () => {
 
     expect(await screen.findByRole('heading', { name: 'Grandma Goulash' })).toBeInTheDocument();
     expect(screen.getByText(UNDER_REVIEW_COPY)).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 150));
+    expect(screen.queryByRole('button', { name: /^Save/ })).not.toBeInTheDocument();
     expectNoEmoji();
   });
 

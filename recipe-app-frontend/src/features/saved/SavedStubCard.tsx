@@ -5,7 +5,7 @@ import { BookmarkButton } from './BookmarkButton';
 
 const BADGES: Record<HiddenState, { label: string; className: string }> = {
   under_review: { label: 'Under review', className: 'bg-saffron/15 text-saffron-deep' },
-  unavailable: { label: 'Unavailable', className: 'bg-sand text-olive/70' },
+  unavailable: { label: 'Unavailable', className: 'bg-sand text-olive' },
 };
 
 /**

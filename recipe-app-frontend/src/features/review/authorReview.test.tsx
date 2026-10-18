@@ -53,25 +53,55 @@ function serveRecipe(recipe: RecipeDisplay) {
   );
 }
 
+/** What the backend returns to the author right after create: the recipe with its review block. */
+function createdBy(profile: MyProfile) {
+  return recipeFixture({
+    id: 'r-new', title: 'My Pie', user: profile,
+    review: profile.isAdmin
+      ? review({ status: 'approved', everApproved: true })
+      : review({ status: 'pending' }),
+  });
+}
+
 async function createRecipeAs(profile: MyProfile) {
   signedInAs(profile);
-  const created = recipeFixture({ id: 'r-new', title: 'My Pie', user: profile });
+  const created = createdBy(profile);
+  const detailGets = { count: 0 };
   server.use(
     http.get(`${BASE}/api/recipes/cuisines`, () => HttpResponse.json([])),
     http.post(`${BASE}/api/recipes`, () => HttpResponse.json(created, { status: 201 })),
   );
   serveRecipe(created);
+  server.use(
+    http.get(`${BASE}/api/recipes/r-new`, () => {
+      detailGets.count++;
+      return HttpResponse.json(created);
+    }),
+  );
   renderApp('/recipes/new');
   await userEvent.type(await screen.findByLabelText(/title/i), 'My Pie');
   await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'apples');
   await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), '3 tart apples');
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
   expect(await screen.findByRole('heading', { name: /my pie/i })).toBeInTheDocument();
+  return detailGets;
 }
 
 test('createShowsSubmittedToast', async () => {
   await createRecipeAs(profileFixture);
   expect(await screen.findByText(SUBMITTED_TOAST)).toBeInTheDocument();
+  expectNoEmoji();
+});
+
+test('createShowsPendingBannerImmediately', async () => {
+  const detailGets = await createRecipeAs(profileFixture);
+
+  expect(screen.getByText('Waiting for review. Only you can see this recipe.')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: /comments/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: /^comments/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /rate \d stars/i })).not.toBeInTheDocument();
+  // The page comes from the create response alone; it needs no extra GET to know it is pending.
+  expect(detailGets.count).toBe(0);
   expectNoEmoji();
 });
 

@@ -51,9 +51,9 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-async function renderSignedInAs(id: string) {
+async function renderSignedInAs(id: string, client = new QueryClient()) {
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <AuthProvider><Probe /></AuthProvider>
     </QueryClientProvider>,
   );
@@ -103,4 +103,46 @@ test('refreshProfileIgnoredAfterUserSwitch', async () => {
   await act(async () => { held.resolve({ ...profileFixture, firstName: 'Stale' }); });
   await new Promise((r) => setTimeout(r, 50));
   expect(screen.getByTestId('name')).toHaveTextContent('Bob');
+});
+
+// Viewer-dependent responses (an author's pending recipes) are cached under keys without the viewer.
+const PENDING_KEY = ['userRecipes', 'u-1', 0];
+
+test('signing out drops every cached query', async () => {
+  const client = new QueryClient();
+  queueMe([profileFixture]);
+  await renderSignedInAs('u-1', client);
+  client.setQueryData(PENDING_KEY, { content: [{ id: 'r-pending' }] });
+  client.setQueryData(['recipe', 'r-pending'], { id: 'r-pending' });
+
+  await act(async () => { mocks.fire!('SIGNED_OUT', null); });
+  await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('anonymous'));
+
+  expect(client.getQueryData(PENDING_KEY)).toBeUndefined();
+  expect(client.getQueryData(['recipe', 'r-pending'])).toBeUndefined();
+});
+
+test('switching to another user drops the cache', async () => {
+  const client = new QueryClient();
+  queueMe([profileFixture, { ...profileFixture, id: 'u-2', firstName: 'Bob' }]);
+  await renderSignedInAs('u-1', client);
+  client.setQueryData(PENDING_KEY, { content: [{ id: 'r-pending' }] });
+
+  await act(async () => { mocks.fire!('SIGNED_IN', sessionFor('u-2')); });
+  await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Bob'));
+
+  expect(client.getQueryData(PENDING_KEY)).toBeUndefined();
+});
+
+test('a token refresh for the same user keeps the cache', async () => {
+  const client = new QueryClient();
+  queueMe([profileFixture]);
+  await renderSignedInAs('u-1', client);
+  client.setQueryData(PENDING_KEY, { content: [{ id: 'r-pending' }] });
+
+  await act(async () => { mocks.fire!('TOKEN_REFRESHED', sessionFor('u-1')); });
+  await new Promise((r) => setTimeout(r, 50));
+
+  expect(screen.getByTestId('status')).toHaveTextContent('ready');
+  expect(client.getQueryData(PENDING_KEY)).toEqual({ content: [{ id: 'r-pending' }] });
 });

@@ -487,3 +487,25 @@ test('reviewPageLinksBackToTheQueue', async () => {
   await openReview(pending('r-1', 'Lemon Tart'));
   expect(screen.getByRole('link', { name: 'Back to the queue' })).toHaveAttribute('href', '/admin/review');
 });
+
+test('reopeningARecipeShowsTheLatestRevision', async () => {
+  await openReview(pending('r-1', 'Lemon Tart'));
+
+  // The author edits while the admin is back on the queue.
+  const edited = pending('r-1', 'Lemon Tart, edited', { revision: 5 });
+  serveAdmin({ queue: [edited], recipes: [edited] });
+  let body: unknown;
+  server.use(
+    http.post(`${BASE}/api/admin/recipes/r-1/approve`, async ({ request }) => {
+      body = await request.json();
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  await userEvent.click(screen.getByRole('link', { name: 'Back to the queue' }));
+  await userEvent.click(await screen.findByRole('link', { name: /lemon tart, edited/i }));
+
+  expect(await screen.findByRole('heading', { name: 'Lemon Tart, edited' })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
+  await screen.findByText('Recipe approved');
+  expect(body).toEqual({ revision: 5 });
+});
