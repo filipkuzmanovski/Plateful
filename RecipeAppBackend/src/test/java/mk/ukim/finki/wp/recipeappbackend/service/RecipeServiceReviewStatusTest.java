@@ -2,6 +2,7 @@ package mk.ukim.finki.wp.recipeappbackend.service;
 
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException;
+import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeIngredientCreateDto;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -81,8 +83,43 @@ class RecipeServiceReviewStatusTest {
     private Recipe existing(UUID recipeId, RecipeStatus status) {
         Recipe r = Recipe.builder().id(recipeId).user(owner).title("Old title")
                 .status(status).submittedAt(longAgo).revision(3).build();
-        when(recipeRepository.findById(recipeId)).thenReturn(Optional.of(r));
+        when(recipeRepository.findForReviewById(recipeId)).thenReturn(Optional.of(r));
         return r;
+    }
+
+    @Test
+    void updateLoadsWithRowLock() {
+        UUID recipeId = UUID.randomUUID();
+        existing(recipeId, RecipeStatus.PENDING);
+
+        service.update(userId, recipeId, dto("Locked edit"));
+
+        // The PESSIMISTIC_WRITE load is shared with approve/reject; a plain findById would race a review.
+        verify(recipeRepository).findForReviewById(recipeId);
+        verify(recipeRepository, never()).findById(recipeId);
+    }
+
+    @Test
+    void deleteLoadsWithRowLock() {
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = existing(recipeId, RecipeStatus.PENDING);
+
+        service.delete(userId, recipeId);
+
+        verify(recipeRepository).findForReviewById(recipeId);
+        verify(recipeRepository, never()).findById(recipeId);
+        verify(recipeRepository).delete(recipe);
+    }
+
+    @Test
+    void updateOfMissingRecipeIs404() {
+        UUID recipeId = UUID.randomUUID();
+        when(recipeRepository.findForReviewById(recipeId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.update(userId, recipeId, dto("Nope")))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.delete(userId, recipeId))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     private Recipe savedByCreate() {

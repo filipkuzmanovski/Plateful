@@ -88,7 +88,7 @@ class RecipeServiceCuisineValidationTest {
     void updateRejectsUnknown() {
         UUID recipeId = UUID.randomUUID();
         Recipe existing = Recipe.builder().id(recipeId).user(owner).title("Old").build();
-        when(recipeRepository.findById(recipeId)).thenReturn(Optional.of(existing));
+        when(recipeRepository.findForReviewById(recipeId)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.update(userId, recipeId, dto(List.of("italian", "lol"))))
                 .isInstanceOf(InvalidCuisineException.class)

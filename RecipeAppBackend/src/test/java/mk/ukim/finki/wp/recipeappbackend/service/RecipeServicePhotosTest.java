@@ -86,7 +86,7 @@ class RecipeServicePhotosTest {
 
     private Recipe existing(UUID recipeId, String image) {
         Recipe r = Recipe.builder().id(recipeId).user(owner).title("Old").image(image).build();
-        when(recipeRepository.findById(recipeId)).thenReturn(Optional.of(r));
+        when(recipeRepository.findForReviewById(recipeId)).thenReturn(Optional.of(r));
         return r;
     }
 

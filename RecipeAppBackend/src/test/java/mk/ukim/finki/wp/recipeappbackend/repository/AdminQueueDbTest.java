@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.repository;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
@@ -96,8 +97,10 @@ class AdminQueueDbTest {
         Recipe saved = recipe("locked", RecipeStatus.PENDING, EARLY);
         em.clear();
 
-        assertThat(recipeRepository.findForReviewById(saved.getId()))
-                .get().extracting(Recipe::getTitle).isEqualTo("locked");
+        Recipe found = recipeRepository.findForReviewById(saved.getId()).orElseThrow();
+
+        assertThat(found.getTitle()).isEqualTo("locked");
+        assertThat(em.getLockMode(found)).isEqualTo(LockModeType.PESSIMISTIC_WRITE);
         assertThat(recipeRepository.findForReviewById(UUID.randomUUID())).isEmpty();
     }
 }

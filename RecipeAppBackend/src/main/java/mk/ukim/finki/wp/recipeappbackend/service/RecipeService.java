@@ -192,7 +192,9 @@ public class RecipeService {
      */
     @Transactional
     public RecipeDisplayDto update(UUID userId, UUID recipeId, RecipeCreateDto dto) {
-        Recipe recipe = recipeRepository.findById(recipeId)
+        // Row lock, shared with approve/reject: an edit and a review of the same recipe serialize, so
+        // neither overwrites the other's columns (Recipe has no @Version, every column is written on flush).
+        Recipe recipe = recipeRepository.findForReviewById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
         assertOwnedBy(recipe, userId);
         // Validate before mutating anything, so a rejected edit leaves the entity untouched.
@@ -247,7 +249,8 @@ public class RecipeService {
     /** Delete own recipe. Ratings/comments/ingredients go via ON DELETE CASCADE. */
     @Transactional
     public void delete(UUID userId, UUID recipeId) {
-        Recipe recipe = recipeRepository.findById(recipeId)
+        // Same row lock as update and the review decisions.
+        Recipe recipe = recipeRepository.findForReviewById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
         assertOwnedBy(recipe, userId);
         recipeRepository.delete(recipe);
