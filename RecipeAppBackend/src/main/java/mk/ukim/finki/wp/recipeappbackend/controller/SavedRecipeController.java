@@ -1,6 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.controller;
 
-import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.SavedItemDto;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
 import mk.ukim.finki.wp.recipeappbackend.service.SavedRecipeService;
 import org.springframework.data.domain.Page;
@@ -42,7 +42,7 @@ public class SavedRecipeController {
 
     /** Size is capped by spring.data.web.pageable.max-page-size. */
     @GetMapping
-    public Page<RecipeDisplayDto> list(@CurrentUserId UUID userId, Pageable pageable) {
+    public Page<SavedItemDto> list(@CurrentUserId UUID userId, Pageable pageable) {
         return savedRecipeService.list(userId, pageable);
     }
 

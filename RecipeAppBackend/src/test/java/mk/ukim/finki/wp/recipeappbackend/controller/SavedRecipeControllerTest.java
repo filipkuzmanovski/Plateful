@@ -3,6 +3,8 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.SavedItemDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.SavedRecipeStubDto;
 import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import mk.ukim.finki.wp.recipeappbackend.service.SavedRecipeService;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -31,6 +35,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -91,16 +96,42 @@ class SavedRecipeControllerTest {
     }
 
     @Test
-    void getListReturnsPageOfRecipes() throws Exception {
+    void getListReturnsPageOfRecipeItems() throws Exception {
         RecipeDisplayDto dto = mock(RecipeDisplayDto.class);
         when(dto.id()).thenReturn(RECIPE_ID);
         Pageable pageable = PageRequest.of(0, 12);
         when(savedRecipeService.list(any(), any()))
-                .thenReturn(new PageImpl<>(List.of(dto), pageable, 1));
+                .thenReturn(new PageImpl<>(List.of(SavedItemDto.ofRecipe(dto)), pageable, 1));
 
         mockMvc.perform(get("/api/users/me/saved").with(authedAs(USER_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id").value(RECIPE_ID.toString()));
+                .andExpect(jsonPath("$.content[0].kind").value("recipe"))
+                .andExpect(jsonPath("$.content[0].recipe.id").value(RECIPE_ID.toString()))
+                .andExpect(jsonPath("$.content[0].stub").value(nullValue()));
+    }
+
+    @Test
+    void listJsonShape() throws Exception {
+        RecipeDisplayDto dto = mock(RecipeDisplayDto.class);
+        when(dto.id()).thenReturn(RECIPE_ID);
+        Pageable pageable = PageRequest.of(0, 12);
+        when(savedRecipeService.list(any(), any())).thenReturn(new PageImpl<>(List.of(
+                SavedItemDto.ofStub(new SavedRecipeStubDto(OTHER_ID, "Approved title", "under_review")),
+                SavedItemDto.ofRecipe(dto)), pageable, 2));
+
+        mockMvc.perform(get("/api/users/me/saved").with(authedAs(USER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].kind").value("stub"))
+                .andExpect(jsonPath("$.content[0].recipe").value(nullValue()))
+                .andExpect(jsonPath("$.content[0].stub.id").value(OTHER_ID.toString()))
+                .andExpect(jsonPath("$.content[0].stub.approvedTitle").value("Approved title"))
+                .andExpect(jsonPath("$.content[0].stub.state").value("under_review"))
+                .andExpect(jsonPath("$.content[1].kind").value("recipe"))
+                .andExpect(jsonPath("$.content[1].recipe.id").value(RECIPE_ID.toString()))
+                .andExpect(jsonPath("$.content[1].stub").value(nullValue()))
+                // The frontend relies on the unused side being an explicit null, not a missing key.
+                .andExpect(content().string(containsString("\"recipe\":null")))
+                .andExpect(content().string(containsString("\"stub\":null")));
     }
 
     @Test
