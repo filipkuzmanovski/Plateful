@@ -1,10 +1,12 @@
 package mk.ukim.finki.wp.recipeappbackend.security;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
+import mk.ukim.finki.wp.recipeappbackend.controller.AdminReviewController;
 import mk.ukim.finki.wp.recipeappbackend.controller.RecipeController;
 import mk.ukim.finki.wp.recipeappbackend.controller.SavedRecipeController;
 import mk.ukim.finki.wp.recipeappbackend.controller.UserController;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.MyProfileDto;
+import mk.ukim.finki.wp.recipeappbackend.service.AdminReviewService;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import mk.ukim.finki.wp.recipeappbackend.service.SavedRecipeService;
 import mk.ukim.finki.wp.recipeappbackend.service.UserService;
@@ -38,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({UserController.class, RecipeController.class, SavedRecipeController.class})
+@WebMvcTest({UserController.class, RecipeController.class, SavedRecipeController.class, AdminReviewController.class})
 @Import(SecurityConfig.class)
 class MfaEnforcementFilterTest {
 
@@ -53,6 +55,10 @@ class MfaEnforcementFilterTest {
     RecipeService recipeService;
     @MockitoBean
     SavedRecipeService savedRecipeService;
+    @MockitoBean
+    AdminReviewService adminReviewService;
+    @MockitoBean
+    AdminGuard adminGuard;
     @MockitoBean
     JwtDecoder jwtDecoder;
     @MockitoBean
@@ -226,6 +232,37 @@ class MfaEnforcementFilterTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void adminGetAal1WithFactorIs401() throws Exception {
+        assertGetIsRefused("/api/admin/recipes/pending");
+    }
+
+    @Test
+    void adminGetAal2Passes() throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+        when(adminReviewService.pending(any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/admin/recipes/pending").with(token("aal2")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void encodedAdminSegmentIs401() throws Exception {
+        assertEncodedMeIsRefused("/api/%61dmin/recipes/pending");
+    }
+
+    /** Whole-segment comparison: "administrator-picks" is not "admin", so the filter never asks about a factor. */
+    @Test
+    void lookalikeSegmentNotGuarded() throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+
+        int status = mockMvc.perform(get("/api/recipes/administrator-picks").with(token("aal1")))
+                .andReturn().getResponse().getStatus();
+
+        assertThat(status).isNotEqualTo(401).isNotEqualTo(503);
+        verifyNoInteractions(mfaFactorLookup);
+    }
+
     private void assertGetIsRefused(String path) throws Exception {
         when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
 
@@ -233,7 +270,7 @@ class MfaEnforcementFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("mfa_required"));
 
-        verifyNoInteractions(userService, recipeService, savedRecipeService);
+        verifyNoInteractions(userService, recipeService, savedRecipeService, adminReviewService, adminGuard);
     }
 
     private void assertEncodedMeIsRefused(String encodedPath) throws Exception {
@@ -243,7 +280,7 @@ class MfaEnforcementFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("mfa_required"));
 
-        verifyNoInteractions(userService, recipeService, savedRecipeService);
+        verifyNoInteractions(userService, recipeService, savedRecipeService, adminReviewService, adminGuard);
     }
 
     /**

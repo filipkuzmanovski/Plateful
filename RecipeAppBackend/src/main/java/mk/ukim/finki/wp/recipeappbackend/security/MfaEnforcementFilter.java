@@ -19,6 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -28,7 +29,7 @@ import java.util.UUID;
  * only the password could still call the API.
  *
  * The rule: for an authenticated request that is a mutation (any method other than GET) or a
- * read of a path with a "me" segment, if the token is not aal2 and the user has a verified factor, answer 401 with code
+ * read of a path with a "me" or "admin" segment, if the token is not aal2 and the user has a verified factor, answer 401 with code
  * "mfa_required". Public GETs are never blocked, so browsing works for everyone.
  *
  * Fail closed: if we cannot find out whether the user has a factor (database down, or any other
@@ -95,8 +96,9 @@ public final class MfaEnforcementFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Mutations and reads of any path with a "me" segment are guarded; every other GET (public browsing)
-     * is not. Segments are compared whole, so "medium" does not match, while "/api/users/me/saved" does.
+     * Mutations and reads of any path with a "me" or "admin" segment are guarded; every other GET (public
+     * browsing) is not. Segments are compared whole, so "medium" and "administrator-picks" do not match,
+     * while "/api/users/me/saved" and "/api/admin/recipes/pending" do.
      *
      * The decision is made on the DECODED path. getRequestURI() is raw, so "/api/users/m%65" would not
      * contain a "me" segment and slip past, yet Spring routes on the decoded path and would reach the
@@ -107,7 +109,8 @@ public final class MfaEnforcementFilter extends OncePerRequestFilter {
             return true;
         }
         String path = UrlPathHelper.defaultInstance.getPathWithinApplication(request);
-        return Arrays.asList(path.split("/")).contains("me");
+        List<String> segments = Arrays.asList(path.split("/"));
+        return segments.contains("me") || segments.contains("admin");
     }
 
     private void writeProblem(HttpServletResponse response, HttpStatus status, String detail, boolean mfaRequired)

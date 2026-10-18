@@ -58,6 +58,30 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** The admin API refused the caller: 403 with code "forbidden" or "admin_mfa_setup_required". */
+    @ExceptionHandler(AdminForbiddenException.class)
+    ProblemDetail handleAdminForbidden(AdminForbiddenException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setProperty("code", ex.getCode());
+        return problem;
+    }
+
+    /** Approve/reject on a recipe that is no longer pending or has been edited since: 409 with code "not_pending" or "recipe_changed". */
+    @ExceptionHandler(ReviewConflictException.class)
+    ProblemDetail handleReviewConflict(ReviewConflictException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", ex.getCode());
+        return problem;
+    }
+
+    /** Missing, blank or over-long rejection reason -> 400 in the bean-validation shape. */
+    @ExceptionHandler(InvalidReviewReasonException.class)
+    ProblemDetail handleInvalidReviewReason(InvalidReviewReasonException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        problem.setProperty("errors", Map.of("reason", ex.getMessage()));
+        return problem;
+    }
+
     @ExceptionHandler(ForbiddenOperationException.class)
     ProblemDetail handleForbidden(ForbiddenOperationException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());

@@ -127,10 +127,19 @@ public class RecipeService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
         visibility.requireVisible(recipe, viewerId);
-        RecipeDisplayDto dto = toDisplayDto(recipe,
-                ingredientRepository.findByRecipeIdOrderBySortOrderAsc(recipeId),
-                photoRepository.findByRecipeIdOrderByPositionAsc(recipeId));
+        RecipeDisplayDto dto = toDetailDto(recipe);
         return visibility.showsReview(recipe, viewerId) ? dto.withReview(RecipeReviewDto.of(recipe)) : dto;
+    }
+
+    /**
+     * The detail page of any recipe, whatever its status, always with the review block. For the admin
+     * review API only: the caller must already have passed the admin guard.
+     */
+    @Transactional(readOnly = true)
+    public RecipeDisplayDto getWithReview(UUID recipeId) {
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
+        return toDetailDto(recipe).withReview(RecipeReviewDto.of(recipe));
     }
 
     /**
@@ -289,6 +298,13 @@ public class RecipeService {
         }
     }
 
+    /** Detail-page assembly for one recipe, without the review block. */
+    private RecipeDisplayDto toDetailDto(Recipe recipe) {
+        return toDisplayDto(recipe,
+                ingredientRepository.findByRecipeIdOrderBySortOrderAsc(recipe.getId()),
+                photoRepository.findByRecipeIdOrderByPositionAsc(recipe.getId()));
+    }
+
     /** Detail-page assembly: per-recipe aggregate queries are fine for ONE recipe. */
     private RecipeDisplayDto toDisplayDto(Recipe recipe, List<RecipeIngredient> ingredients,
                                           List<RecipePhoto> photos) {
@@ -332,6 +348,11 @@ public class RecipeService {
      */
     public Page<RecipeDisplayDto> toDisplayPage(Page<Recipe> page) {
         return toDisplayPage(page, false);
+    }
+
+    /** As above, with each recipe's review block attached. For the admin review API only. */
+    public Page<RecipeDisplayDto> toDisplayPageWithReview(Page<Recipe> page) {
+        return toDisplayPage(page, true);
     }
 
     /** As above; withReview attaches each recipe's review block (only for the author's or an admin's view). */
