@@ -30,6 +30,14 @@ export interface CommentDisplay { id: string; user: UserDisplay; body: string; l
 export interface RatingDisplay { id: string; user: UserDisplay; rating: number; createdAt: string | null; }
 export interface ReactionDisplay { user: UserDisplay; isLike: boolean; createdAt: string | null; }
 
+/** Why a saved recipe the reader can no longer open is hidden. */
+export type HiddenState = 'under_review' | 'unavailable';
+
+/** One entry of the saved list: the recipe itself, or a stub that keeps its place while the recipe is hidden. */
+export type SavedItem =
+  | { kind: 'recipe'; recipe: RecipeDisplay; stub: null }
+  | { kind: 'stub'; recipe: null; stub: { id: string; approvedTitle: string; state: HiddenState } };
+
 export interface Page<T> { content: T[]; page: { size: number; number: number; totalElements: number; totalPages: number }; }
 
 export interface RecipeFilter {

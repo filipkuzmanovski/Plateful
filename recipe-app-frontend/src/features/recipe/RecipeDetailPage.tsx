@@ -27,6 +27,7 @@ import { RatingBox } from './RatingBox';
 import { CommentsSection } from './CommentsSection';
 import { PhotoCollage } from './PhotoCollage';
 import { SaveRecipeButton } from '@/features/saved/SaveRecipeButton';
+import { HiddenRecipePage } from './HiddenRecipePage';
 import { ReviewStatusBanner } from '@/features/review/ReviewStatusBanner';
 
 /** One time/servings fact in the photo card: a terracotta icon, a value and a small label. */
@@ -88,7 +89,12 @@ export default function RecipeDetailPage() {
 
   if (query.isPending) return <Spinner />;
   if (query.isError) {
-    const notFound = query.error instanceof ApiError && query.error.status === 404;
+    const error = query.error;
+    const notFound = error instanceof ApiError && error.status === 404;
+    // A recipe approved once but hidden now answers 404 with a code and its last approved title.
+    if (notFound && (error.code === 'under_review' || error.code === 'unavailable') && error.approvedTitle) {
+      return <HiddenRecipePage recipeId={id!} approvedTitle={error.approvedTitle} state={error.code} />;
+    }
     return (
       <EmptyState
         icon={notFound ? SearchX : CircleAlert}

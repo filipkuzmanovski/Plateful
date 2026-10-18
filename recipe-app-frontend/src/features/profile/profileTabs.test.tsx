@@ -8,7 +8,7 @@ import { AuthProvider } from '@/auth/AuthProvider';
 import AppRoutes from '@/AppRoutes';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
-import type { RecipeDisplay } from '@/lib/types';
+import type { RecipeDisplay, SavedItem } from '@/lib/types';
 
 const BASE = 'http://localhost:8080';
 
@@ -77,7 +77,9 @@ function fakeSavedServer(recipes: RecipeDisplay[]) {
       const page = Number(url.searchParams.get('page') ?? '0');
       const size = Number(url.searchParams.get('size') ?? '12');
       const all = recipes.filter((r) => state.ids.includes(r.id));
-      const content = all.slice(page * size, (page + 1) * size);
+      const content: SavedItem[] = all
+        .slice(page * size, (page + 1) * size)
+        .map((recipe) => ({ kind: 'recipe', recipe, stub: null }));
       return HttpResponse.json(
         pageOf(content, { number: page, size, totalElements: all.length, totalPages: Math.ceil(all.length / size) }),
       );
@@ -287,7 +289,9 @@ describe('profile tabs', () => {
     // Account A's saved page is still in the shared cache (same tab, no cache clear on sign-out).
     // Account B signs in: it must never see A's private list, only its own.
     const queryClient = newQueryClient();
-    const aList = pageOf([recipeFixture({ id: 'a-1', title: 'Account A Secret Stew' })]);
+    const aList = pageOf<SavedItem>([
+      { kind: 'recipe', recipe: recipeFixture({ id: 'a-1', title: 'Account A Secret Stew' }), stub: null },
+    ]);
     queryClient.setQueryData(['savedRecipes', 'u-1', 0], aList);
     queryClient.setQueryData(['savedRecipes', 0], aList); // the pre-fix, unscoped key
 

@@ -4,11 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Bookmark } from 'lucide-react';
 import { getSavedRecipes } from '@/api/saved';
 import { RecipeCard } from '@/components/RecipeCard';
+import { SavedStubCard } from './SavedStubCard';
 import { Pagination } from '@/components/Pagination';
 import { EmptyState, Spinner } from '@/components/ui';
 import { useAuth } from '@/auth/AuthProvider';
 
-/** The signed-in user's saved recipes, newest saved first. Unsaving a card refetches this list via ['savedRecipes']. */
+/** The signed-in user's saved recipes, newest saved first; a hidden one shows as a stub under its approved title. Unsaving a card refetches this list via ['savedRecipes']. */
 export function SavedRecipesPanel() {
   const { profile } = useAuth();
   const [page, setPage] = useState(0);
@@ -51,7 +52,13 @@ export function SavedRecipesPanel() {
   return (
     <>
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {saved.data.content.map((r) => <RecipeCard key={r.id} recipe={r} />)}
+        {saved.data.content.map((item) =>
+          item.kind === 'recipe' ? (
+            <RecipeCard key={item.recipe.id} recipe={item.recipe} />
+          ) : (
+            <SavedStubCard key={item.stub.id} id={item.stub.id} approvedTitle={item.stub.approvedTitle} state={item.stub.state} />
+          ),
+        )}
       </div>
       <Pagination page={saved.data.page.number} totalPages={saved.data.page.totalPages} onPage={setPage} />
     </>
