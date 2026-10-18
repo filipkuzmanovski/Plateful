@@ -126,6 +126,7 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.isAdmin").value(false))
+                .andExpect(jsonPath("$.admin").doesNotExist())
                 .andExpect(jsonPath("$.rejectedCount").value(0));
     }
 

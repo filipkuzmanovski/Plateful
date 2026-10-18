@@ -46,16 +46,18 @@ class AdminReviewSchemaDbTest {
         return id;
     }
 
-    private long count(String where) {
-        return ((Number) em.createNativeQuery("SELECT count(*) FROM recipes WHERE " + where)
+    // Only rows that existed when V6 ran: recipes created later may legitimately be pending or rejected.
+    private long countMigratedRecipes(String where) {
+        return ((Number) em.createNativeQuery("SELECT count(*) FROM recipes WHERE (" + where + ") "
+                        + "AND created_at <= (SELECT installed_on FROM flyway_schema_history WHERE version = '6')")
                 .getSingleResult()).longValue();
     }
 
     @Test
     void existingRecipesAreApproved() {
-        assertThat(count("status <> 'approved'")).isZero();
-        assertThat(count("approved_title IS DISTINCT FROM title")).isZero();
-        assertThat(count("NOT ever_approved")).isZero();
+        assertThat(countMigratedRecipes("status <> 'approved'")).isZero();
+        assertThat(countMigratedRecipes("approved_title IS DISTINCT FROM title")).isZero();
+        assertThat(countMigratedRecipes("NOT ever_approved")).isZero();
     }
 
     @Test
