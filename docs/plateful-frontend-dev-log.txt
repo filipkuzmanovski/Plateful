@@ -3777,3 +3777,82 @@ Known follow-ups
     impact is nil.
   - Unsaving a card on the Saved tab removes the card, so keyboard focus is
     lost to the page body. The tabpanel could take focus after the unsave.
+
+
+
+################################################################################
+################################################################################
+ PART 12 — SPOONACULAR IMPORTER REMOVED
+ Branch: chore/remove-spoonacular-importer
+################################################################################
+################################################################################
+
+What was done
+-------------
+The one-off Spoonacular importer was removed from the backend. This is a code
+cleanup only: the database, the imported recipes and the credits in the UI are
+unchanged.
+
+Why
+---
+  - Plateful is about users' own recipes. The importer only seeded the first
+    206 recipes and was never meant to be a feature.
+  - The import was a one-off run. Nothing needs to call Spoonacular again.
+  - Replace mode (spoonacular.import.replace-existing) once wiped data. Leaving
+    a switch that can delete rows in the codebase is a standing risk.
+  - Deployment no longer needs a Spoonacular API key to be managed or kept
+    secret.
+
+Removed
+-------
+  - The whole package ...recipeappbackend.spoonacular (12 classes):
+    ImportSummary, QuotaExceededException, SpoonacularClient,
+    SpoonacularConfig, SpoonacularImportCleaner, SpoonacularImportProperties,
+    SpoonacularImportRunner, SpoonacularImportService, SpoonacularProperties,
+    SpoonacularRecipePersister, SpoonacularRecipeTranslator,
+    SpoonacularSearchResponse.
+  - Its tests: SpoonacularClientTest, SpoonacularImportRunnerTest,
+    SpoonacularImportServiceTest, SpoonacularPropertiesTest,
+    SpoonacularRecipeTranslatorTest, and the fixture
+    src/test/resources/spoonacular/complex-search-response.json.
+  - The spoonacular.* block (and its comment header) in application.properties.
+  - RecipeRepository.findBySpoonacularId, existsBySpoonacularId and
+    deleteAllImported, which only the importer used.
+  - A few comments that called code "for the Spoonacular import" now say
+    "imported recipes" (RecipeDisplayDto, CommentService).
+
+Kept
+----
+  - The 206 imported recipes, and the columns source, spoonacular_id,
+    source_name and source_url. No Flyway migration, no data change.
+  - The Recipe entity fields (including spoonacularId) and the source fields
+    of the display DTO, so the recipe page still shows the "Source" credit.
+  - The credit lines in SiteFooter, About, Privacy and Terms. No frontend code
+    changed.
+  - CuisineCatalogTest.containsAllSpoonacularCuisines: the imported recipes
+    still use those cuisine keys.
+  - The old design docs under docs/superpowers/.
+
+Recovering the importer
+-----------------------
+The last commit that still has the importer is tagged
+spoonacular-importer-final. To bring the package back:
+
+  git checkout spoonacular-importer-final -- RecipeAppBackend/src/main/java/mk/ukim/finki/wp/recipeappbackend/spoonacular
+
+(The tests, the fixture, the properties block and the three repository methods
+would have to be restored from the same tag the same way.)
+
+Leftover to clean up
+--------------------
+The SPOONACULAR_API_KEY environment variable in the IntelliJ run configuration
+is no longer read by anything. You can delete it.
+
+Totals
+------
+  - Backend regression list (the previous list minus the 5 Spoonacular test
+    classes): 21 classes, 162 tests, all passing. It was 187 before, so the 25
+    removed tests were the importer's.
+  - *DbTest: 7 classes, 32 tests, 0 failures. This run had no skips (the
+    earlier run had 1 known skip in RecipeSortDbTest).
+  - Frontend: 32 files, 341 tests passed; npm run build succeeded.
