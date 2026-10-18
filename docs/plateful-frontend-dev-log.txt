@@ -4184,8 +4184,9 @@ Task 2 - the service stores and returns the video (002016f)
 Task 3 - upload API and browser probe (0fea39c, d1f4bdc)
 --------------------------------------------------------
   - api/videos.ts uploads the clip and the poster to the recipe-videos bucket
-    and deletes them. lib/videoProbe.ts reads a file in the browser (duration,
-    size, a poster frame captured as a JPEG) before anything is uploaded.
+    and deletes them. lib/videoProbe.ts reads a file in the browser (whether
+    it plays, its duration, a poster frame captured as a JPEG) before anything
+    is uploaded. The type and size check is in VideoPicker, not the probe.
   - Review fix (d1f4bdc): audio-only files, which report a zero width or
     height, are refused. The probe was hardened: its handlers are detached
     when it settles, errors settle it immediately, and Safari waits for
@@ -4254,9 +4255,26 @@ Known limitations
     a new review.
   - Autoplay uses bandwidth on the free plan. The tile loads nothing until it
     is visible (preload none), but a playing tile streams the clip.
+  - Deleting a recipe removes its video and poster from storage, but only on
+    a best-effort basis: if that cleanup call fails, the files stay behind.
 
-Known follow-ups
-----------------
-  - The final whole-branch review is still to come.
-  - The controller's real-browser check of upload, autoplay and the viewer is
-    still to come.
+Final review fixes
+------------------
+The final whole-branch review found no critical issues. Fixed afterwards:
+  - Deleting a recipe left its video and poster in the public bucket, so the
+    clip stayed watchable. RecipeDetailPage now deletes both files after the
+    delete succeeds, as it already did for photos. Test:
+    deletingRecipeDeletesItsVideo, plus one that a failed delete removes
+    nothing.
+  - A save that fails (400 or 500) deletes no video files, and the form keeps
+    the new value. This was true already; now it has tests.
+  - A nested server error such as video.path is shown under the video field,
+    mapped like the cuisines errors.
+  - This log: the probe no longer claims to check the size.
+Frontend after the fixes: npx vitest run, 40 files, 477 tests, all passed.
+npm run build succeeded (only the usual chunk-size warning).
+
+Status
+------
+The final whole-branch review is done and its fixes are in. The real-browser
+check of upload, autoplay and the viewer is pending the user's test upload.
