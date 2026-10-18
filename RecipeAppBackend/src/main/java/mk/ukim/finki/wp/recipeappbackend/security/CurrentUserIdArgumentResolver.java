@@ -29,6 +29,11 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer, //resolves the arguemtn to get the ID
                                   NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
+        return currentUserId();
+    }
+
+    /** The authenticated user's id (JWT "sub"); 401 when there is no JWT principal or the subject is not a UUID. */
+    public static UUID currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");

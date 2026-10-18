@@ -27,7 +27,6 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -156,14 +155,36 @@ class AdminReviewControllerTest {
 
     @Test
     void reasonOver500Is400() throws Exception {
-        String body = "{\"revision\":1,\"reason\":\"" + "x".repeat(501) + "\"}";
+        String tooLong = "x".repeat(501);
+        doThrow(new InvalidReviewReasonException("The reason must be at most 500 characters"))
+                .when(adminReviewService).reject(ADMIN_ID, RECIPE_ID, 1, tooLong);
 
         mockMvc.perform(post("/api/admin/recipes/{id}/reject", RECIPE_ID).with(authedAs(ADMIN_ID))
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"revision\":1,\"reason\":\"" + tooLong + "\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.reason").exists());
+                .andExpect(jsonPath("$.errors.reason").value("The reason must be at most 500 characters"));
+    }
 
-        verify(adminReviewService, never()).reject(any(), any(), anyInt(), anyString());
+    /** The guard is an interceptor, so it runs before body validation: a non-admin never learns what was wrong with the body. */
+    @Test
+    void nonAdminInvalidBodyIs403() throws Exception {
+        doThrow(AdminForbiddenException.forbidden()).when(adminGuard).requireAdmin(ADMIN_ID);
+
+        mockMvc.perform(post("/api/admin/recipes/{id}/approve", RECIPE_ID).with(authedAs(ADMIN_ID))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("forbidden"));
+        mockMvc.perform(post("/api/admin/recipes/{id}/reject", RECIPE_ID).with(authedAs(ADMIN_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"" + "x".repeat(501) + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("forbidden"));
+        mockMvc.perform(post("/api/admin/recipes/{id}/reject", RECIPE_ID).with(authedAs(ADMIN_ID))
+                        .contentType(MediaType.APPLICATION_JSON).content("not json"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminReviewService);
     }
 
     @Test

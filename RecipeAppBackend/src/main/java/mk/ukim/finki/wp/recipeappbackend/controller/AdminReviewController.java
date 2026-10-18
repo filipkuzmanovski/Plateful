@@ -3,7 +3,6 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 import jakarta.validation.Valid;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.ReviewDecisionDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
-import mk.ukim.finki.wp.recipeappbackend.security.AdminGuard;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
 import mk.ukim.finki.wp.recipeappbackend.service.AdminReviewService;
 import org.springframework.data.domain.Page;
@@ -20,35 +19,30 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 import java.util.UUID;
 
-/** The admin review API. Every route asks {@link AdminGuard} before it does anything else. */
+/** The admin review API. AdminGuardInterceptor (see WebConfig) guards every route here before it is reached. */
 @RestController
 @RequestMapping("/api/admin")
 public class AdminReviewController {
 
-    private final AdminGuard adminGuard;
     private final AdminReviewService reviewService;
 
-    public AdminReviewController(AdminGuard adminGuard, AdminReviewService reviewService) {
-        this.adminGuard = adminGuard;
+    public AdminReviewController(AdminReviewService reviewService) {
         this.reviewService = reviewService;
     }
 
     /** Size is capped by spring.data.web.pageable.max-page-size; the order is fixed (oldest first). */
     @GetMapping("/recipes/pending")
-    public Page<RecipeDisplayDto> pending(@CurrentUserId UUID adminId, Pageable pageable) {
-        adminGuard.requireAdmin(adminId);
+    public Page<RecipeDisplayDto> pending(Pageable pageable) {
         return reviewService.pending(pageable);
     }
 
     @GetMapping("/recipes/pending/count")
-    public Map<String, Long> pendingCount(@CurrentUserId UUID adminId) {
-        adminGuard.requireAdmin(adminId);
+    public Map<String, Long> pendingCount() {
         return Map.of("count", reviewService.pendingCount());
     }
 
     @GetMapping("/recipes/{id}")
-    public RecipeDisplayDto get(@CurrentUserId UUID adminId, @PathVariable UUID id) {
-        adminGuard.requireAdmin(adminId);
+    public RecipeDisplayDto get(@PathVariable UUID id) {
         return reviewService.get(id);
     }
 
@@ -56,7 +50,6 @@ public class AdminReviewController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void approve(@CurrentUserId UUID adminId, @PathVariable UUID id,
                         @Valid @RequestBody ReviewDecisionDto body) {
-        adminGuard.requireAdmin(adminId);
         reviewService.approve(adminId, id, body.revision());
     }
 
@@ -64,7 +57,6 @@ public class AdminReviewController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void reject(@CurrentUserId UUID adminId, @PathVariable UUID id,
                        @Valid @RequestBody ReviewDecisionDto body) {
-        adminGuard.requireAdmin(adminId);
         reviewService.reject(adminId, id, body.revision(), body.reason());
     }
 }
