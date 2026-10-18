@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
 import mk.ukim.finki.wp.recipeappbackend.exception.RecipeHiddenException;
+import mk.ukim.finki.wp.recipeappbackend.exception.RecipeNotApprovedException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
@@ -46,6 +47,18 @@ public class RecipeVisibility {
             throw new RecipeHiddenException(recipe.getId(), recipe.getApprovedTitle(), recipe.getStatus());
         }
         throw new ResourceNotFoundException("Recipe", recipe.getId());
+    }
+
+    /**
+     * Guard for every comment, rating and reaction write, deletes included: the recipe must be visible
+     * (same exceptions as {@link #requireVisible}) and approved. A viewer who can see an unapproved
+     * recipe (its author or an admin) gets {@link RecipeNotApprovedException}.
+     */
+    public void requireApprovedForInteraction(Recipe recipe, UUID viewerId) {
+        requireVisible(recipe, viewerId);
+        if (recipe.getStatus() != RecipeStatus.APPROVED) {
+            throw new RecipeNotApprovedException(recipe.getId(), recipe.getStatus());
+        }
     }
 
     /** The review block is for the author and admins only. */

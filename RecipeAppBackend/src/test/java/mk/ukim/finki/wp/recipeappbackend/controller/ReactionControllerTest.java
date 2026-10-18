@@ -2,6 +2,8 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
+import mk.ukim.finki.wp.recipeappbackend.exception.RecipeNotApprovedException;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.CommentReactionCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.service.ReactionService;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -43,6 +47,7 @@ class ReactionControllerTest {
     MfaFactorLookup mfaFactorLookup; // SecurityConfig's MFA filter; the default false keeps these tests unaffected
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID RECIPE_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID COMMENT_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
     private static RequestPostProcessor authed() {
@@ -51,11 +56,32 @@ class ReactionControllerTest {
 
     @Test
     void listReactions_anonymous_is200() throws Exception {
-        when(reactionService.getForComment(eq(COMMENT_ID), any())).thenReturn(Page.empty());
+        when(reactionService.getForComment(isNull(), eq(COMMENT_ID), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/comments/" + COMMENT_ID + "/reactions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void listReactions_withToken_passesViewerId() throws Exception {
+        when(reactionService.getForComment(eq(USER_ID), eq(COMMENT_ID), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/comments/" + COMMENT_ID + "/reactions").with(authed()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void putMyReaction_pendingRecipeAsAuthor_is409() throws Exception {
+        doThrow(new RecipeNotApprovedException(RECIPE_ID, RecipeStatus.PENDING))
+                .when(reactionService).react(eq(USER_ID), eq(COMMENT_ID), any());
+
+        mockMvc.perform(put("/api/comments/" + COMMENT_ID + "/reactions/me")
+                        .with(authed())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isLike\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("recipe_not_approved"));
     }
 
     @Test

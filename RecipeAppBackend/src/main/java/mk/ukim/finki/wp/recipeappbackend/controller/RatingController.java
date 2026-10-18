@@ -5,6 +5,7 @@ import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeRatingCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeRatingDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
+import mk.ukim.finki.wp.recipeappbackend.security.OptionalCurrentUserId;
 import mk.ukim.finki.wp.recipeappbackend.service.RatingService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,8 +33,9 @@ public class RatingController {
     }
 
     @GetMapping
-    public Page<RecipeRatingDisplayDto> list(@PathVariable UUID recipeId, Pageable pageable) {
-        return ratingService.getForRecipe(recipeId, pageable);
+    public Page<RecipeRatingDisplayDto> list(@OptionalCurrentUserId UUID viewerId,
+                                             @PathVariable UUID recipeId, Pageable pageable) {
+        return ratingService.getForRecipe(viewerId, recipeId, pageable);
     }
 
     /** Rate or re-rate — the service upserts on (recipeId, userId), so PUT is naturally idempotent. */

@@ -27,7 +27,8 @@ import java.util.stream.Collectors;
 /**
  * Comments. Moderation policy (product decision): a comment can be deleted
  * by its AUTHOR or by the OWNER of the recipe it sits on ("my recipe, my
- * comment section"). Editing stays author-only — moderators remove content,
+ * comment section"). Every write needs an approved recipe and every read a visible one (spec 4.2); a comment
+ * on a recipe that went back to review stays as it is until the recipe is approved again. Editing stays author-only — moderators remove content,
  * they don't rewrite other people's words.
  */
 @Service
@@ -37,21 +38,25 @@ public class CommentService {
     private final CommentReactionRepository reactionRepository;
     private final RecipeRepository recipeRepository;
     private final UserRepository userRepository;
+    private final RecipeVisibility visibility;
 
     public CommentService(RecipeCommentRepository commentRepository,
                           CommentReactionRepository reactionRepository,
                           RecipeRepository recipeRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          RecipeVisibility visibility) {
         this.commentRepository = commentRepository;
         this.reactionRepository = reactionRepository;
         this.recipeRepository = recipeRepository;
         this.userRepository = userRepository;
+        this.visibility = visibility;
     }
 
     @Transactional
     public RecipeCommentDisplayDto add(UUID userId, UUID recipeId, RecipeCommentCreateDto dto) {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
+        visibility.requireApprovedForInteraction(recipe, userId);
         User author = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         RecipeComment saved = commentRepository.save(dto.toEntity(recipe, author));
@@ -63,6 +68,7 @@ public class CommentService {
     public RecipeCommentDisplayDto edit(UUID userId, UUID commentId, RecipeCommentCreateDto dto) {
         RecipeComment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", commentId));
+        visibility.requireApprovedForInteraction(comment.getRecipe(), userId);
         if (!comment.getUser().getId().equals(userId)) {
             throw new ForbiddenOperationException("Only the author can edit a comment");
         }
@@ -82,6 +88,7 @@ public class CommentService {
     public void delete(UUID userId, UUID commentId) {
         RecipeComment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", commentId));
+        visibility.requireApprovedForInteraction(comment.getRecipe(), userId);
 
         boolean isAuthor = comment.getUser().getId().equals(userId);
         User recipeOwner = comment.getRecipe().getUser();
@@ -100,10 +107,8 @@ public class CommentService {
      * in one — never per-comment queries (see N+1 BUGFIX notes in the repos).
      */
     @Transactional(readOnly = true)
-    public Page<RecipeCommentDisplayDto> getForRecipe(UUID recipeId, Pageable pageable) {
-        if (!recipeRepository.existsById(recipeId)) {
-            throw new ResourceNotFoundException("Recipe", recipeId);
-        }
+    public Page<RecipeCommentDisplayDto> getForRecipe(UUID viewerId, UUID recipeId, Pageable pageable) {
+        requireVisibleRecipe(viewerId, recipeId);
         Page<RecipeComment> page =
                 commentRepository.findByRecipeIdOrderByCreatedAtDesc(recipeId, pageable);
 
@@ -127,7 +132,14 @@ public class CommentService {
      */
     @Transactional(readOnly = true)
     public Map<UUID, Boolean> getMyReactions(UUID userId, UUID recipeId) {
+        requireVisibleRecipe(userId, recipeId);
         return reactionRepository.findMyReactionsForRecipe(recipeId, userId).stream()
                 .collect(Collectors.toMap(MyCommentReaction::commentId, MyCommentReaction::isLike));
+    }
+
+    private void requireVisibleRecipe(UUID viewerId, UUID recipeId) {
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
+        visibility.requireVisible(recipe, viewerId);
     }
 }

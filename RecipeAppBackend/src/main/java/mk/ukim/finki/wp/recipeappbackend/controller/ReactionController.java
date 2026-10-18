@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.CommentReactionCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.CommentReactionDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
+import mk.ukim.finki.wp.recipeappbackend.security.OptionalCurrentUserId;
 import mk.ukim.finki.wp.recipeappbackend.service.ReactionService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,8 +31,9 @@ public class ReactionController {
     }
 
     @GetMapping
-    public Page<CommentReactionDisplayDto> list(@PathVariable UUID commentId, Pageable pageable) {
-        return reactionService.getForComment(commentId, pageable);
+    public Page<CommentReactionDisplayDto> list(@OptionalCurrentUserId UUID viewerId,
+                                                @PathVariable UUID commentId, Pageable pageable) {
+        return reactionService.getForComment(viewerId, commentId, pageable);
     }
 
     /** Like/dislike — the service upserts and flips the same row, so PUT is idempotent. */

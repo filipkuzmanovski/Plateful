@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
 import mk.ukim.finki.wp.recipeappbackend.exception.RecipeHiddenException;
+import mk.ukim.finki.wp.recipeappbackend.exception.RecipeNotApprovedException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
@@ -135,6 +136,37 @@ class RecipeVisibilityTest {
 
         assertThatCode(() -> visibility.requireVisible(r, authorId)).doesNotThrowAnyException();
         assertThatCode(() -> visibility.requireVisible(r, adminId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void interactionNeedsAnApprovedRecipe() {
+        Recipe approved = recipe(RecipeStatus.APPROVED, true, authorId);
+
+        assertThatCode(() -> visibility.requireApprovedForInteraction(approved, otherId)).doesNotThrowAnyException();
+        assertThatCode(() -> visibility.requireApprovedForInteraction(approved, adminId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void interactionOnHiddenRecipeThrowsTheVisibilityExceptions() {
+        Recipe neverApproved = recipe(RecipeStatus.PENDING, false, authorId);
+        Recipe editedAfterApproval = recipe(RecipeStatus.PENDING, true, authorId);
+
+        assertThatThrownBy(() -> visibility.requireApprovedForInteraction(neverApproved, otherId))
+                .isExactlyInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> visibility.requireApprovedForInteraction(editedAfterApproval, null))
+                .isExactlyInstanceOf(RecipeHiddenException.class);
+    }
+
+    @Test
+    void interactionOnVisibleButUnapprovedRecipeIs409ForAuthorAndAdmin() {
+        for (RecipeStatus status : new RecipeStatus[]{RecipeStatus.PENDING, RecipeStatus.REJECTED}) {
+            Recipe r = recipe(status, true, authorId);
+
+            assertThatThrownBy(() -> visibility.requireApprovedForInteraction(r, authorId))
+                    .as("author %s", status).isExactlyInstanceOf(RecipeNotApprovedException.class);
+            assertThatThrownBy(() -> visibility.requireApprovedForInteraction(r, adminId))
+                    .as("admin %s", status).isExactlyInstanceOf(RecipeNotApprovedException.class);
+        }
     }
 
     @Test

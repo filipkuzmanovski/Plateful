@@ -2,6 +2,8 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
+import mk.ukim.finki.wp.recipeappbackend.exception.RecipeNotApprovedException;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeRatingCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.service.RatingService;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -52,11 +56,32 @@ class RatingControllerTest {
 
     @Test
     void listRatings_anonymous_is200() throws Exception {
-        when(ratingService.getForRecipe(eq(RECIPE_ID), any())).thenReturn(Page.empty());
+        when(ratingService.getForRecipe(isNull(), eq(RECIPE_ID), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/recipes/" + RECIPE_ID + "/ratings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void listRatings_withToken_passesViewerId() throws Exception {
+        when(ratingService.getForRecipe(eq(USER_ID), eq(RECIPE_ID), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/recipes/" + RECIPE_ID + "/ratings").with(authed()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void putMyRating_pendingRecipeAsAuthor_is409() throws Exception {
+        doThrow(new RecipeNotApprovedException(RECIPE_ID, RecipeStatus.PENDING))
+                .when(ratingService).rate(eq(USER_ID), eq(RECIPE_ID), any());
+
+        mockMvc.perform(put("/api/recipes/" + RECIPE_ID + "/ratings/me")
+                        .with(authed())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":4}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("recipe_not_approved"));
     }
 
     @Test

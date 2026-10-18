@@ -3,6 +3,9 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
+import mk.ukim.finki.wp.recipeappbackend.exception.RecipeHiddenException;
+import mk.ukim.finki.wp.recipeappbackend.exception.RecipeNotApprovedException;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCommentCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeCommentDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.UserDisplayDto;
@@ -24,6 +27,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -65,12 +69,45 @@ class CommentControllerTest {
 
     @Test
     void listComments_anonymous_is200() throws Exception {
-        when(commentService.getForRecipe(eq(RECIPE_ID), any()))
+        when(commentService.getForRecipe(isNull(), eq(RECIPE_ID), any()))
                 .thenReturn(new PageImpl<>(List.of(sampleComment("Tasty!"))));
 
         mockMvc.perform(get("/api/recipes/" + RECIPE_ID + "/comments"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].body").value("Tasty!"));
+    }
+
+    @Test
+    void listComments_withToken_passesViewerId() throws Exception {
+        when(commentService.getForRecipe(eq(USER_ID), eq(RECIPE_ID), any()))
+                .thenReturn(new PageImpl<>(List.of(sampleComment("Tasty!"))));
+
+        mockMvc.perform(get("/api/recipes/" + RECIPE_ID + "/comments").with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].body").value("Tasty!"));
+    }
+
+    @Test
+    void listComments_hiddenRecipe_is404UnderReview() throws Exception {
+        when(commentService.getForRecipe(isNull(), eq(RECIPE_ID), any()))
+                .thenThrow(new RecipeHiddenException(RECIPE_ID, "Old Title", RecipeStatus.PENDING));
+
+        mockMvc.perform(get("/api/recipes/" + RECIPE_ID + "/comments"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("under_review"));
+    }
+
+    @Test
+    void commentOnPendingAsAuthorIs409() throws Exception {
+        when(commentService.add(eq(USER_ID), eq(RECIPE_ID), any()))
+                .thenThrow(new RecipeNotApprovedException(RECIPE_ID, RecipeStatus.PENDING));
+
+        mockMvc.perform(post("/api/recipes/" + RECIPE_ID + "/comments")
+                        .with(authed())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"body\":\"Tasty!\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("recipe_not_approved"));
     }
 
     @Test

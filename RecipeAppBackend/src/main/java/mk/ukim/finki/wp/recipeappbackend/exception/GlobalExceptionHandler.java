@@ -50,6 +50,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** A visible recipe that is not approved cannot take comments, ratings or reactions: 409. */
+    @ExceptionHandler(RecipeNotApprovedException.class)
+    ProblemDetail handleRecipeNotApproved(RecipeNotApprovedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", "recipe_not_approved");
+        return problem;
+    }
+
     @ExceptionHandler(ForbiddenOperationException.class)
     ProblemDetail handleForbidden(ForbiddenOperationException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());

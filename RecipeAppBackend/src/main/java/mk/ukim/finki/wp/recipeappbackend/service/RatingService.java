@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.service;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeRatingCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeRatingDisplayDto;
+import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeRating;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRatingRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
@@ -17,18 +18,22 @@ import java.util.UUID;
 /**
  * Ratings. No ownership checks needed anywhere here — every operation is
  * inherently scoped to the CALLER's row by (recipeId, userId), so you can't
- * touch anyone else's rating by construction.
+ * touch anyone else's rating by construction. Review status still applies (spec 4.2): reads need a visible recipe,
+ * writes (deleting included) an approved one.
  */
 @Service
 public class RatingService {
 
     private final RecipeRatingRepository ratingRepository;
     private final RecipeRepository recipeRepository;
+    private final RecipeVisibility visibility;
 
     public RatingService(RecipeRatingRepository ratingRepository,
-                         RecipeRepository recipeRepository) {
+                         RecipeRepository recipeRepository,
+                         RecipeVisibility visibility) {
         this.ratingRepository = ratingRepository;
         this.recipeRepository = recipeRepository;
+        this.visibility = visibility;
     }
 
     /**
@@ -40,31 +45,34 @@ public class RatingService {
      */
     @Transactional
     public void rate(UUID userId, UUID recipeId, RecipeRatingCreateDto dto) {
-        if (!recipeRepository.existsById(recipeId)) {
-            throw new ResourceNotFoundException("Recipe", recipeId);
-        }
+        visibility.requireApprovedForInteraction(findRecipe(recipeId), userId);
         ratingRepository.upsertRating(recipeId, userId, dto.rating());
     }
 
     /** Lets the UI pre-fill the caller's stars on the recipe page. */
     @Transactional(readOnly = true)
     public Optional<Integer> getMyRating(UUID userId, UUID recipeId) {
+        visibility.requireVisible(findRecipe(recipeId), userId);
         return ratingRepository.findByRecipeIdAndUserId(recipeId, userId)
                 .map(RecipeRating::getRating);
     }
 
     @Transactional
     public void deleteMyRating(UUID userId, UUID recipeId) {
+        visibility.requireApprovedForInteraction(findRecipe(recipeId), userId);
         ratingRepository.deleteByRecipeIdAndUserId(recipeId, userId);
     }
 
     /** Paged ratings list — user is JOIN-fetched by the @EntityGraph, no N+1. */
     @Transactional(readOnly = true)
-    public Page<RecipeRatingDisplayDto> getForRecipe(UUID recipeId, Pageable pageable) {
-        if (!recipeRepository.existsById(recipeId)) {
-            throw new ResourceNotFoundException("Recipe", recipeId);
-        }
+    public Page<RecipeRatingDisplayDto> getForRecipe(UUID viewerId, UUID recipeId, Pageable pageable) {
+        visibility.requireVisible(findRecipe(recipeId), viewerId);
         return ratingRepository.findByRecipeId(recipeId, pageable)
                 .map(RecipeRatingDisplayDto::fromEntity);
+    }
+
+    private Recipe findRecipe(UUID recipeId) {
+        return recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
     }
 }

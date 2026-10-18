@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCommentCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeCommentDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
+import mk.ukim.finki.wp.recipeappbackend.security.OptionalCurrentUserId;
 import mk.ukim.finki.wp.recipeappbackend.service.CommentService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,8 +39,9 @@ public class CommentController {
     }
 
     @GetMapping("/recipes/{recipeId}/comments")
-    public Page<RecipeCommentDisplayDto> list(@PathVariable UUID recipeId, Pageable pageable) {
-        return commentService.getForRecipe(recipeId, pageable);
+    public Page<RecipeCommentDisplayDto> list(@OptionalCurrentUserId UUID viewerId,
+                                              @PathVariable UUID recipeId, Pageable pageable) {
+        return commentService.getForRecipe(viewerId, recipeId, pageable);
     }
 
     /**

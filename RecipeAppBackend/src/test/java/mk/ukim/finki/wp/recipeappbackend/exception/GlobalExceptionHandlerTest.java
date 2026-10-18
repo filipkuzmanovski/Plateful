@@ -107,6 +107,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void recipeNotApprovedMapsTo409WithCode() {
+        ProblemDetail problem = handler.handleRecipeNotApproved(
+                new RecipeNotApprovedException(UUID.randomUUID(), RecipeStatus.PENDING));
+
+        assertThat(problem.getStatus()).isEqualTo(409);
+        assertThat(problem.getProperties()).containsEntry("code", "recipe_not_approved");
+    }
+
+    @Test
     void invalidSortMapsTo400WithSortByFieldError() {
         ProblemDetail problem = handler.handleInvalidSort(new InvalidSortException("Unknown sort: bogus"));
 
