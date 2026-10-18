@@ -11,9 +11,11 @@ import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { Button, EmptyState, Field, Spinner, TextInput } from '@/components/ui';
 import { deletePhotos, pathFromPublicUrl } from '@/api/photos';
+import { deleteVideoFiles, pathFromPublicVideoUrl } from '@/api/videos';
 import { CuisinePicker } from './CuisinePicker';
 import { PhotoPicker } from './PhotoPicker';
-import type { RecipeCreate } from '@/lib/types';
+import { VideoPicker } from './VideoPicker';
+import type { RecipeCreate, RecipeDisplay, RecipeVideoInput } from '@/lib/types';
 
 // Mirrors the backend's @PositiveOrZero Integer; empty = not set.
 const wholeNumber = z.string().regex(/^\d*$/, 'Whole number ≥ 0');
@@ -25,6 +27,7 @@ const schema = z.object({
   cookingMinutes: wholeNumber,
   preparationMinutes: wholeNumber,
   photos: z.array(z.string()).max(6),
+  video: z.object({ path: z.string(), posterPath: z.string(), durationSeconds: z.number() }).nullable(),
   instructions: z.string().max(50000),
   steps: z.array(z.object({ text: z.string().min(1, 'Step text required').max(5000) })).max(100),
   dairyFree: z.boolean(),
@@ -46,7 +49,7 @@ type FormValues = z.infer<typeof schema>;
 
 const emptyValues: FormValues = {
   title: '', servings: '', readyInMinutes: '', cookingMinutes: '',
-  preparationMinutes: '', photos: [], instructions: '',
+  preparationMinutes: '', photos: [], video: null, instructions: '',
   steps: [], dairyFree: false, glutenFree: false, vegan: false, vegetarian: false,
   cuisines: [], ingredients: [{ ingredientName: '', originalText: '' }],
 };
@@ -80,6 +83,15 @@ const isPath = (p: string | null): p is string => p !== null;
 /** Storage paths of a recipe's photos; imported (non-bucket) URLs have none and are dropped. */
 const bucketPaths = (urls: string[]) => urls.map(pathFromPublicUrl).filter(isPath);
 
+/** The recipe's video as storage paths; null when it has none or either file is not in our bucket. */
+function videoInput(video: RecipeDisplay['video']): RecipeVideoInput | null {
+  if (!video) return null;
+  const path = pathFromPublicVideoUrl(video.url);
+  const posterPath = pathFromPublicVideoUrl(video.posterUrl);
+  return path && posterPath ? { path, posterPath, durationSeconds: video.durationSeconds } : null;
+}
+const videoPaths = (v: RecipeVideoInput | null) => (v ? [v.path, v.posterPath] : []);
+
 function toDto(v: FormValues): RecipeCreate {
   return {
     title: v.title,
@@ -88,6 +100,7 @@ function toDto(v: FormValues): RecipeCreate {
     cookingMinutes: toInt(v.cookingMinutes),
     preparationMinutes: toInt(v.preparationMinutes),
     photos: v.photos,
+    video: v.video,
     instructions: toNull(v.instructions),
     instructionsSteps: v.steps.map((s, i) => ({ number: i + 1, step: s.text, ingredients: [], equipment: [] })),
     dairyFree: v.dairyFree, glutenFree: v.glutenFree, vegan: v.vegan, vegetarian: v.vegetarian,
@@ -103,7 +116,10 @@ export default function RecipeFormPage() {
   const { profile, refreshProfile } = useAuth();
   const hydratedFor = useRef<string | null>(null); // recipe id the form was last filled from
   const initialPaths = useRef<string[]>([]); // bucket photos the recipe had when the form was filled
+  const initialVideoPaths = useRef<string[]>([]); // the video files the recipe had when the form was filled
+  const sessionVideoPaths = useRef(new Set<string>()); // every video file this form has uploaded and handed to the field
   const [photosBusy, setPhotosBusy] = useState(false);
+  const [videoBusy, setVideoBusy] = useState(false);
 
   const existing = useQuery({
     queryKey: ['recipe', id],
@@ -121,11 +137,13 @@ export default function RecipeFormPage() {
       hydratedFor.current = existing.data.id;
       const r = existing.data;
       initialPaths.current = bucketPaths(r.photos);
+      const video = videoInput(r.video);
+      initialVideoPaths.current = videoPaths(video);
       reset({
         title: r.title, servings: r.servings?.toString() ?? '',
         readyInMinutes: r.readyInMinutes?.toString() ?? '', cookingMinutes: r.cookingMinutes?.toString() ?? '',
         preparationMinutes: r.preparationMinutes?.toString() ?? '',
-        photos: initialPaths.current, instructions: r.instructions ?? '',
+        photos: initialPaths.current, video, instructions: r.instructions ?? '',
         steps: r.instructionsSteps.map((s) => ({ text: s.step })),
         dairyFree: r.dairyFree, glutenFree: r.glutenFree, vegan: r.vegan, vegetarian: r.vegetarian,
         cuisines: r.cuisines,
@@ -148,6 +166,12 @@ export default function RecipeFormPage() {
       // Files the user took off the recipe go only once the update has succeeded; best-effort.
       const removed = id ? initialPaths.current.filter((p) => !values.photos.includes(p)) : [];
       if (removed.length > 0) void deletePhotos(removed);
+      // Same for the video: the original's files and any upload this session that ended up unused.
+      const keptVideo = videoPaths(values.video);
+      const unusedVideo = [...new Set([...initialVideoPaths.current, ...sessionVideoPaths.current])].filter(
+        (p) => !keptVideo.includes(p),
+      );
+      if (unusedVideo.length > 0) void deleteVideoFiles(unusedVideo);
       // A save can change how many of the author's recipes are rejected; keep the profile tab label current.
       void refreshProfile();
       if (!id && !profile?.isAdmin) toast.success("Submitted for review. We'll email you when it's approved.");
@@ -214,6 +238,26 @@ export default function RecipeFormPage() {
               />
               {errors.photos?.message && (
                 <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{errors.photos.message}</p>
+              )}
+            </div>
+            <div>
+              <Controller
+                control={control}
+                name="video"
+                render={({ field }) => (
+                  <VideoPicker
+                    value={field.value}
+                    onChange={(video) => {
+                      videoPaths(video).forEach((p) => sessionVideoPaths.current.add(p));
+                      field.onChange(video);
+                    }}
+                    userId={profile?.id ?? ''}
+                    onBusyChange={setVideoBusy}
+                  />
+                )}
+              />
+              {errors.video?.message && (
+                <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{errors.video.message}</p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -352,7 +396,7 @@ export default function RecipeFormPage() {
       <div className="sticky bottom-4 z-10 mt-8 flex items-center justify-end gap-3">
         {photosBusy && <p className="rounded-full bg-paper/90 px-3 py-1.5 text-xs text-olive/70 ring-1 ring-sand">Waiting for photos to finish uploading</p>}
         <div className="rounded-full bg-paper/90 p-1.5 shadow-lift ring-1 ring-sand backdrop-blur-md">
-          <Button type="submit" disabled={isSubmitting || photosBusy}>Save recipe</Button>
+          <Button type="submit" disabled={isSubmitting || photosBusy || videoBusy}>Save recipe</Button>
         </div>
       </div>
     </form>
