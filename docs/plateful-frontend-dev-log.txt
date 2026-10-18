@@ -3873,3 +3873,220 @@ Totals
   - *DbTest: 7 classes, 32 tests, 0 failures. This run had no skips (the
     earlier run had 1 known skip in RecipeSortDbTest).
   - Frontend: 32 files, 341 tests passed; npm run build succeeded.
+
+
+
+
+################################################################################
+################################################################################
+ PART 13 — ADMIN REVIEW
+ Branch: feature/admin-review
+################################################################################
+################################################################################
+
+What was done
+-------------
+Every recipe is now reviewed by an admin before it is public. A new or edited
+recipe waits as "pending"; an admin approves it, or rejects it with a reason
+(1-500 characters), from a review queue; the author gets an email either way.
+Until a recipe is approved only its author and admins can see it. Recipes that
+existed before the feature stay public. Backend and frontend. Built as eleven
+tasks.
+
+Task 1 - review columns, admin flag and profile DTO (612679c)
+-------------------------------------------------------------
+  - Migration V6__admin_review.sql adds users.is_admin (default false) and, on
+    recipes: status (pending, approved or rejected, with a CHECK),
+    rejection_reason, approved_title, ever_approved, submitted_at,
+    reviewed_at, reviewed_by and revision. Two indexes: a partial one on
+    submitted_at for pending recipes (the queue) and one on status.
+  - Every recipe that existed before V6 was marked approved, with its title
+    copied to approved_title, so nothing disappears from the site.
+  - is_admin is set only by SQL; there is no screen or endpoint that grants it.
+  - RecipeStatus (PENDING, APPROVED, REJECTED) with a converter to the text
+    column. MyProfileDto returns isAdmin and rejectedCount.
+  - AdminReviewSchemaDbTest checks the migration against the real database.
+  - Review fix (98e4549, 4b2d34d): the migration test was scoped to recipes
+    that existed before V6, so a recipe created later cannot fail it, and a
+    guard makes it fail if that scope is empty (it cannot pass on nothing).
+
+Task 2 - one visibility rule for recipe reads (8b42837)
+-------------------------------------------------------
+RecipeVisibility is the single rule: a recipe is visible to a viewer when it is
+approved, or the viewer is its author, or the viewer is an admin. Admin status
+is read from users.is_admin on every call, never from the token.
+  - Applied to browse, search, cuisine counts, public and own profile lists,
+    and the recipe page. Browse, search and counts are approved-only even for
+    authors and admins (they use an approved-only specification).
+  - A hidden recipe that was approved before answers 404 with the code
+    under_review (pending) or unavailable (rejected) and approvedTitle, so a
+    saved link can still say what it was. A recipe that was never approved
+    answers a plain 404.
+  - @OptionalCurrentUserId (with its argument resolver) gives public read
+    endpoints the viewer id when there is one and null when not.
+  - RecipeVisibilityTest and RecipeVisibilityDbTest; GlobalExceptionHandler
+    maps RecipeHiddenException.
+
+Task 3 - status transitions on create and edit (1b17910)
+--------------------------------------------------------
+  - A new recipe starts pending (submittedAt = now).
+  - Every successful edit bumps the revision counter, so an approve or reject
+    based on an older version is refused. An edit puts an approved or rejected
+    recipe back to pending, at the back of the queue, and clears any old
+    rejection reason.
+  - An admin's own recipes skip the queue: they are approved on create and on
+    edit. approvedTitle always follows the current title.
+  - RecipeServiceReviewStatusTest.
+
+Task 4 - interactions only on approved recipes (4f68017)
+--------------------------------------------------------
+Comment, rating and reaction writes, deletes included, need an approved recipe.
+A recipe the viewer cannot see answers the 404 from Task 2; one the viewer can
+see (author or admin) but that is not approved answers 409 recipe_not_approved.
+Public reads of comments, ratings and reactions follow recipe visibility.
+InteractionReviewGuardTest; the three controller tests grew.
+
+Task 5 - Saved list keeps re-reviewed recipes as stubs (1fb2f96)
+----------------------------------------------------------------
+GET /api/users/me/saved now returns SavedItemDto rows: kind "recipe" carries
+the normal card, kind "stub" carries SavedRecipeStubDto (id, approvedTitle,
+state pending or unavailable). A saved recipe that was edited or rejected
+after it was approved stays in the list as a stub instead of vanishing or
+leaking. SavedRecipeServiceTest and SavedRecipeControllerTest grew.
+
+Task 6 - admin API (76a475c, 5c23c46, d6c9e88)
+----------------------------------------------
+/api/admin: pending queue (oldest first, id as tie-break), pending count, the
+full recipe with its review block, approve and reject. Reject needs a reason,
+trimmed, 1-500 characters (400 with errors.reason otherwise).
+  - Every route goes through AdminGuard: an admin flag read from the database
+    plus a verified two-factor factor. A non-admin gets 403 forbidden; an admin
+    without a verified factor gets 403 admin_mfa_setup_required.
+  - A decision locks the recipe row (PESSIMISTIC_WRITE), then checks the
+    status (409 not_pending) and the revision (409 recipe_changed), then
+    publishes a RecipeReviewedEvent in the same transaction.
+  - MfaEnforcementFilter now also guards any path that has an "admin" segment,
+    GET included, the way it already guarded "me".
+  - Review fix (5c23c46): author edits and deletes now load the recipe through
+    the same row lock. Recipe has no @Version and Hibernate writes every
+    column, so an author's edit that read the row without the lock could have
+    overwritten an admin's committed approval. AdminQueueDbTest asserts the
+    lock mode is really PESSIMISTIC_WRITE.
+  - Review fix (d6c9e88): the admin check moved into a HandlerInterceptor on
+    /api/admin/**. It runs before argument resolution and body validation, so
+    a non-admin gets 403 whatever the body holds, and a new admin route cannot
+    skip the check. ReviewDecisionDto lost its @Size, so the service's trimmed
+    1-500 rule is the only reason rule.
+  - AdminReviewControllerTest, AdminReviewServiceTest, AdminGuardTest,
+    AdminQueueDbTest; MfaEnforcementFilterTest grew.
+
+Task 7 - emails to authors (f467d88, 6dbbbff)
+---------------------------------------------
+Approve and reject publish RecipeReviewedEvent. ReviewEmailListener sends the
+author an email, using the exact texts of spec section 4.6.
+  - Mail goes through Gmail SMTP (smtp.gmail.com, port 587, STARTTLS) when
+    spring.mail.username (MAIL_USERNAME) is set. When it is blank a logging
+    sender writes the email to the backend log instead, so the app starts and
+    works with no MAIL_* variables at all.
+  - Emails are sent only after the decision commits (AFTER_COMMIT), in the
+    background (@Async), and a failure is logged and never undoes or fails the
+    decision.
+  - Links in the emails use plateful.frontend-url (FRONTEND_URL, default
+    http://localhost:5173).
+  - The mail starter dependency was added to pom.xml.
+  - Review fix (6dbbbff): the sign-off no longer ends with a newline (spec
+    4.6 byte for byte), and the SMTP sender strips CR and LF from the subject
+    itself. The CR/LF subject guard now exists in both layers (the email
+    builder and the sender), so a header cannot be injected through a recipe
+    title.
+  - MailConfigTest, ReviewEmailListenerTest, ReviewEmailsTest,
+    SmtpReviewEmailSenderTest.
+
+Task 8 - review status for authors (886ce64, 101e3b9)
+-----------------------------------------------------
+  - ReviewStatusBanner on the author's own recipe page: "Waiting for review"
+    (saffron) or "This recipe wasn't approved." with the reason and an "Edit
+    and resubmit" button (danger). StatusBadge ("Pending review" or
+    "Rejected") on the author's cards.
+  - The recipe form shows an edit notice: saving an approved or rejected
+    recipe sends it back for review and hides it from others until approved.
+  - The profile's "My recipes" tab shows a "needs attention" count from
+    rejectedCount.
+  - AuthProvider gets refreshProfile, which refetches the profile after a
+    create, an edit or a delete, so the count stays current. api/client.ts and
+    users.ts carry the new fields and error codes.
+  - Review fix (101e3b9): a profile refresh that finishes after a sign-out or
+    an account switch is ignored, so account A's profile can never land in
+    account B's session. refresh-profile.test.tsx proves it.
+  - authorReview.test.tsx.
+
+Task 9 - Saved stub cards and the hidden recipe page (b70d088)
+--------------------------------------------------------------
+  - SavedStubCard in the Saved tab for the stubs from Task 5: the last
+    approved title, a placeholder picture, an "Under review" or "Unavailable"
+    badge, and the bookmark, so the stub can still be removed.
+  - HiddenRecipePage: the recipe page turns the under_review and unavailable
+    404s into a page that names the recipe (approvedTitle) with a short
+    explanation, a Save button and a link back to all recipes, instead of a
+    generic not-found.
+  - savedStubs.test.tsx.
+
+Task 10 - admin queue and review pages (f8db75e, e339728)
+---------------------------------------------------------
+  - ReviewQueuePage lists the pending recipes, oldest first. ReviewRecipePage
+    shows one recipe with Approve and Reject; RejectDialog collects the reason
+    (1-500 characters). AdminRoute keeps non-admins out and AdminMfaPanel
+    tells an admin without two-factor to set it up. AppShell shows a "Review
+    queue" link with the pending count for admins. api/admin.ts is the client.
+  - RecipeBody was extracted from RecipeDetailPage so the review page shows
+    exactly what readers will see.
+  - Review fix (e339728): the review page never refetches on focus, so the
+    admin always decides on the revision they read. If the author edits in the
+    meantime, the decision answers recipe_changed and the admin is told,
+    instead of the page quietly swapping the recipe under them.
+  - admin.test.tsx.
+
+Task 11 - verification and this log
+-----------------------------------
+Safety check (no running backend with the Spoonacular profile): printed False,
+so it was safe to compile and test.
+Backend regression list plus the ten new non-DbTest classes (32 classes): 287
+tests, 0 failures, 0 errors, 0 skipped. New classes: AdminReviewControllerTest
+15, AdminReviewServiceTest 16, AdminGuardTest 4, InteractionReviewGuardTest 16,
+RecipeServiceReviewStatusTest 11, RecipeVisibilityTest 15, MailConfigTest 3,
+ReviewEmailListenerTest 5, ReviewEmailsTest 4, SmtpReviewEmailSenderTest 2.
+Grown classes: MfaEnforcementFilterTest 23, SavedRecipeServiceTest 10,
+SavedRecipeControllerTest 8, RecipeControllerTest 22.
+Backend *DbTest against the real database: 10 classes, 43 tests, 0 failures, 0
+errors, 0 skipped. New: AdminReviewSchemaDbTest 4, AdminQueueDbTest 3,
+RecipeVisibilityDbTest 4. (A first run with the database password not
+exported skipped all 43; the counts above are from the run with it.) The
+DbTests run with Flyway disabled, so V6 reaches the live database only through
+the backend restart in the Rollout section below.
+Frontend: npx vitest run, 36 files, 391 tests, all passed. npm run build
+succeeded (only the usual chunk-size warning).
+
+Rollout
+-------
+  1. V6 applies automatically on the next backend restart. Everything visible
+     today stays visible.
+  2. Make yourself an admin in the Supabase SQL editor:
+       update users set is_admin = true where email = '<your email>';
+  3. The admin account must have two-factor turned on to use the queue.
+  4. Optional, for real emails (until then they appear in the backend log):
+       a. Create a personal Gmail account for Plateful.
+       b. Turn on 2-Step Verification.
+       c. Create an app password at myaccount.google.com/apppasswords.
+       d. Add MAIL_USERNAME and MAIL_PASSWORD to the IntelliJ run
+          configuration.
+     At deployment the same variables, plus FRONTEND_URL, go into Render.
+  5. Test: post a recipe from a second, non-admin account, approve it from the
+     queue as the admin, and check the email.
+  6. After pulling the new mail dependency, reload Maven in IntelliJ.
+
+Known follow-ups
+----------------
+  - The final whole-branch review is still to come.
+  - Photos of pending recipes are reachable by URL in storage but unlisted:
+    the URLs are random and no page links to them. Private storage for them is
+    out of scope for now.
