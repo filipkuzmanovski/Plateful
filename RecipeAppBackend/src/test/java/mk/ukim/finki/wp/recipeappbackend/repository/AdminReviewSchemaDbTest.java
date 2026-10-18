@@ -55,6 +55,8 @@ class AdminReviewSchemaDbTest {
 
     @Test
     void existingRecipesAreApproved() {
+        // guards against a vacuous pass: the scope must contain the pre-V6 recipes (and a V6 row must exist)
+        assertThat(countMigratedRecipes("TRUE")).isPositive();
         assertThat(countMigratedRecipes("status <> 'approved'")).isZero();
         assertThat(countMigratedRecipes("approved_title IS DISTINCT FROM title")).isZero();
         assertThat(countMigratedRecipes("NOT ever_approved")).isZero();
