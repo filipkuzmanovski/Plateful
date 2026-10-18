@@ -21,6 +21,7 @@ class CuisineCatalogTest {
                 .allMatch(k -> k.equals(CuisineCatalog.normalize(k)));
     }
 
+    // Kept after the importer was removed: the imported recipes in the DB still use these cuisine keys.
     @Test
     void containsAllSpoonacularCuisines() {
         List.of("african", "american", "asian", "british", "cajun", "caribbean", "chinese", "eastern european", "european",

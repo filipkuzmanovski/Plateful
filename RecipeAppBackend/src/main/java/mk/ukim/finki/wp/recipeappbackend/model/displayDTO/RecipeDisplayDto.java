@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * user is nullable — spoonacular-imported recipes have no owning user
+ * user is nullable — imported recipes have no owning user
  * (recipes.user_id is nullable exactly for this case).
  * averageRating/ratingCount/commentCount aren't columns on recipes — they're
  * aggregates from recipe_ratings/recipe_comments, computed by the service
@@ -21,7 +21,7 @@ import java.util.UUID;
  * is essentially never shown without its ingredient list, and the count per
  * recipe is always small — no benefit to a separate paginated fetch the way
  * ratings/comments (potentially hundreds per recipe) get.
- * spoonacular_id is intentionally left out — it's an internal dedup key,
+ * spoonacular_id is intentionally left out — it's an internal import key,
  * nothing a client needs to see.
  */
 public record RecipeDisplayDto(
@@ -69,7 +69,7 @@ public record RecipeDisplayDto(
         return new RecipeDisplayDto(
                 recipe.getId(),
                 recipe.getSource(),
-                recipe.getUser() != null ? UserDisplayDto.fromEntity(recipe.getUser()) : null, //can be null because it may only be a spoonacular recipe
+                recipe.getUser() != null ? UserDisplayDto.fromEntity(recipe.getUser()) : null, //can be null because it may be an imported recipe
                 recipe.getTitle(),
                 recipe.getImage(),
                 photos,

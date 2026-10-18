@@ -74,7 +74,7 @@ public class CommentService {
     }
 
     /**
-     * Author OR recipe owner (moderation). For Spoonacular recipes the owner
+     * Author OR recipe owner (moderation). For imported recipes the owner
      * is null, so those comment sections are author-moderated only.
      * Reactions on the comment vanish via ON DELETE CASCADE.
      */
