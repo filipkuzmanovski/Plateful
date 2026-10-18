@@ -3819,7 +3819,11 @@ Removed
   - RecipeRepository.findBySpoonacularId, existsBySpoonacularId and
     deleteAllImported, which only the importer used.
   - A few comments that called code "for the Spoonacular import" now say
-    "imported recipes" (RecipeDisplayDto, CommentService).
+    "imported recipes" (RecipeDisplayDto, CommentService), and the
+    RecipeDisplayDto note on spoonacular_id now calls it an "internal import
+    key". A one-line note was added to CuisineCatalogTest saying why
+    containsAllSpoonacularCuisines stays. InstructionStep's comment now says
+    the importer (now removed) did the translating.
 
 Kept
 ----
@@ -3840,13 +3844,26 @@ spoonacular-importer-final. To bring the package back:
 
   git checkout spoonacular-importer-final -- RecipeAppBackend/src/main/java/mk/ukim/finki/wp/recipeappbackend/spoonacular
 
-(The tests, the fixture, the properties block and the three repository methods
-would have to be restored from the same tag the same way.)
+The same checkout command also restores the test directory and the test
+fixture (replace the path with the one below):
+
+  RecipeAppBackend/src/test/java/mk/ukim/finki/wp/recipeappbackend/spoonacular
+  RecipeAppBackend/src/test/resources/spoonacular
+
+Two things must be re-added BY HAND, not by checking out the whole file (that
+would overwrite every later edit): the spoonacular.* block in
+application.properties, and findBySpoonacularId, existsBySpoonacularId and
+deleteAllImported in RecipeRepository (the package does not compile without
+them). Copy them from `git show spoonacular-importer-final:<path>`.
+@ConfigurationPropertiesScan was kept on purpose in RecipeAppBackendApplication
+(it binds the properties), so a restore needs nothing else.
 
 Leftover to clean up
 --------------------
 The SPOONACULAR_API_KEY environment variable in the IntelliJ run configuration
-is no longer read by anything. You can delete it.
+is no longer read by anything. You can delete it. Any --spoonacular.import.*
+program arguments still in that run configuration are now ignored too, and can
+be deleted.
 
 Totals
 ------

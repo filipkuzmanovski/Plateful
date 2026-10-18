@@ -19,13 +19,14 @@ import java.util.List;
  * type Hibernate serializes into the jsonb column.
  * <p>
  * IMPORTANT — this is a deliberate SIMPLIFICATION of Spoonacular's raw shape
- * (verified against their live docs). The importer must translate:
+ * (verified against their live docs). The Spoonacular importer (now removed)
+ * translated:
  * 1. Raw ingredients/equipment are OBJECTS ({id, name, image, temperature?});
  *    we keep names only — map ingredients[].name / equipment[].name here.
  *    (Their per-item images and oven temperatures are intentionally dropped.)
  * 2. The raw response is a list of GROUPS ([{name, steps[]}] — e.g. "For the
- *    sauce"), and step numbers restart per group. The importer must flatten
- *    all groups' steps into this single list and renumber continuously 1..N.
+ *    sauce"), and step numbers restart per group. It flattened all groups'
+ *    steps into this single list and renumbered continuously 1..N.
  */
 public record InstructionStep(
         Integer number,
