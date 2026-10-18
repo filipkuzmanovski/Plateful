@@ -1,7 +1,9 @@
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, LogOut, Plus, UserRound } from 'lucide-react';
+import { getPendingCount } from '@/api/admin';
 import { useAuth } from '@/auth/AuthProvider';
 import { IdleSessionGuard } from '@/auth/IdleSessionGuard';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -14,6 +16,29 @@ const navLink = ({ isActive }: { isActive: boolean }) =>
 
 const pillLink =
   'inline-flex items-center rounded-full px-4 py-1.5 font-semibold whitespace-nowrap transition duration-200';
+
+/** The admin's way into the queue, with the number of recipes waiting once there are any. */
+function ReviewQueueLink() {
+  // No retries: an admin without two-factor gets a 403 here, and the link works fine without a badge.
+  const { data: count = 0 } = useQuery({ queryKey: ['admin', 'pendingCount'], queryFn: getPendingCount, retry: false });
+  return (
+    <NavLink
+      to="/admin/review"
+      aria-label={count > 0 ? `Review queue, ${count} pending` : undefined}
+      className={(s) => `${navLink(s)} inline-flex items-center gap-1.5`}
+    >
+      Review queue
+      {count > 0 && (
+        <span
+          aria-hidden="true"
+          className="rounded-full bg-saffron px-1.5 text-[11px] leading-[1.125rem] font-semibold text-olive tabular-nums"
+        >
+          {count}
+        </span>
+      )}
+    </NavLink>
+  );
+}
 
 export default function AppShell() {
   const { status, profile, signOut } = useAuth();
@@ -56,6 +81,7 @@ export default function AppShell() {
                 New Recipe
               </NavLink>
             )}
+            {status === 'ready' && profile?.isAdmin && <ReviewQueueLink />}
             {status === 'ready' && profile ? (
               <div ref={menuRef} className="relative ml-1">
                 <button
