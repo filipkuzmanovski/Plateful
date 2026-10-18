@@ -64,11 +64,11 @@ class RecipeControllerTest {
              "ingredients":[{"ingredientName":"Flour","originalText":"2 cups flour"}]}
             """;
 
-    /** RecipeDisplayDto has 29 components; tests only care about id/title/photos. */
+    /** RecipeDisplayDto has 30 components; tests only care about id/title/photos. */
     private static RecipeDisplayDto sampleRecipe(UUID id) {
         return new RecipeDisplayDto(id, "user", null, "Pancakes", null, List.of("https://x/recipe-photos/u/p.webp"), null, null, null, null,
                 null, null, null, List.of(), false, false, false, false, List.of(),
-                null, null, null, null, null, List.of(), null, 0L, 0L, null);
+                null, null, null, null, null, List.of(), null, 0L, 0L, null, null);
     }
 
     @Test

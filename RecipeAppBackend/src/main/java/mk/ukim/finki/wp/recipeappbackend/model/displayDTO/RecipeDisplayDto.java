@@ -56,7 +56,9 @@ public record RecipeDisplayDto(
         Double averageRating,
         long ratingCount,
         long commentCount,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        // Present only when the viewer is the author or an admin; null for everyone else.
+        RecipeReviewDto review
 ) {
     public static RecipeDisplayDto fromEntity(
             Recipe recipe,
@@ -95,7 +97,15 @@ public record RecipeDisplayDto(
                 averageRating,
                 ratingCount,
                 commentCount,
-                recipe.getCreatedAt()
+                recipe.getCreatedAt(),
+                null
         );
+    }
+
+    public RecipeDisplayDto withReview(RecipeReviewDto review) {
+        return new RecipeDisplayDto(id, source, user, title, image, photos, servings, readyInMinutes,
+                cookingMinutes, preparationMinutes, sourceName, sourceUrl, instructions, instructionsSteps,
+                dairyFree, glutenFree, vegan, vegetarian, cuisines, calories, proteinGrams, fatGrams,
+                carbsGrams, nutrition, ingredients, averageRating, ratingCount, commentCount, createdAt, review);
     }
 }

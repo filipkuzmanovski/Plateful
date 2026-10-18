@@ -1,9 +1,12 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.UserCreateDto;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.MyProfileDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.UserDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
+import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,9 +22,11 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final RecipeRepository recipeRepository;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, RecipeRepository recipeRepository) {
         this.userRepository = userRepository;
+        this.recipeRepository = recipeRepository;
     }
 
     /**
@@ -31,10 +36,18 @@ public class UserService {
      * twice is not an error worth surfacing to the user.
      */
     @Transactional
-    public UserDisplayDto getOrCreate(UUID id, String email, UserCreateDto dto) {
+    public MyProfileDto getOrCreate(UUID id, String email, UserCreateDto dto) {
         User user = userRepository.findById(id)
                 .orElseGet(() -> userRepository.save(dto.toEntity(id, email)));
-        return UserDisplayDto.fromEntity(user);
+        return toMyProfile(user);
+    }
+
+    /** The signed-in user's own profile, including isAdmin and how many of their recipes were rejected. */
+    @Transactional(readOnly = true)
+    public MyProfileDto myProfile(UUID id) {
+        return userRepository.findById(id)
+                .map(this::toMyProfile)
+                .orElseThrow(() -> new ResourceNotFoundException("User", id));
     }
 
     @Transactional(readOnly = true)
@@ -50,11 +63,15 @@ public class UserService {
      * own row.
      */
     @Transactional
-    public UserDisplayDto updateNames(UUID id, String firstName, String lastName) {
+    public MyProfileDto updateNames(UUID id, String firstName, String lastName) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));
         user.setFirstName(firstName);
         user.setLastName(lastName);
-        return UserDisplayDto.fromEntity(user); // dirty checking flushes the UPDATE
+        return toMyProfile(user); // dirty checking flushes the UPDATE
+    }
+
+    private MyProfileDto toMyProfile(User user) {
+        return MyProfileDto.of(user, recipeRepository.countByUserIdAndStatus(user.getId(), RecipeStatus.REJECTED));
     }
 }

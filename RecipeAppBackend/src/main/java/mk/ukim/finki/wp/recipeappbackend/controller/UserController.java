@@ -2,6 +2,7 @@ package mk.ukim.finki.wp.recipeappbackend.controller;
 
 import jakarta.validation.Valid;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.UserCreateDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.MyProfileDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.UserDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.security.CurrentUserId;
@@ -39,21 +40,21 @@ public class UserController {
      * email come from the verified JWT, never the body.
      */
     @PostMapping("/me")
-    public UserDisplayDto createMyProfile(@CurrentUserId UUID userId,
-                                          @AuthenticationPrincipal Jwt jwt,
-                                          @Valid @RequestBody UserCreateDto dto) {
+    public MyProfileDto createMyProfile(@CurrentUserId UUID userId,
+                                        @AuthenticationPrincipal Jwt jwt,
+                                        @Valid @RequestBody UserCreateDto dto) {
         return userService.getOrCreate(userId, jwt.getClaimAsString("email"), dto);
     }
 
     /** 404 here = "profile not provisioned yet" — the frontend's cue to collect names. */
     @GetMapping("/me")
-    public UserDisplayDto myProfile(@CurrentUserId UUID userId) {
-        return userService.getById(userId);
+    public MyProfileDto myProfile(@CurrentUserId UUID userId) {
+        return userService.myProfile(userId);
     }
 
     @PutMapping("/me")
-    public UserDisplayDto updateMyProfile(@CurrentUserId UUID userId,
-                                          @Valid @RequestBody UserCreateDto dto) {
+    public MyProfileDto updateMyProfile(@CurrentUserId UUID userId,
+                                        @Valid @RequestBody UserCreateDto dto) {
         return userService.updateNames(userId, dto.firstName(), dto.lastName());
     }
 

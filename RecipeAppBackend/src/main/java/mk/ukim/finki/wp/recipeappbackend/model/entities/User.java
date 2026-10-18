@@ -8,6 +8,7 @@ import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -57,6 +58,11 @@ public class User implements Persistable<UUID> {
 
     @Column(name = "email", nullable = false, unique = true)
     private String email;
+
+    // Set by hand with SQL only. Read-only from the app: it is never written, and no request DTO carries it.
+    @Column(name = "is_admin", nullable = false, insertable = false, updatable = false)
+    @Setter(AccessLevel.NONE)
+    private boolean isAdmin;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

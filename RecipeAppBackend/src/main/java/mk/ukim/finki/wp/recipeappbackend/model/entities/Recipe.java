@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.model.entities;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -14,6 +15,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import mk.ukim.finki.wp.recipeappbackend.model.InstructionStep;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatusConverter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -133,6 +136,35 @@ public class Recipe {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "nutrition", columnDefinition = "jsonb")
     private Map<String, Object> nutrition;
+
+    // Admin review (V6). The status column holds the lowercase text; the converter maps it.
+    @Builder.Default
+    @Convert(converter = RecipeStatusConverter.class)
+    @Column(name = "status", nullable = false)
+    private RecipeStatus status = RecipeStatus.PENDING;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
+    @Column(name = "approved_title")
+    private String approvedTitle;
+
+    @Column(name = "ever_approved", nullable = false)
+    private boolean everApproved;
+
+    @Builder.Default
+    @Column(name = "submitted_at", nullable = false)
+    private OffsetDateTime submittedAt = OffsetDateTime.now();
+
+    @Column(name = "reviewed_at")
+    private OffsetDateTime reviewedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by")
+    private User reviewedBy;
+
+    @Column(name = "revision", nullable = false)
+    private int revision;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

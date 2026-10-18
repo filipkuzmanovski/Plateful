@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.repository;
 
+import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.CuisineCount;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,9 @@ public interface RecipeRepository extends JpaRepository<Recipe, UUID>, JpaSpecif
     // 500 recipes would load all 500 rows (plus their JSONB blobs) into
     // memory on every profile view. Now paginated like every other listing.
     Page<Recipe> findByUserId(UUID userId, Pageable pageable);
+
+    // how many of a user's recipes are in a given review state (e.g. rejected, for the profile badge)
+    long countByUserIdAndStatus(UUID userId, RecipeStatus status);
 
     // recipe count per cuisine key (unnests the text[] column); callers map keys onto the catalogue
     @Query(value = "select c as key, count(*) as count from recipes, unnest(cuisines) c group by c", nativeQuery = true)

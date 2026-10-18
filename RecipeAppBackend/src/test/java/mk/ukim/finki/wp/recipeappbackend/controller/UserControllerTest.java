@@ -4,6 +4,7 @@ import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.UserCreateDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.MyProfileDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.UserDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import mk.ukim.finki.wp.recipeappbackend.service.UserService;
@@ -23,6 +24,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -56,7 +58,7 @@ class UserControllerTest {
     @Test
     void postMe_passesJwtIdentityToService() throws Exception {
         when(userService.getOrCreate(eq(USER_ID), eq("jane@example.com"), any()))
-                .thenReturn(new UserDisplayDto(USER_ID, "Jane", "Doe"));
+                .thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0));
 
         mockMvc.perform(post("/api/users/me")
                         .with(authed())
@@ -90,7 +92,7 @@ class UserControllerTest {
 
     @Test
     void getMe_notProvisioned_is404ProblemDetail() throws Exception {
-        when(userService.getById(USER_ID)).thenThrow(new ResourceNotFoundException("User", USER_ID));
+        when(userService.myProfile(USER_ID)).thenThrow(new ResourceNotFoundException("User", USER_ID));
 
         mockMvc.perform(get("/api/users/me").with(authed()))
                 .andExpect(status().isNotFound())
@@ -106,7 +108,7 @@ class UserControllerTest {
     @Test
     void putMe_updatesNames() throws Exception {
         when(userService.updateNames(USER_ID, "Janet", "Doe"))
-                .thenReturn(new UserDisplayDto(USER_ID, "Janet", "Doe"));
+                .thenReturn(new MyProfileDto(USER_ID, "Janet", "Doe", false, 0));
 
         mockMvc.perform(put("/api/users/me")
                         .with(authed())
@@ -114,6 +116,34 @@ class UserControllerTest {
                         .content("{\"firstName\":\"Janet\",\"lastName\":\"Doe\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Janet"));
+    }
+
+    @Test
+    void myProfileIncludesIsAdminAndRejectedCount() throws Exception {
+        when(userService.myProfile(USER_ID)).thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0));
+
+        mockMvc.perform(get("/api/users/me").with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.isAdmin").value(false))
+                .andExpect(jsonPath("$.rejectedCount").value(0));
+    }
+
+    @Test
+    void updateMyProfileIgnoresIsAdmin() throws Exception {
+        when(userService.updateNames(USER_ID, "Janet", "Doe"))
+                .thenReturn(new MyProfileDto(USER_ID, "Janet", "Doe", false, 0));
+
+        mockMvc.perform(put("/api/users/me")
+                        .with(authed())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\":\"Janet\",\"lastName\":\"Doe\",\"isAdmin\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isAdmin").value(false));
+
+        // the flag in the body never reaches the service: its only inputs are the id and the two names
+        verify(userService).updateNames(USER_ID, "Janet", "Doe");
+        verifyNoMoreInteractions(userService);
     }
 
     @Test
