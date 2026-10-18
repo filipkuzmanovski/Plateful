@@ -66,7 +66,7 @@ export function RecipeBody({
       {/* Left: sticky photo and facts card */}
       <aside>
         <div className="overflow-hidden rounded-card bg-paper shadow-card ring-1 ring-sand/70 lg:sticky lg:top-24">
-          <PhotoCollage photos={recipe.photos} title={recipe.title} />
+          <PhotoCollage photos={recipe.photos} video={recipe.video ?? null} title={recipe.title} />
           <div className="space-y-5 p-5 sm:p-6">
             {hasFacts && (
               <dl className="flex gap-2">

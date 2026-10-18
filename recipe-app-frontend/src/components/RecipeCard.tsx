@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { Clock, UtensilsCrossed } from 'lucide-react';
+import { Clock, UtensilsCrossed, Video } from 'lucide-react';
 import type { RecipeDisplay } from '@/lib/types';
 import { StarDisplay } from './StarDisplay';
 import { Pill } from './ui';
@@ -14,7 +14,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
         to={`/recipes/${recipe.id}`}
         className="flex flex-1 flex-col overflow-hidden rounded-card bg-paper shadow-card ring-1 ring-sand/70 transition duration-300 ease-out group-hover:shadow-lift group-hover:ring-sand"
       >
-        <div className="aspect-[4/3] overflow-hidden bg-sand">
+        <div className="relative aspect-[4/3] overflow-hidden bg-sand">
           {recipe.image ? (
             <img
               src={recipe.image}
@@ -26,6 +26,13 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
             <div className="flex size-full items-center justify-center bg-sand text-olive/30">
               <UtensilsCrossed aria-hidden="true" className="size-10" strokeWidth={1.25} />
             </div>
+          )}
+          {recipe.video && (
+            // Top left; the bookmark owns the top right, and the review status badge sits in the text below.
+            <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-olive/85 px-2.5 py-1 text-xs font-semibold text-cream shadow-button">
+              <Video aria-hidden="true" className="size-3.5" strokeWidth={2} />
+              Video
+            </span>
           )}
         </div>
         <div className="flex flex-1 flex-col gap-2.5 px-4 pt-3.5 pb-4">
