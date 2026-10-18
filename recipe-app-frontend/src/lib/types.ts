@@ -10,6 +10,11 @@ export interface RecipeReview {
   revision: number; submittedAt: string;
 }
 
+/** A recipe's optional clip: the public file URLs and its length, rounded up to whole seconds. */
+export interface RecipeVideo { url: string; posterUrl: string; durationSeconds: number; }
+/** What the form sends: storage paths, not URLs. */
+export interface RecipeVideoInput { path: string; posterPath: string; durationSeconds: number; }
+
 export interface RecipeDisplay {
   id: string; source: string; user: UserDisplay | null; title: string;
   image: string | null; servings: number | null; readyInMinutes: number | null;
@@ -22,6 +27,8 @@ export interface RecipeDisplay {
   ingredients: IngredientDisplay[]; averageRating: number | null;
   ratingCount: number; commentCount: number; createdAt: string | null;
   photos: string[];
+  /** A video-only recipe has no photos and its `image` is the video's poster. */
+  video?: RecipeVideo | null;
   /** Null for anyone but the author or an admin. */
   review?: RecipeReview | null;
 }
@@ -56,4 +63,5 @@ export interface RecipeCreate {
   instructionsSteps: InstructionStep[]; dairyFree: boolean; glutenFree: boolean;
   vegan: boolean; vegetarian: boolean; cuisines: string[]; ingredients: IngredientCreate[];
   photos: string[];
+  video?: RecipeVideoInput | null;
 }
