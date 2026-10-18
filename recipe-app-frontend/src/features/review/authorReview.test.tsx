@@ -77,7 +77,8 @@ test('createShowsSubmittedToast', async () => {
 
 test('adminCreateHasNoReviewToast', async () => {
   await createRecipeAs({ ...profileFixture, isAdmin: true });
-  expect(screen.queryByText(SUBMITTED_TOAST)).not.toBeInTheDocument();
+  // Give a wrongly shown toast time to render before asserting it is absent.
+  await expect(screen.findByText(SUBMITTED_TOAST, {}, { timeout: 400 })).rejects.toThrow();
   expectNoEmoji();
 });
 

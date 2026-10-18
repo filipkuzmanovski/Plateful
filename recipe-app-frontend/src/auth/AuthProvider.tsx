@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { getMe } from '@/api/users';
@@ -24,6 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfileState] = useState<MyProfile | null>(null);
   const [status, setStatus] = useState<Status>('loading');
+  // Latest signed-in user id and status, readable from async callbacks that must not act on stale state.
+  const liveUserId = useRef<string | null>(null);
+  const liveStatus = useRef<Status>('loading');
+  useEffect(() => { liveStatus.current = status; }, [status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function resolveProfile(s: Session | null) {
       // The assurance level is part of the key: an aal1 -> aal2 upgrade is a real change to resolve.
+      liveUserId.current = s?.user.id ?? null;
       const key = s ? `${s.user.id}:${aalOf(s) ?? 'none'}` : null;
       if (key === lastUserKey) return; // dedupes INITIAL_SESSION/getSession double-fire and token refreshes
       lastUserKey = key;
@@ -121,19 +126,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    const userId = liveUserId.current;
+    if (!userId || liveStatus.current !== 'ready') return;
+    try {
+      const me = await getMe();
+      // The user may have signed out or switched while the request was in flight.
+      if (liveUserId.current === userId && liveStatus.current === 'ready') setProfileState(me);
+    } catch {
+      // Keep the profile we have; the next load corrects the count.
+    }
+  }, []);
+
   const value: AuthState = {
     session,
     profile,
     status,
     signOut: async () => { await supabase.auth.signOut(); },
     setProfile: (p) => { setProfileState(p); setStatus('ready'); },
-    refreshProfile: async () => {
-      try {
-        setProfileState(await getMe());
-      } catch {
-        // Keep the profile we have; the next load corrects the count.
-      }
-    },
+    refreshProfile,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
