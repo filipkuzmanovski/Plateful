@@ -38,7 +38,7 @@ export default function TermsPage() {
                 display and share it on the service, so that other people can see it.
               </p>
               <p>
-                You confirm that you have the right to post it. Please do not post recipes or photos copied from
+                You confirm that you have the right to post it. Please do not post recipes, photos or videos copied from
                 someone else without their permission. You can delete your content at any time.
               </p>
             </>

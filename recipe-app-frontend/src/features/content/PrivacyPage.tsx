@@ -36,7 +36,7 @@ export default function PrivacyPage() {
                 date of birth is checked in your browser and never sent or stored.
               </li>
               <li>
-                <Strong>Content you post:</Strong> recipes, photos, ratings, comments, likes and dislikes.
+                <Strong>Content you post:</Strong> recipes, photos and videos, ratings, comments, likes and dislikes.
               </li>
               <li>
                 <Strong>Security:</Strong> the two-factor authentication devices you set up, which are managed by our
@@ -101,8 +101,8 @@ export default function PrivacyPage() {
             <>
               <Ul>
                 <li>
-                  <Strong>Supabase</Strong> provides our database, authentication and photo storage. Its servers are in
-                  the EU, in Stockholm, Sweden.
+                  <Strong>Supabase</Strong> provides our database, authentication and photo and video storage. Its
+                  servers are in the EU, in Stockholm, Sweden.
                 </li>
                 <li>
                   <Strong>Our web hosting providers</Strong> serve the site to you. They will be named here once the
@@ -118,8 +118,8 @@ export default function PrivacyPage() {
           title: 'Public content',
           body: (
             <p>
-              Recipes, photos, ratings, comments and your display name are visible to anyone who visits {SITE.name}, not
-              only to people who are signed in. Please do not post anything you want to keep private.
+              Recipes, photos and videos, ratings, comments and your display name are visible to anyone who visits{' '}
+              {SITE.name}, not only to people who are signed in. Please do not post anything you want to keep private.
             </p>
           ),
         },

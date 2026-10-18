@@ -152,6 +152,15 @@ describe('Privacy Policy', () => {
     for (const a of mails) expect(a).toHaveAttribute('href', `mailto:${SITE.contactEmail}`);
   });
 
+  test('mentions videos in what we collect, who sees it and where it is stored', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const main = screen.getByRole('main');
+    expect(main).toHaveTextContent('recipes, photos and videos, ratings, comments, likes and dislikes');
+    expect(main).toHaveTextContent('Recipes, photos and videos, ratings, comments and your display name are visible');
+    expect(main).toHaveTextContent('authentication and photo and video storage');
+  });
+
   test('has section headings as h2', async () => {
     renderApp('/privacy');
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
@@ -164,6 +173,12 @@ describe('Terms of Service', () => {
   test('shows the last-updated date from SITE', async () => {
     renderApp('/terms');
     expect(await screen.findByText(`Last updated: ${SITE.legalLastUpdated}`)).toBeInTheDocument();
+  });
+
+  test('covers videos in the sentence about copied content', async () => {
+    renderApp('/terms');
+    await screen.findByRole('heading', { level: 1, name: 'Terms of Service' });
+    expect(screen.getByRole('main')).toHaveTextContent('recipes, photos or videos copied from someone else');
   });
 
   test('has the food-safety disclaimer heading', async () => {
