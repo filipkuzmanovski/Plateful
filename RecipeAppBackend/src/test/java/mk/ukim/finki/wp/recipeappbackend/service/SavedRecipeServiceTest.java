@@ -8,6 +8,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.SavedItemDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
+import mk.ukim.finki.wp.recipeappbackend.photo.RecipeVideoPaths;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
@@ -59,6 +60,7 @@ class SavedRecipeServiceTest {
                 new CuisineCatalog(),
                 mock(RecipePhotoRepository.class),
                 new RecipePhotoPaths("https://x/recipe-photos"),
+                new RecipeVideoPaths("https://x/recipe-videos"),
                 visibility);
         service = new SavedRecipeService(savedRepository, recipeRepository, recipeService, visibility);
     }

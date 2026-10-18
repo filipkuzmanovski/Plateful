@@ -8,6 +8,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
+import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeVideoCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeIngredientDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeReviewDto;
@@ -19,6 +20,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.projection.RecipeCommentCount;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.RecipeRatingSummary;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
+import mk.ukim.finki.wp.recipeappbackend.photo.RecipeVideoPaths;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRatingRepository;
@@ -63,6 +65,7 @@ public class RecipeService {
     private final CuisineCatalog cuisineCatalog;
     private final RecipePhotoRepository photoRepository;
     private final RecipePhotoPaths photoPaths;
+    private final RecipeVideoPaths videoPaths;
     private final RecipeVisibility visibility;
 
     public RecipeService(RecipeRepository recipeRepository,
@@ -73,6 +76,7 @@ public class RecipeService {
                          CuisineCatalog cuisineCatalog,
                          RecipePhotoRepository photoRepository,
                          RecipePhotoPaths photoPaths,
+                         RecipeVideoPaths videoPaths,
                          RecipeVisibility visibility) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
@@ -82,6 +86,7 @@ public class RecipeService {
         this.cuisineCatalog = cuisineCatalog;
         this.photoRepository = photoRepository;
         this.photoPaths = photoPaths;
+        this.videoPaths = videoPaths;
         this.visibility = visibility;
     }
 
@@ -100,7 +105,9 @@ public class RecipeService {
         Recipe toSave = dto.toEntity(owner);
         toSave.setCuisines(validatedCuisines(dto));
         List<String> photos = photoPaths.validate(userId, dto.photos());
-        toSave.setImage(coverUrl(photos));
+        RecipeVideoCreateDto video = videoPaths.validate(userId, dto.video());
+        applyVideo(toSave, video);
+        toSave.setImage(coverUrl(photos, video));
         // An admin's own recipes skip the queue; everyone else's wait for review.
         if (visibility.isAdmin(userId)) {
             markApproved(toSave, owner);
@@ -201,6 +208,10 @@ public class RecipeService {
         // Validate before mutating anything, so a rejected edit leaves the entity untouched.
         List<String> cuisines = validatedCuisines(dto);
         List<String> photos = photoPaths.validate(userId, dto.photos());
+        RecipeVideoCreateDto video = videoPaths.validate(userId, dto.video());
+        // Remembered before the video changes: a photoless recipe's cover image is its poster.
+        String oldPosterUrl = recipe.getVideoPosterPath() != null
+                ? videoPaths.publicUrl(recipe.getVideoPosterPath()) : null;
 
         recipe.setTitle(dto.title());
         recipe.setServings(dto.servings());
@@ -217,6 +228,7 @@ public class RecipeService {
         recipe.setVegan(dto.vegan());
         recipe.setVegetarian(dto.vegetarian());
         recipe.setCuisines(cuisines);
+        applyVideo(recipe, video);
         // Every successful edit changes what a reviewer would see, so it bumps the revision
         // (a stale approve/reject is then refused), and it re-enters review unless the author is an admin.
         recipe.setRevision(recipe.getRevision() + 1);
@@ -234,14 +246,21 @@ public class RecipeService {
 
         List<RecipePhoto> savedPhotos;
         if (photos.isEmpty() && !photoRepository.existsByRecipeId(recipeId)) {
-            // Legacy recipe whose cover is a linked image URL (no photo rows): leave it alone.
+            // Legacy recipe whose cover is a linked image URL (no photo rows): leave it alone,
+            // unless a video is being set (the poster becomes the cover) or the poster was the cover
+            // and the video is gone (nothing left to show).
             savedPhotos = List.of();
+            if (video != null) {
+                recipe.setImage(coverUrl(photos, video));
+            } else if (oldPosterUrl != null && oldPosterUrl.equals(recipe.getImage())) {
+                recipe.setImage(null);
+            }
         } else {
             photoRepository.deleteAllByRecipeId(recipeId);
             savedPhotos = photos.isEmpty()
                     ? List.of()
                     : photoRepository.saveAll(toPhotoEntities(recipe, photos));
-            recipe.setImage(coverUrl(photos));
+            recipe.setImage(coverUrl(photos, video));
         }
 
         return toDisplayDto(recipe, ingredients, savedPhotos).withReview(RecipeReviewDto.of(recipe));
@@ -319,13 +338,26 @@ public class RecipeService {
                 ratingRepository.findAverageRatingByRecipeId(recipe.getId()),
                 ratingRepository.countByRecipeId(recipe.getId()),
                 commentRepository.countByRecipeId(recipe.getId()),
-                null // video: wired in the service in the next task
+                videoPaths.toDisplay(recipe)
         );
     }
 
-    /** The cover (position 0) as a public URL, or null when there are no photos. */
-    private String coverUrl(List<String> photos) {
-        return photos.isEmpty() ? null : photoPaths.publicUrl(photos.get(0));
+    /**
+     * The cover as a public URL: photo 0 if there are photos, else the video's poster, else null.
+     * Photos win so a recipe's card image never changes just because a video was added.
+     */
+    private String coverUrl(List<String> photos, RecipeVideoCreateDto video) {
+        if (!photos.isEmpty()) {
+            return photoPaths.publicUrl(photos.get(0));
+        }
+        return video != null ? videoPaths.publicUrl(video.posterPath()) : null;
+    }
+
+    /** Sets or clears the three video columns together (the DB constraint requires all or none). */
+    private void applyVideo(Recipe recipe, RecipeVideoCreateDto video) {
+        recipe.setVideoPath(video != null ? video.path() : null);
+        recipe.setVideoPosterPath(video != null ? video.posterPath() : null);
+        recipe.setVideoDurationSeconds(video != null ? video.durationSeconds() : null);
     }
 
     private List<RecipePhoto> toPhotoEntities(Recipe recipe, List<String> paths) {
@@ -339,10 +371,14 @@ public class RecipeService {
     /**
      * Public URLs of the (already position-ordered) photo rows. Recipes without rows fall back to
      * their linked image (imported or legacy recipes), so clients only ever read {@code photos}.
+     * A video's poster stands in as the card image but is not a photo, so it is not repeated here.
      */
     private List<String> photoUrls(Recipe recipe, List<RecipePhoto> photos) {
         if (photos.isEmpty()) {
-            return recipe.getImage() != null ? List.of(recipe.getImage()) : List.of();
+            String image = recipe.getImage();
+            boolean isPoster = recipe.getVideoPosterPath() != null
+                    && videoPaths.publicUrl(recipe.getVideoPosterPath()).equals(image);
+            return image != null && !isPoster ? List.of(image) : List.of();
         }
         return photos.stream().map(p -> photoPaths.publicUrl(p.getPath())).toList();
     }
@@ -405,7 +441,7 @@ public class RecipeService {
                     summary != null ? summary.averageRating() : null,
                     summary != null ? summary.ratingCount() : 0L,
                     commentCounts.getOrDefault(recipe.getId(), 0L),
-                    null // video: wired in the service in the next task
+                    videoPaths.toDisplay(recipe)
             );
             return withReview ? dto.withReview(RecipeReviewDto.of(recipe)) : dto;
         });

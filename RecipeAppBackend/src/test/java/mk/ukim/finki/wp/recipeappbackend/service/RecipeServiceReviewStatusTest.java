@@ -10,6 +10,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
+import mk.ukim.finki.wp.recipeappbackend.photo.RecipeVideoPaths;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
@@ -63,6 +64,7 @@ class RecipeServiceReviewStatusTest {
                 new CuisineCatalog(),
                 photoRepository,
                 paths,
+                new RecipeVideoPaths("https://x/recipe-videos"),
                 visibility);
         owner = User.builder().id(userId).build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(owner));

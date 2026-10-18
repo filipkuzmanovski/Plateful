@@ -7,6 +7,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
+import mk.ukim.finki.wp.recipeappbackend.photo.RecipeVideoPaths;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
@@ -54,6 +55,7 @@ class RecipeServiceBrowseTest {
                 new CuisineCatalog(),
                 mock(RecipePhotoRepository.class),
                 new RecipePhotoPaths("https://x/recipe-photos"),
+                new RecipeVideoPaths("https://x/recipe-videos"),
                 visibility);
     }
 

@@ -7,6 +7,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeIngredientCreateD
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
+import mk.ukim.finki.wp.recipeappbackend.photo.RecipeVideoPaths;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
@@ -53,6 +54,7 @@ class RecipeServiceCuisineValidationTest {
                 catalog,
                 mock(RecipePhotoRepository.class),
                 new RecipePhotoPaths("https://x/recipe-photos"),
+                new RecipeVideoPaths("https://x/recipe-videos"),
                 mock(RecipeVisibility.class));
         owner = User.builder().id(userId).build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(owner));
