@@ -8,11 +8,13 @@ function RejectForm({
   busy,
   error,
   onCancel,
+  onEdit,
   onSubmit,
 }: {
   busy: boolean;
   error: string | null;
   onCancel: () => void;
+  onEdit: () => void;
   onSubmit: (reason: string) => void;
 }) {
   const [reason, setReason] = useState('');
@@ -32,7 +34,7 @@ function RejectForm({
       <textarea
         id="reject-reason"
         value={reason}
-        onChange={(e) => setReason(e.target.value)}
+        onChange={(e) => { setReason(e.target.value); onEdit(); }}
         rows={5}
         required
         aria-describedby="reject-reason-count"
@@ -48,7 +50,7 @@ function RejectForm({
         </span>
       </div>
       <div className="mt-6 flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>Cancel</Button>
         <Button type="submit" variant="danger" disabled={!valid || busy}>Reject recipe</Button>
       </div>
     </form>
@@ -61,6 +63,7 @@ export function RejectDialog({
   busy,
   error,
   onCancel,
+  onEdit,
   onSubmit,
 }: {
   open: boolean;
@@ -68,10 +71,13 @@ export function RejectDialog({
   /** A reason problem reported by the server, shown under the field. */
   error: string | null;
   onCancel: () => void;
+  /** The reason text changed, so a server complaint about the old text no longer applies. */
+  onEdit: () => void;
   onSubmit: (reason: string) => void;
 }) {
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && onCancel()}>
+    // Escape and overlay clicks are ignored mid-request, so the dialog cannot vanish before the outcome is known.
+    <Dialog.Root open={open} onOpenChange={(o) => !o && !busy && onCancel()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-olive/35 backdrop-blur-[2px]" />
         <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 animate-dialog-in rounded-card bg-paper p-6 shadow-lift ring-1 ring-sand sm:p-7">
@@ -80,7 +86,7 @@ export function RejectDialog({
             The author will see this reason and can edit the recipe to send it back for review.
           </Dialog.Description>
           {/* Mounted only while open, so every opening starts with an empty reason. */}
-          <RejectForm busy={busy} error={error} onCancel={onCancel} onSubmit={onSubmit} />
+          <RejectForm busy={busy} error={error} onCancel={onCancel} onEdit={onEdit} onSubmit={onSubmit} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

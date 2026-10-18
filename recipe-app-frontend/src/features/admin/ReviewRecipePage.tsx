@@ -43,7 +43,14 @@ function problemOf(e: unknown): Problem | null {
 function ReviewRecipeView({ id }: { id: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: ['admin', 'recipe', id], queryFn: () => getReviewRecipe(id), retry: false });
+  const query = useQuery({ queryKey: ['admin', 'recipe', id], queryFn: () => getReviewRecipe(id),
+    retry: false,
+    // The revision the admin read is what a decision sends. Only Reload (or a 409) may change it, never a focus or
+    // reconnect refetch: that would swap in the author's newer edit and defeat the recipe_changed guard.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
   const [problem, setProblem] = useState<Problem | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [reasonError, setReasonError] = useState<string | null>(null);
@@ -85,7 +92,8 @@ function ReviewRecipeView({ id }: { id: string }) {
   if (leaving) return <Spinner />;
   if (problem === 'mfa' || (query.isError && isAdminMfaSetupRequired(query.error))) return <AdminMfaPanel />;
   if (query.isPending) return <Spinner />;
-  if (query.isError) {
+  // A failed Reload keeps the recipe on screen (query.data survives a failed refetch).
+  if (query.isError && !query.data) {
     const notFound = query.error instanceof ApiError && query.error.status === 404;
     return (
       <EmptyState icon={notFound ? SearchX : CircleAlert} action={backLink}>
@@ -102,6 +110,7 @@ function ReviewRecipeView({ id }: { id: string }) {
 
   return (
     <>
+      {!decided && <div className="mb-6">{backLink}</div>}
       <RecipeBody recipe={recipe} />
       <div className="sticky bottom-0 z-20 mt-10 -mx-4 border-t border-sand bg-paper/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
@@ -115,7 +124,12 @@ function ReviewRecipeView({ id }: { id: string }) {
               <Button
                 variant="outline"
                 disabled={query.isFetching}
-                onClick={() => void query.refetch().then((r) => { if (r.isSuccess) setProblem(null); })}
+                onClick={() =>
+                  void query.refetch().then((r) => {
+                    if (r.isSuccess) setProblem(null);
+                    else toast.error("Couldn't reload this recipe.");
+                  })
+                }
               >
                 Reload
               </Button>
@@ -144,7 +158,12 @@ function ReviewRecipeView({ id }: { id: string }) {
         busy={decide.isPending}
         error={reasonError}
         onCancel={() => setRejecting(false)}
-        onSubmit={(reason) => { if (revision !== undefined) decide.mutate({ revision, reason }); }}
+        onEdit={() => setReasonError(null)}
+        onSubmit={(reason) => {
+          if (revision === undefined) return;
+          setReasonError(null);
+          decide.mutate({ revision, reason });
+        }}
       />
     </>
   );

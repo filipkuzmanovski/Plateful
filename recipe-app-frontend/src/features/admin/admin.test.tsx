@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, focusManager } from '@tanstack/react-query';
 import { server } from '@/test/server';
 import { newTestQueryClient, renderApp } from '@/test/utils';
 import { pageOf, profileFixture, recipeFixture } from '@/test/fixtures';
@@ -389,4 +390,100 @@ test('adminWithoutMfaSeesPanelOnTheReviewPage', async () => {
 
   expect(await screen.findByText('Set up two-factor authentication to use the review queue.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /two-factor/i })).toHaveAttribute('href', '/me');
+});
+
+test('focusDoesNotRefetchReviewedRecipe', async () => {
+  // Stale immediately, as it would be after a long time in another tab: a refetch on focus would be allowed.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } });
+  let body: unknown;
+  signedInAs(admin);
+  serveAdmin({ recipes: [pending('r-1', 'Lemon Tart')] });
+  renderApp('/admin/review/r-1', queryClient);
+  expect(await screen.findByRole('heading', { name: 'Lemon Tart' })).toBeInTheDocument();
+
+  // The author edits while the admin is away.
+  let fetches = 0;
+  server.use(
+    http.get(`${BASE}/api/admin/recipes/r-1`, () => {
+      fetches++;
+      return HttpResponse.json(pending('r-1', 'Lemon Tart, edited', { revision: 5 }));
+    }),
+    http.post(`${BASE}/api/admin/recipes/r-1/approve`, async ({ request }) => {
+      body = await request.json();
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+  window.dispatchEvent(new Event('focus'));
+  document.dispatchEvent(new Event('visibilitychange'));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  expect(fetches).toBe(0);
+  expect(screen.getByRole('heading', { name: 'Lemon Tart' })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
+  await screen.findByText('Recipe approved');
+  expect(body).toEqual({ revision: 4 });
+});
+
+test('failedReloadKeepsThePage', async () => {
+  await openReview(pending('r-1', 'Lemon Tart'));
+  server.use(http.post(`${BASE}/api/admin/recipes/r-1/approve`, () => problem(409, 'recipe_changed')));
+  await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
+  await screen.findByText('This recipe changed. Reload to review the latest version.');
+
+  server.use(http.get(`${BASE}/api/admin/recipes/r-1`, () => problem(500, 'boom')));
+  await userEvent.click(screen.getByRole('button', { name: 'Reload' }));
+
+  expect(await screen.findByText("Couldn't reload this recipe.")).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Lemon Tart' })).toBeInTheDocument();
+  expect(screen.queryByText("Couldn't load this recipe.")).not.toBeInTheDocument();
+  expect(screen.getByText('This recipe changed. Reload to review the latest version.')).toBeInTheDocument();
+});
+
+test('rejectDialogIgnoresEscapeWhileSending', async () => {
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  await openReview(pending('r-1', 'Lemon Tart'));
+  server.use(
+    http.post(`${BASE}/api/admin/recipes/r-1/reject`, async () => {
+      await gate;
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+
+  await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+  await userEvent.type(await screen.findByRole('textbox'), 'Needs work');
+  await userEvent.click(screen.getByRole('button', { name: 'Reject recipe' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Reject recipe' })).toBeDisabled());
+
+  await userEvent.keyboard('{Escape}');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  release();
+  expect(await screen.findByText('Recipe rejected')).toBeInTheDocument();
+});
+
+test('serverReasonErrorClearsWhenTheReasonChanges', async () => {
+  await openReview(pending('r-1', 'Lemon Tart'));
+  server.use(
+    http.post(`${BASE}/api/admin/recipes/r-1/reject`, () =>
+      HttpResponse.json({ status: 400, detail: 'Validation failed', errors: { reason: 'Bad reason' } }, { status: 400 }),
+    ),
+  );
+
+  await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+  const reason = await screen.findByRole('textbox');
+  await userEvent.type(reason, 'First');
+  await userEvent.click(screen.getByRole('button', { name: 'Reject recipe' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Bad reason');
+
+  await userEvent.type(reason, ' more');
+  expect(screen.queryByText('Bad reason')).not.toBeInTheDocument();
+});
+
+test('reviewPageLinksBackToTheQueue', async () => {
+  await openReview(pending('r-1', 'Lemon Tart'));
+  expect(screen.getByRole('link', { name: 'Back to the queue' })).toHaveAttribute('href', '/admin/review');
 });
