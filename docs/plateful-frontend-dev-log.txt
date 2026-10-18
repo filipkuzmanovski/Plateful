@@ -3914,7 +3914,8 @@ Task 2 - one visibility rule for recipe reads (8b42837)
 -------------------------------------------------------
 RecipeVisibility is the single rule: a recipe is visible to a viewer when it is
 approved, or the viewer is its author, or the viewer is an admin. Admin status
-is read from users.is_admin on every call, never from the token.
+is read from users.is_admin on every call, never from the token. (After the
+final review it also needs an aal2 session; see "Final review fixes".)
   - Applied to browse, search, cuisine counts, public and own profile lists,
     and the recipe page. Browse, search and counts are approved-only even for
     authors and admins (they use an approved-only specification).
@@ -3950,7 +3951,7 @@ Task 5 - Saved list keeps re-reviewed recipes as stubs (1fb2f96)
 ----------------------------------------------------------------
 GET /api/users/me/saved now returns SavedItemDto rows: kind "recipe" carries
 the normal card, kind "stub" carries SavedRecipeStubDto (id, approvedTitle,
-state pending or unavailable). A saved recipe that was edited or rejected
+state under_review or unavailable). A saved recipe that was edited or rejected
 after it was approved stays in the list as a stub instead of vanishing or
 leaking. SavedRecipeServiceTest and SavedRecipeControllerTest grew.
 
@@ -4061,15 +4062,17 @@ Backend *DbTest against the real database: 10 classes, 43 tests, 0 failures, 0
 errors, 0 skipped. New: AdminReviewSchemaDbTest 4, AdminQueueDbTest 3,
 RecipeVisibilityDbTest 4. (A first run with the database password not
 exported skipped all 43; the counts above are from the run with it.) The
-DbTests run with Flyway disabled, so V6 reaches the live database only through
-the backend restart in the Rollout section below.
+DbTests run with Flyway disabled. V6 was already applied to the live database
+when the dev backend restarted during development, so the DbTests ran against
+the new columns.
 Frontend: npx vitest run, 36 files, 391 tests, all passed. npm run build
 succeeded (only the usual chunk-size warning).
 
 Rollout
 -------
-  1. V6 applies automatically on the next backend restart. Everything visible
-     today stays visible.
+  1. V6 is already applied to the live (dev) database: it landed when the dev
+     backend restarted during development. It applies to the Render database
+     when this branch is deployed. Everything visible today stays visible.
   2. Make yourself an admin in the Supabase SQL editor:
        update users set is_admin = true where email = '<your email>';
   3. The admin account must have two-factor turned on to use the queue.
@@ -4084,9 +4087,49 @@ Rollout
      queue as the admin, and check the email.
   6. After pulling the new mail dependency, reload Maven in IntelliJ.
 
-Known follow-ups
-----------------
-  - The final whole-branch review is still to come.
-  - Photos of pending recipes are reachable by URL in storage but unlisted:
-    the URLs are random and no page links to them. Private storage for them is
-    out of scope for now.
+Final review fixes
+------------------
+The whole-branch review found five things worth fixing before merge.
+  1. The author's create and edit response had no review block, so right after
+     saving, a non-admin saw no "Waiting for review" banner and got comment
+     and rating controls that failed with 409. RecipeService.create and
+     update now attach the review block (the caller is always the author).
+     The authoring tests return a realistic review block, and
+     createShowsPendingBannerImmediately checks the banner with no extra GET.
+  2. Caches that depend on the viewer survived a sign-out. AuthProvider now
+     calls queryClient.removeQueries() when the signed-in user id changes
+     (sign-out, sign-in, or a switch to another user), never on a token
+     refresh or an aal upgrade of the same user.
+  3. Admin rights now need aal2 everywhere. RecipeVisibility.isAdmin is true
+     only when users.is_admin is set and the request's JWT has aal = aal2.
+     An admin on aal1, or without a second factor, is treated as a normal
+     user: they cannot see others' pending recipes through profile lists or
+     the recipe page, and their own new or edited recipes go to the queue.
+     AdminGuard on /api/admin still reads the flag alone
+     (RecipeVisibility.hasAdminFlag), so an admin without a factor still gets
+     403 admin_mfa_setup_required.
+  4. The hidden recipe page shows Save/Saved only for a recipe the reader
+     already saved, so it can be unsaved but never gives a failing Save.
+  5. Small ones: the admin review query uses gcTime 0 (with staleTime
+     Infinity), so reopening a recipe never shows an older revision; the
+     "Unavailable" badge text is full-strength olive for contrast; and
+     ReviewEmailTransactionTest proves, with the real listener and a no-op
+     transaction manager, that a rolled-back approve or reject sends no email
+     and a committed one sends exactly one (spec section 6).
+Verification after the fixes: backend regression list plus the admin-review
+classes (33 classes) 298 tests, 0 failures; *DbTest 43 tests, 0 failures;
+frontend 397 tests; npm run build succeeded.
+
+Known limitations
+-----------------
+  - Photos in storage can be replaced at the same path without a new review.
+    The storage policy lets an author delete and upload objects in their own
+    folder, so an approved recipe's photo can be swapped through the Supabase
+    API without calling the edit endpoint. This is a storage policy matter
+    outside this feature. Backend-mediated deletes or content-addressed paths
+    would close it.
+  - Photo files of pending recipes are reachable by URL but unlisted: the URLs
+    are random and no page links to them. Private storage for them is out of
+    scope for now.
+  - Task 10's gcTime is now 0: the review page drops its recipe when you leave
+    it, so going back to a recipe fetches it again.
