@@ -6,6 +6,7 @@ import { CircleAlert, Pencil, SearchX, Trash2 } from 'lucide-react';
 import { deleteRecipe, getRecipe } from '@/api/recipes';
 import { ApiError } from '@/api/client';
 import { deletePhotos, pathFromPublicUrl } from '@/api/photos';
+import { deleteVideoFiles, pathFromPublicVideoUrl } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
 import { Button, EmptyState, SectionHeading, Spinner } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -29,6 +30,11 @@ export default function RecipeDetailPage() {
       // The row is gone, so its files are orphans; the helper never throws.
       const paths = (query.data?.photos ?? []).map(pathFromPublicUrl).filter((p): p is string => p !== null);
       if (paths.length > 0) void deletePhotos(paths);
+      const video = query.data?.video;
+      const videoFiles = video
+        ? [video.url, video.posterUrl].map(pathFromPublicVideoUrl).filter((p): p is string => p !== null)
+        : [];
+      if (videoFiles.length > 0) void deleteVideoFiles(videoFiles);
       navigate('/'); // leave first, so the removed query isn't refetched by this page
       queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
       void queryClient.invalidateQueries({ queryKey: ['recipes'] });

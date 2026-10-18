@@ -179,12 +179,15 @@ export default function RecipeFormPage() {
     } catch (e) {
       if (e instanceof ApiError && e.errors) {
         for (const [field, message] of Object.entries(e.errors)) {
-          // Backend keys match ours except instructionsSteps[n].x → steps and cuisines[n] → cuisines.
+          // Backend keys match ours except instructionsSteps[n].x → steps, cuisines[n] → cuisines
+          // and video.x → video (the field shows one message).
           const name = field.startsWith('instructionsSteps')
             ? 'steps'
             : field.startsWith('cuisines')
               ? 'cuisines'
-              : field;
+              : field.startsWith('video')
+                ? 'video'
+                : field;
           setError(name as never, { message });
         }
       }

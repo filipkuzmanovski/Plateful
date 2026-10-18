@@ -6,12 +6,18 @@ import { renderApp, newTestQueryClient } from '@/test/utils';
 import { recipeFixture, profileFixture, pageOf } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
 import { deletePhotos, publicPhotoUrl } from '@/api/photos';
+import { deleteVideoFiles, publicVideoUrl } from '@/api/videos';
 
 const BASE = 'http://localhost:8080';
 
 vi.mock('@/api/photos', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/photos')>()),
   deletePhotos: vi.fn(async () => {}),
+}));
+
+vi.mock('@/api/videos', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/videos')>()),
+  deleteVideoFiles: vi.fn(async () => {}),
 }));
 
 vi.mock('@/auth/supabaseClient', () => ({
@@ -199,4 +205,50 @@ test('a failed recipe delete leaves its photos alone', async () => {
   await userEvent.click(await screen.findByRole('button', { name: /confirm/i }));
   expect(await screen.findByText('boom')).toBeInTheDocument();
   expect(deletePhotos).not.toHaveBeenCalled();
+});
+
+function stubVideoRecipeDelete(deleteResponse: () => Response) {
+  server.use(
+    http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profileFixture)),
+    http.get(`${BASE}/api/recipes/r-1`, () =>
+      HttpResponse.json(
+        recipeFixture({
+          user: profileFixture,
+          video: { url: publicVideoUrl('u-1/clip.mp4'), posterUrl: publicVideoUrl('u-1/clip.jpg'), durationSeconds: 30 },
+        }),
+      ),
+    ),
+    http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-1/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+    http.delete(`${BASE}/api/recipes/r-1`, deleteResponse),
+    http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))),
+  );
+}
+
+test('deletingRecipeDeletesItsVideo: after the delete resolves, the clip and its poster are removed from storage', async () => {
+  vi.mocked(deleteVideoFiles).mockClear();
+  const log: string[] = [];
+  vi.mocked(deleteVideoFiles).mockImplementation(async () => { log.push('video'); });
+  stubVideoRecipeDelete(() => {
+    log.push('api');
+    return new HttpResponse(null, { status: 204 });
+  });
+  renderApp('/recipes/r-1');
+  await userEvent.click(await screen.findByRole('button', { name: /delete recipe/i }));
+  await userEvent.click(await screen.findByRole('button', { name: /confirm/i }));
+  await vi.waitFor(() => expect(deleteVideoFiles).toHaveBeenCalledWith(['u-1/clip.mp4', 'u-1/clip.jpg']));
+  expect(deleteVideoFiles).toHaveBeenCalledTimes(1);
+  expect(log).toEqual(['api', 'video']);
+});
+
+test('a failed recipe delete leaves its video alone', async () => {
+  vi.mocked(deleteVideoFiles).mockClear();
+  stubVideoRecipeDelete(() => HttpResponse.json({ status: 500, detail: 'boom' }, { status: 500 }));
+  renderApp('/recipes/r-1');
+  await userEvent.click(await screen.findByRole('button', { name: /delete recipe/i }));
+  await userEvent.click(await screen.findByRole('button', { name: /confirm/i }));
+  expect(await screen.findByText('boom')).toBeInTheDocument();
+  expect(deleteVideoFiles).not.toHaveBeenCalled();
 });

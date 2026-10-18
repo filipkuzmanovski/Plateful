@@ -392,3 +392,57 @@ test('cancelEditDeletesNothing: replacing the video then leaving the form never 
 
   expect(deleteMock).not.toHaveBeenCalled();
 });
+
+test.each([
+  ['removing', 400],
+  ['removing', 500],
+  ['replacing', 400],
+])('a failed save after %s the video (HTTP %i) deletes nothing and keeps the form value', async (action, status) => {
+  const state = stubEditWithVideo();
+  server.use(
+    http.put(`${BASE}/api/recipes/r-1`, () => {
+      state.log.push('put');
+      return HttpResponse.json({ status, detail: 'Save failed' }, { status });
+    }),
+  );
+  renderApp('/recipes/r-1/edit');
+  await screen.findByText('0:42');
+  if (action === 'removing') {
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(screen.getByRole('button', { name: 'Add video' })).toBeInTheDocument();
+  } else {
+    await pick(clip('new.mp4'));
+    await waitFor(() => expect(poster()).toHaveAttribute('src', publicVideoUrl('u-1/clip.jpg')));
+  }
+
+  await userEvent.click(saveButton());
+  expect(await screen.findByText('Save failed')).toBeInTheDocument(); // the error toast
+  expect(state.log).toEqual(['put']);
+  expect(deleteMock).not.toHaveBeenCalled();
+  // The form still holds the new value, so the author can fix the problem and save again.
+  if (action === 'removing') {
+    expect(screen.getByRole('button', { name: 'Add video' })).toBeInTheDocument();
+  } else {
+    expect(poster()).toHaveAttribute('src', publicVideoUrl('u-1/clip.jpg'));
+  }
+});
+
+test('nestedVideoErrorsShowUnderTheVideoField: a server key like video.path maps to the video field', async () => {
+  const state = stubEditWithVideo();
+  server.use(
+    http.put(`${BASE}/api/recipes/r-1`, () => {
+      state.log.push('put');
+      return HttpResponse.json(
+        { status: 400, detail: 'Validation failed', errors: { 'video.path': 'Video path is invalid' } },
+        { status: 400 },
+      );
+    }),
+  );
+  renderApp('/recipes/r-1/edit');
+  await screen.findByText('0:42');
+  await userEvent.click(saveButton());
+
+  const message = await screen.findByText('Video path is invalid');
+  expect(message).toHaveAttribute('role', 'alert');
+  expect(deleteMock).not.toHaveBeenCalled();
+});
