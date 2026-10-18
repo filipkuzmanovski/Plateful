@@ -4133,3 +4133,130 @@ Known limitations
     scope for now.
   - Task 10's gcTime is now 0: the review page drops its recipe when you leave
     it, so going back to a recipe fetches it again.
+
+
+
+
+################################################################################
+################################################################################
+ PART 14 — RECIPE VIDEO
+ Branch: feature/recipe-video
+################################################################################
+################################################################################
+
+What was done
+-------------
+A recipe can now carry one short video: up to 60 seconds, up to 50 MB, as mp4,
+webm or mov. The author adds it in the recipe form, it plays as a tile in the
+photo collage, and it plays with sound and controls in the viewer. Cards show
+a "Video" badge. A video is reviewed like the rest of the recipe. Backend and
+frontend. Built as six tasks.
+
+Task 1 - schema, DTOs and path validation (9528068)
+---------------------------------------------------
+  - docs/supabase/recipe-videos-storage.sql creates the recipe-videos bucket
+    (50 MB limit; video/mp4, video/webm, video/quicktime and image/jpeg for
+    the poster) with INSERT, SELECT and DELETE policies on the user's own
+    folder and no UPDATE policy. The user ran it.
+  - Migration V7__recipe_video.sql adds three nullable columns to recipes
+    (video_path, video_poster_path, video_duration_seconds) and an
+    all-or-none CHECK: either all three are set or none is.
+  - RecipeVideoCreateDto in, RecipeVideoDto (url, posterUrl,
+    durationSeconds) out. RecipeVideoPaths validates the paths: the clip is
+    {userId}/{uuid}.{mp4|webm|mov}, the poster {userId}/{uuid}.jpg, and the
+    duration is 1-60. A bad video answers 400 with errors.video.
+  - RecipeVideoSchemaDbTest checks V7 against the real database.
+  - Startup bug found when the user ran the backend: the SMALLINT duration
+    column was mapped as an integer. Fixed with
+    @JdbcTypeCode(SqlTypes.SMALLINT), the same as RecipePhoto.position.
+
+Task 2 - the service stores and returns the video (002016f)
+-----------------------------------------------------------
+  - RecipeService saves the video on create and update and returns it in the
+    display DTO.
+  - A video change rides the revision bump: it sends the recipe back to the
+    admin review queue like any other edit.
+  - The poster becomes the cover image when the recipe has no photos.
+  - Decisions: photos[] does not repeat the poster for a video-only recipe,
+    and removing the video from a photoless recipe clears a poster cover.
+  - RecipeServiceVideoTest covers it.
+
+Task 3 - upload API and browser probe (0fea39c, d1f4bdc)
+--------------------------------------------------------
+  - api/videos.ts uploads the clip and the poster to the recipe-videos bucket
+    and deletes them. lib/videoProbe.ts reads a file in the browser (duration,
+    size, a poster frame captured as a JPEG) before anything is uploaded.
+  - Review fix (d1f4bdc): audio-only files, which report a zero width or
+    height, are refused. The probe was hardened: its handlers are detached
+    when it settles, errors settle it immediately, and Safari waits for
+    loadeddata before seeking.
+
+Task 4 - VideoPicker in the recipe form (7eda58f)
+-------------------------------------------------
+  - VideoPicker checks the type, size and length, shows a spinner while it
+    uploads, and then offers Play, Replace and Remove.
+  - Old files are deleted only after a successful save, so a failed save never
+    loses the video the recipe already had.
+  - The duration is rounded up (Math.ceil), so a clip of 60.2 seconds is
+    stored as 61 and refused.
+  - lib/formatClock.ts formats the m:ss chip.
+
+Task 5 - collage tile, viewer and card badge (6c66f54, 69fe63e)
+---------------------------------------------------------------
+  - VideoTile sits second in the collage, after the cover photo, or is the
+    cover itself when there are no photos. It plays muted and looped while at
+    least 50% of it is visible, never under prefers-reduced-motion. The
+    viewer plays the video with sound and controls. Cards show a "Video"
+    badge and never autoplay.
+  - Review fixes (69fe63e): the arrow keys no longer hijack seeking in the
+    viewer's video; the tile pauses while the viewer is open; a compact
+    thumbnail on phones; an aria-label on the viewer's video.
+  - Decision: the form's Play preview stays a compact dialog rather than the
+    full viewer.
+
+Task 6 - legal wording, verification and this log
+-------------------------------------------------
+Privacy Policy: "recipes, photos and videos, ratings, comments, likes and
+dislikes" (content you post), "Recipes, photos and videos, ratings, ..."
+(public content) and "photo and video storage" (Supabase). Terms of Service:
+"recipes, photos or videos copied from someone else". content.test.tsx asserts
+all four phrases; it failed before the wording changed.
+Safety check (no running backend with the Spoonacular profile): printed False,
+so it was safe to compile and test.
+Backend regression list plus RecipeVideoPathsTest and RecipeServiceVideoTest
+(35 classes): 324 tests, 0 failures, 0 errors, 0 skipped.
+Backend *DbTest against the real database: 11 classes, 46 tests, 0 failures,
+0 errors, 0 skipped. New: RecipeVideoSchemaDbTest 3. V7 was already live in
+the dev database, and the DbTests run with Flyway disabled.
+Frontend: npx vitest run, 40 files, 471 tests, all passed. npm run build
+succeeded (only the usual chunk-size warning).
+
+Rollout
+-------
+  1. Run docs/supabase/recipe-videos-storage.sql once in the Supabase SQL
+     editor. Already done in dev.
+  2. V7 applies when the backend restarts. Already live in dev; it applies to
+     the Render database when this branch is deployed.
+  3. No new environment variables and no new dependencies.
+
+Known limitations
+-----------------
+  - There is no transcoding. A clip the browser cannot play is refused, so
+    HEVC (H.265) clips, for example from an iPhone, may be refused by desktop
+    browsers.
+  - iOS Safari may fail the poster capture. The worst case is the message
+    that the video can't be played.
+  - Files from a form that is never saved remain in storage: a clip or poster
+    is uploaded before the recipe is saved.
+  - Storage files can be replaced at the same path. As with photos, the
+    policy lets an author delete and upload objects in their own folder, so an
+    approved recipe's video can be swapped through the Supabase API without
+    a new review.
+  - Autoplay uses bandwidth on the free plan. The tile loads nothing until it
+    is visible (preload none), but a playing tile streams the clip.
+
+Known follow-ups
+----------------
+  - The final whole-branch review is still to come.
+  - The controller's real-browser check of upload, autoplay and the viewer is
+    still to come.
