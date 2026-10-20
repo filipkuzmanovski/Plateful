@@ -56,3 +56,35 @@ create policy "recipe-photos delete own folder"
         bucket_id = 'recipe-photos'
         and (storage.foldername(name))[1] = auth.uid()::text
     );
+
+-- Admin moderation: an admin at aal2 can see and delete any photo file, so removing
+-- someone else's recipe or comment can also remove its files. The aal claim keeps a
+-- session without a second factor from using it. SELECT is needed for the same reason as
+-- above: Storage remove() matches rows through SELECT first.
+drop policy if exists "recipe-photos select any (admin)" on storage.objects;
+create policy "recipe-photos select any (admin)"
+    on storage.objects
+    for select
+    to authenticated
+    using (
+        bucket_id = 'recipe-photos'
+        and (auth.jwt() ->> 'aal') = 'aal2'
+        and exists (
+            select 1 from public.users u
+            where u.id = auth.uid() and u.is_admin
+        )
+    );
+
+drop policy if exists "recipe-photos delete any (admin)" on storage.objects;
+create policy "recipe-photos delete any (admin)"
+    on storage.objects
+    for delete
+    to authenticated
+    using (
+        bucket_id = 'recipe-photos'
+        and (auth.jwt() ->> 'aal') = 'aal2'
+        and exists (
+            select 1 from public.users u
+            where u.id = auth.uid() and u.is_admin
+        )
+    );

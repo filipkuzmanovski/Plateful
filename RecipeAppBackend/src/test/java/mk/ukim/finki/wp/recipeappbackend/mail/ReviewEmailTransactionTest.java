@@ -1,5 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.mail;
 
+import mk.ukim.finki.wp.recipeappbackend.service.CommentRemovedEvent;
+import mk.ukim.finki.wp.recipeappbackend.service.RecipeRemovedEvent;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeReviewedEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
@@ -89,10 +91,44 @@ class ReviewEmailTransactionTest {
         });
     }
 
+    @Test
+    void noRemovalEmailWhenTheTransactionRollsBack() {
+        runner.run(ctx -> {
+            ReviewEmailSender sender = ctx.getBean(ReviewEmailSender.class);
+
+            ctx.getBean(TransactionTemplate.class).executeWithoutResult(status -> {
+                ctx.publishEvent(new RecipeRemovedEvent(UUID.randomUUID(), "Soup", "Spam",
+                        "author@example.com", UUID.randomUUID(), UUID.randomUUID()));
+                ctx.publishEvent(new CommentRemovedEvent(UUID.randomUUID(), "Soup", "Salty", "Rude",
+                        "author@example.com", UUID.randomUUID(), UUID.randomUUID()));
+                status.setRollbackOnly();
+            });
+
+            verify(sender, never()).send(anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void removalEmailsAreSentOnlyAfterCommit() {
+        runner.run(ctx -> {
+            ReviewEmailSender sender = ctx.getBean(ReviewEmailSender.class);
+
+            ctx.getBean(TransactionTemplate.class).executeWithoutResult(status -> {
+                ctx.publishEvent(new RecipeRemovedEvent(UUID.randomUUID(), "Soup", "Spam",
+                        "author@example.com", UUID.randomUUID(), UUID.randomUUID()));
+                ctx.publishEvent(new CommentRemovedEvent(UUID.randomUUID(), "Soup", "Salty", "Rude",
+                        "author@example.com", UUID.randomUUID(), UUID.randomUUID()));
+                verify(sender, never()).send(anyString(), anyString(), anyString());
+            });
+
+            verify(sender, times(2)).send(anyString(), anyString(), anyString());
+        });
+    }
+
     @Configuration
     @EnableTransactionManagement
     @EnableAsync
-    @Import(ReviewEmailListener.class)
+    @Import({ReviewEmailListener.class, RemovalEmailListener.class})
     static class WiringConfig implements AsyncConfigurer {
 
         @Override

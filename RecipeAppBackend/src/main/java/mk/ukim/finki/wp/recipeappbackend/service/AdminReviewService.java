@@ -81,7 +81,7 @@ public class AdminReviewService {
         events.publishEvent(event(recipe, false, trimmed, adminId));
     }
 
-    private static String validReason(String reason) {
+    static String validReason(String reason) {
         String trimmed = reason == null ? "" : reason.trim();
         if (trimmed.isEmpty()) {
             throw new InvalidReviewReasonException("A reason is required");

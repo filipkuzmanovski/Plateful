@@ -6,7 +6,7 @@ final class ReviewEmails {
     record Email(String subject, String body) {
     }
 
-    private static final String SIGN_OFF = "— The Plateful team";
+    static final String SIGN_OFF = "— The Plateful team";
 
     private ReviewEmails() {
     }
@@ -36,7 +36,7 @@ final class ReviewEmails {
     }
 
     /** Header-injection guard: a CR or LF in a subject would let a title add mail headers. */
-    private static String withoutLineBreaks(String text) {
+    static String withoutLineBreaks(String text) {
         return text.replace("\r", "").replace("\n", "");
     }
 }
