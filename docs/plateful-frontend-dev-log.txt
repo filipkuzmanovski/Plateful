@@ -4278,3 +4278,58 @@ Status
 ------
 The final whole-branch review is done and its fixes are in. The real-browser
 check of upload, autoplay and the viewer is pending the user's test upload.
+
+
+
+
+################################################################################
+################################################################################
+ PART 15 — INGREDIENT NAMES AND ADMIN REMOVAL
+ Branches: fix/ingredient-names, feature/admin-removal
+################################################################################
+################################################################################
+
+Ingredient names (3cfd553, bdd66ac)
+-----------------------------------
+The recipe form asked for an ingredient name and an "as written" line, but the
+recipe page only showed the line, so "flour" + "2 cups, sifted" displayed as
+"2 cups, sifted". The two fields came from the Spoonacular data shape, where
+the line already contains the name.
+  - The form's boxes are now "Ingredient" and "Amount and notes", with
+    "Ingredient required" / "Amount required" messages.
+  - The recipe page shows the name in bold before the line ("flour, 2 cups,
+    sifted") unless the line already mentions it at the start of a word.
+    "egg" counts as mentioned in "2 eggs"; "oil" does not count in "boiled".
+    Imported recipes keep showing their line alone.
+  - Frontend only (src/lib/ingredientLine.ts). Search still uses the name.
+
+Admin removal (bc18866, 2f23486, 258b10e, a4e61a3)
+---------------------------------------------------
+Admins can remove any recipe or comment, with a required reason (trimmed,
+1-500 characters) that is emailed to the author.
+  - Backend: POST /api/admin/recipes/{id}/remove and
+    /api/admin/comments/{id}/remove ({ reason }, 204), in
+    AdminModerationController/Service. They sit under /api/admin, so the
+    admin interceptor and the 2FA filter apply. Recipe removal takes the row
+    lock; comment removal works whatever the recipe's review status.
+  - Emails after commit (RemovalEmails, RemovalEmailListener): "Your recipe
+    ... was removed from Plateful" and "Your comment on ... was removed",
+    each with the reason; the comment one quotes the first 200 characters.
+    No email for authorless content or when the admin removes their own.
+  - Storage: both bucket scripts add admin select/delete-any policies (aal2
+    plus admin). Review fix: public.users has row level security, so the
+    policies check the flag through a security definer function,
+    public.is_admin(), instead of a direct subquery that would see no rows.
+  - Frontend: "Remove" on other people's recipes and comments for admins,
+    with a reason dialog (ReasonDialog, also used by Reject). Toasts
+    "Recipe removed" / "Comment removed". An admin sees one moderation
+    button per comment. Removed recipes are dropped from every cached list.
+Tests: backend regression 39 classes, 354 tests, DbTest 46; frontend 502
+tests; build green.
+
+Rollout
+-------
+  1. Re-run docs/supabase/recipe-photos-storage.sql and
+     docs/supabase/recipe-videos-storage.sql in the Supabase SQL editor
+     (idempotent; they add public.is_admin() and the admin policies).
+  2. No migration and no new environment variables.
