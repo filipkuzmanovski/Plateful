@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { RatingBox } from './RatingBox';
 import { CommentsSection } from './CommentsSection';
 import { RecipeBody } from './RecipeBody';
+import { ShareRecipe } from './ShareRecipe';
 import { SaveRecipeButton } from '@/features/saved/SaveRecipeButton';
 import { HiddenRecipePage } from './HiddenRecipePage';
 import { ReviewStatusBanner } from '@/features/review/ReviewStatusBanner';
@@ -134,6 +135,7 @@ export default function RecipeDetailPage() {
       actions={
         <>
           <SaveRecipeButton recipeId={recipe.id} />
+          {acceptsFeedback && <ShareRecipe recipe={recipe} />}
           {isOwner && (
             <>
               <Link
