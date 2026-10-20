@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MessageCircle, Pencil, ShieldX, ThumbsDown, ThumbsUp, Trash2, type LucideIcon } from 'lucide-react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { removeComment } from '@/api/admin';
+import { MFA_SETUP_MESSAGE, isAdminMfaSetupRequired, removeComment } from '@/api/admin';
 import { addComment, deleteComment, editComment, getComments } from '@/api/comments';
 import { deleteMyReaction, getMyReactions, putMyReaction } from '@/api/reactions';
 import { useAuth } from '@/auth/AuthProvider';
@@ -182,6 +182,8 @@ export function CommentsSection({
         setRemovingId(null);
         toast.error('This comment was already removed.');
         invalidate();
+      } else if (isAdminMfaSetupRequired(e)) {
+        toast.error(MFA_SETUP_MESSAGE);
       } else if (e instanceof ApiError && e.errors?.reason) {
         setReasonError(e.errors.reason);
       } else {
@@ -224,8 +226,9 @@ export function CommentsSection({
       >
         {query.data.content.map((comment) => {
           const isAuthor = profile?.id === comment.user.id;
-          const canDelete = isAuthor || (recipeOwnerId !== null && profile?.id === recipeOwnerId);
+          // An admin moderates strangers' comments with Remove (reason + email), so they get one button, not two.
           const canRemove = !!profile?.isAdmin && !isAuthor;
+          const canDelete = isAuthor || (!canRemove && recipeOwnerId !== null && profile?.id === recipeOwnerId);
           const date = formatDate(comment.createdAt);
           return (
             <li key={comment.id} className="flex gap-3">

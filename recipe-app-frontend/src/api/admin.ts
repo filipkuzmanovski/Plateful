@@ -39,6 +39,9 @@ export const removeComment = (id: string, reason: string) =>
     body: JSON.stringify({ reason }),
   });
 
+/** Shown instead of the server's 403 text when an admin tries a moderation action before setting up 2FA. */
+export const MFA_SETUP_MESSAGE = 'Set up two-factor authentication to remove content.';
+
 /** True for the 403 an admin gets until they have set up two-factor authentication. */
 export const isAdminMfaSetupRequired = (e: unknown): boolean =>
   e instanceof ApiError && e.status === 403 && e.code === 'admin_mfa_setup_required';

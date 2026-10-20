@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CircleAlert, Pencil, SearchX, ShieldX, Trash2 } from 'lucide-react';
 import { deleteRecipe, getRecipe } from '@/api/recipes';
-import { removeRecipe as removeRecipeAsAdmin } from '@/api/admin';
+import { MFA_SETUP_MESSAGE, isAdminMfaSetupRequired, removeRecipe as removeRecipeAsAdmin } from '@/api/admin';
 import { ApiError } from '@/api/client';
 import { deletePhotos, pathFromPublicUrl } from '@/api/photos';
 import { deleteVideoFiles, pathFromPublicVideoUrl } from '@/api/videos';
@@ -33,7 +33,9 @@ function cleanUpMedia(recipe: RecipeDisplay | undefined) {
 
 export default function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const query = useQuery({ queryKey: ['recipe', id], queryFn: () => getRecipe(id!), retry: false });
+  // Set once the recipe is known to be gone, so dropping its cached query is not followed by a refetch of it.
+  const [gone, setGone] = useState(false);
+  const query = useQuery({ queryKey: ['recipe', id], queryFn: () => getRecipe(id!), retry: false, enabled: !gone });
   const { profile, refreshProfile } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const navigate = useNavigate();
@@ -56,24 +58,33 @@ export default function RecipeDetailPage() {
     onError: (e) => toast.error(e instanceof ApiError ? e.detail : "Couldn't delete the recipe"),
   });
 
-  // An admin takes the recipe down with a reason; the author is emailed. The recipe row and its ratings are gone.
+  /** The recipe no longer exists: leave the page, drop its cache and mark every list that may show it stale. */
+  const forgetRecipe = (recipeId: string) => {
+    setGone(true);
+    navigate('/');
+    queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
+    for (const queryKey of [['recipes'], ['userRecipes'], ['savedRecipes'], ['savedIds'], ['admin']]) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  };
+
+  // An admin takes the recipe down with a reason; the author is emailed.
   const adminRemove = useMutation({
     mutationFn: ({ recipeId, reason }: { recipeId: string; reason: string }) => removeRecipeAsAdmin(recipeId, reason),
     onSuccess: (_data, { recipeId }) => {
       cleanUpMedia(query.data);
       toast.success('Recipe removed');
       setRemoving(false);
-      navigate('/');
-      queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
-      for (const queryKey of [['recipes'], ['userRecipes'], ['savedRecipes'], ['savedIds'], ['admin']]) {
-        void queryClient.invalidateQueries({ queryKey });
-      }
+      forgetRecipe(recipeId);
     },
-    onError: (e) => {
+    onError: (e, { recipeId }) => {
       if (e instanceof ApiError && e.status === 404) {
+        // Someone else removed it first: nothing of ours to clean up, but the caches still hold it.
         setRemoving(false);
         toast.error('This recipe was already removed.');
-        navigate('/');
+        forgetRecipe(recipeId);
+      } else if (isAdminMfaSetupRequired(e)) {
+        toast.error(MFA_SETUP_MESSAGE);
       } else if (e instanceof ApiError && e.errors?.reason) {
         setReasonError(e.errors.reason);
       } else {

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Button } from '@/components/ui';
 
@@ -19,6 +19,8 @@ function ReasonForm({
   onEdit: () => void;
   onSubmit: (reason: string) => void;
 }) {
+  const fieldId = useId();
+  const countId = `${fieldId}-count`;
   const [reason, setReason] = useState('');
   const length = reason.trim().length;
   const valid = length >= 1 && length <= MAX_REASON;
@@ -30,22 +32,22 @@ function ReasonForm({
 
   return (
     <form onSubmit={submit} className="mt-4">
-      <label htmlFor="reason" className="mb-1.5 block text-[13px] font-semibold text-olive">
+      <label htmlFor={fieldId} className="mb-1.5 block text-[13px] font-semibold text-olive">
         Reason
       </label>
       <textarea
-        id="reason"
+        id={fieldId}
         value={reason}
         onChange={(e) => { setReason(e.target.value); onEdit(); }}
         rows={5}
         required
-        aria-describedby="reason-count"
+        aria-describedby={countId}
         className="w-full resize-y rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
       />
       <div className="mt-1.5 flex items-start justify-between gap-3">
         {error ? <span role="alert" className="text-xs font-medium text-danger">{error}</span> : <span />}
         <span
-          id="reason-count"
+          id={countId}
           className={`text-xs tabular-nums ${length > MAX_REASON ? 'font-semibold text-danger' : 'text-olive/70'}`}
         >
           {length}/{MAX_REASON}
