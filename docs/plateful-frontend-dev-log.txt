@@ -4333,3 +4333,41 @@ Rollout
      docs/supabase/recipe-videos-storage.sql in the Supabase SQL editor
      (idempotent; they add public.is_admin() and the admin policies).
   2. No migration and no new environment variables.
+
+
+
+
+################################################################################
+################################################################################
+ PART 16 — SOCIAL SHARING
+ Branch: feature/social-sharing
+################################################################################
+################################################################################
+
+What was done (6cf55cc, 60d7342)
+--------------------------------
+A "Share" button next to Save on approved recipes (hidden on pending and
+rejected ones, never on cards or admin pages). Frontend only, no new
+dependencies, no tracking or third-party scripts.
+  - Phones (coarse pointer) with the Web Share API open the device's own
+    share sheet, which is how Instagram and TikTok are reached. Cancelling
+    is silent; any other failure falls back to the menu.
+  - Everywhere else a "Share this recipe" dialog shows the link with "Copy
+    link" ("Link copied" / "Couldn't copy the link.") plus Facebook, X,
+    WhatsApp, Pinterest (with the cover photo) and Email links, and "More
+    options" for the OS share sheet when the browser has one.
+  - Shared text is "{title} on Plateful" with the recipe's address. Every
+    value is URL-encoded (src/lib/shareLinks.ts); a test proves a hostile
+    title can't inject "&cc=" or a newline into the mailto link.
+  - Review fixes: closing the dialog returns focus to Share; desktop always
+    gets the menu; a second click while the native sheet is open is ignored;
+    external links announce "(opens in a new tab)" to screen readers.
+Checked in the browser: the menu at desktop and phone widths, every link's
+address, and focus returning to Share after Escape.
+Tests: frontend 527 tests; build green.
+
+Not yet done
+------------
+  - Link previews (the photo and title card Facebook or WhatsApp show for a
+    pasted link) need server-rendered Open Graph tags. That belongs to the
+    deployment round; until then shared links show as plain addresses.
