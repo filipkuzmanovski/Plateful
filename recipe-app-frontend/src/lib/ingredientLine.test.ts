@@ -19,4 +19,17 @@ describe('ingredientLine', () => {
     expect(ingredientLine('  flour  ', '2 cups flour')).toEqual({ name: null, text: '2 cups flour' });
     expect(ingredientLine('  flour  ', '2 cups, sifted')).toEqual({ name: 'flour', text: '2 cups, sifted' });
   });
+
+  test('matches plurals, since only the start of the name is anchored', () => {
+    expect(ingredientLine('egg', '2 eggs')).toEqual({ name: null, text: '2 eggs' });
+  });
+
+  test('matches a multi-word name', () => {
+    expect(ingredientLine('olive oil', '2 tbsp olive oil')).toEqual({ name: null, text: '2 tbsp olive oil' });
+  });
+
+  test('does not match inside another word', () => {
+    expect(ingredientLine('oil', '1 cup boiled water')).toEqual({ name: 'oil', text: '1 cup boiled water' });
+    expect(ingredientLine('salt', '1 tsp unsalted butter')).toEqual({ name: 'salt', text: '1 tsp unsalted butter' });
+  });
 });

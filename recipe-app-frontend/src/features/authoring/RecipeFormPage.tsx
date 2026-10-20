@@ -38,8 +38,8 @@ const schema = z.object({
   ingredients: z
     .array(
       z.object({
-        ingredientName: z.string().min(1, 'Name required').max(255),
-        originalText: z.string().min(1, 'Text required').max(500),
+        ingredientName: z.string().min(1, 'Ingredient required').max(255),
+        originalText: z.string().min(1, 'Amount required').max(500),
       }),
     )
     .min(1, 'At least one ingredient')

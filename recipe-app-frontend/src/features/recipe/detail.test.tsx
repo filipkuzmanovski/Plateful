@@ -79,6 +79,7 @@ test('prefixes the ingredient name when the line does not mention it, and shows 
   renderApp('/recipes/r-1');
   const flour = await screen.findByText('flour');
   expect(flour.tagName).toBe('STRONG');
+  expect(screen.getByRole('checkbox', { name: 'flour, 2 cups, sifted' })).toBeInTheDocument();
   expect(screen.getByText(/^, 2 cups, sifted$/)).toBe(flour.parentElement);
 
   const garlicLine = screen.getByText('3 cloves garlic, minced');
