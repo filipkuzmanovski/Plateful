@@ -73,12 +73,12 @@ test('create: fills the form, adds an ingredient row, POSTs, navigates to the ne
   renderApp('/recipes/new');
 
   await userEvent.type(await screen.findByLabelText(/title/i), 'My Pie');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'apples');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), '3 tart apples, sliced');
+  await userEvent.type(screen.getByLabelText('Ingredient 1'), 'apples');
+  await userEvent.type(screen.getByLabelText('Ingredient 1 amount and notes'), '3 tart apples, sliced');
   await userEvent.click(screen.getByRole('button', { name: /add ingredient/i }));
   expectNoEmoji();
-  await userEvent.type(screen.getByLabelText(/ingredient 2 name/i), 'sugar');
-  await userEvent.type(screen.getByLabelText(/ingredient 2 text/i), '1 cup sugar');
+  await userEvent.type(screen.getByLabelText('Ingredient 2'), 'sugar');
+  await userEvent.type(screen.getByLabelText('Ingredient 2 amount and notes'), '1 cup sugar');
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
 
   expect(await screen.findByRole('heading', { name: /my pie/i })).toBeInTheDocument();
@@ -111,8 +111,8 @@ test('server field errors from ProblemDetail map onto the form', async () => {
   );
   renderApp('/recipes/new');
   await userEvent.type(await screen.findByLabelText(/title/i), 'X');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'a');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), 'b');
+  await userEvent.type(screen.getByLabelText('Ingredient 1'), 'a');
+  await userEvent.type(screen.getByLabelText('Ingredient 1 amount and notes'), 'b');
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
   expect(await screen.findByText('must not be blank')).toBeInTheDocument();
 });
@@ -205,8 +205,8 @@ test('a server error on a field without an inline slot is still shown', async ()
   );
   renderApp('/recipes/new');
   await userEvent.type(await screen.findByLabelText(/title/i), 'X');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'a');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), 'b');
+  await userEvent.type(screen.getByLabelText('Ingredient 1'), 'a');
+  await userEvent.type(screen.getByLabelText('Ingredient 1 amount and notes'), 'b');
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
   expect(await screen.findByText('must be greater than or equal to 0')).toBeInTheDocument();
 });
@@ -235,8 +235,8 @@ async function cuisineInput() {
 
 async function fillRequired() {
   await userEvent.type(await screen.findByLabelText(/title/i), 'X');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'a');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), 'b');
+  await userEvent.type(screen.getByLabelText('Ingredient 1'), 'a');
+  await userEvent.type(screen.getByLabelText('Ingredient 1 amount and notes'), 'b');
 }
 
 test('pickerSearchesAndAddsCuisine: typing filters by label and the chosen key is POSTed', async () => {
@@ -513,4 +513,36 @@ test('serverPhotosErrorShowsUnderThePicker', async () => {
   await fillRequired();
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
   expect(await screen.findByText('Invalid photo path')).toBeInTheDocument();
+});
+
+test('create: ingredient inputs are labelled by their role and still send ingredientName and originalText', async () => {
+  stubMe();
+  let posted: any = null;
+  const created = recipeFixture({ id: 'r-new', title: 'Bread', user: profileFixture, review: PENDING });
+  server.use(
+    http.post(`${BASE}/api/recipes`, async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json(created, { status: 201 });
+    }),
+    http.get(`${BASE}/api/recipes/r-new`, () => HttpResponse.json(created)),
+    http.get(`${BASE}/api/recipes/r-new/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-new/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+  );
+  renderApp('/recipes/new');
+
+  const name = await screen.findByLabelText('Ingredient 1');
+  const notes = screen.getByLabelText('Ingredient 1 amount and notes');
+  expect(name).toHaveAttribute('placeholder', 'Ingredient (e.g. flour)');
+  expect(notes).toHaveAttribute('placeholder', 'Amount and notes (e.g. 2 cups, sifted)');
+  expectNoEmoji();
+
+  await userEvent.type(await screen.findByLabelText(/title/i), 'Bread');
+  await userEvent.type(name, 'flour');
+  await userEvent.type(notes, '2 cups, sifted');
+  await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
+
+  expect(await screen.findByRole('heading', { name: /bread/i })).toBeInTheDocument();
+  expect(posted.ingredients).toEqual([{ ingredientName: 'flour', originalText: '2 cups, sifted' }]);
 });

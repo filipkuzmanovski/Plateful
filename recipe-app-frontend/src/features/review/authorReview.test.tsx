@@ -80,8 +80,8 @@ async function createRecipeAs(profile: MyProfile) {
   );
   renderApp('/recipes/new');
   await userEvent.type(await screen.findByLabelText(/title/i), 'My Pie');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'apples');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), '3 tart apples');
+  await userEvent.type(screen.getByLabelText('Ingredient 1'), 'apples');
+  await userEvent.type(screen.getByLabelText('Ingredient 1 amount and notes'), '3 tart apples');
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
   expect(await screen.findByRole('heading', { name: /my pie/i })).toBeInTheDocument();
   return detailGets;
@@ -250,8 +250,8 @@ test('creating a recipe refreshes the profile so the needs-attention count stays
   serveRecipe(created);
   renderApp('/recipes/new');
   await userEvent.type(await screen.findByLabelText(/title/i), 'My Pie');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'apples');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), '3 tart apples');
+  await userEvent.type(screen.getByLabelText('Ingredient 1'), 'apples');
+  await userEvent.type(screen.getByLabelText('Ingredient 1 amount and notes'), '3 tart apples');
   await userEvent.click(screen.getByRole('button', { name: /^save recipe$/i }));
   await screen.findByRole('heading', { name: /my pie/i });
 

@@ -305,8 +305,8 @@ export default function RecipeFormPage() {
               <div key={field.id} className="flex items-start gap-2">
                 <div className="w-2/5 sm:w-1/3">
                   <TextInput
-                    aria-label={`Ingredient ${i + 1} name`}
-                    placeholder="Name (e.g. flour)"
+                    aria-label={`Ingredient ${i + 1}`}
+                    placeholder="Ingredient (e.g. flour)"
                     {...register(`ingredients.${i}.ingredientName`)}
                   />
                   {errors.ingredients?.[i]?.ingredientName && (
@@ -315,8 +315,8 @@ export default function RecipeFormPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <TextInput
-                    aria-label={`Ingredient ${i + 1} text`}
-                    placeholder="As written (e.g. 2 cups flour, sifted)"
+                    aria-label={`Ingredient ${i + 1} amount and notes`}
+                    placeholder="Amount and notes (e.g. 2 cups, sifted)"
                     {...register(`ingredients.${i}.originalText`)}
                   />
                   {errors.ingredients?.[i]?.originalText && (

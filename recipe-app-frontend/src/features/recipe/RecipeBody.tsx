@@ -4,6 +4,7 @@ import { Check, Clock, ExternalLink, Flame, Leaf, Users, type LucideIcon } from 
 import { StarDisplay } from '@/components/StarDisplay';
 import { Pill, SectionHeading } from '@/components/ui';
 import type { RecipeDisplay } from '@/lib/types';
+import { ingredientLine } from '@/lib/ingredientLine';
 import { PhotoCollage } from './PhotoCollage';
 
 /** One time/servings fact in the photo card: a terracotta icon, a value and a small label. */
@@ -137,26 +138,30 @@ export function RecipeBody({
 
         <SectionHeading>Ingredients</SectionHeading>
         <ul className="rounded-card bg-paper p-2 shadow-card ring-1 ring-sand/70">
-          {recipe.ingredients.map((ing, i) => (
-            <li key={i}>
-              <label className="group flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-cream">
-                <span className="relative mt-0.5 flex size-5 shrink-0">
-                  <input
-                    type="checkbox"
-                    className="peer size-5 cursor-pointer appearance-none rounded-md border border-olive/30 bg-paper transition checked:border-olive checked:bg-olive"
-                  />
-                  <Check
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 m-auto size-3.5 text-cream opacity-0 transition-opacity peer-checked:opacity-100"
-                    strokeWidth={3}
-                  />
-                </span>
-                <span className="text-[15px] leading-relaxed text-olive transition-colors group-has-checked:text-olive/70 group-has-checked:line-through group-has-checked:decoration-olive/40">
-                  {ing.originalText}
-                </span>
-              </label>
-            </li>
-          ))}
+          {recipe.ingredients.map((ing, i) => {
+            const line = ingredientLine(ing.ingredientName, ing.originalText);
+            return (
+              <li key={i}>
+                <label className="group flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-cream">
+                  <span className="relative mt-0.5 flex size-5 shrink-0">
+                    <input
+                      type="checkbox"
+                      className="peer size-5 cursor-pointer appearance-none rounded-md border border-olive/30 bg-paper transition checked:border-olive checked:bg-olive"
+                    />
+                    <Check
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 m-auto size-3.5 text-cream opacity-0 transition-opacity peer-checked:opacity-100"
+                      strokeWidth={3}
+                    />
+                  </span>
+                  <span className="text-[15px] leading-relaxed text-olive transition-colors group-has-checked:text-olive/70 group-has-checked:line-through group-has-checked:decoration-olive/40">
+                    {line.name && <><strong className="font-semibold">{line.name}</strong>, </>}
+                    {line.text}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
         </ul>
 
         <SectionHeading>Instructions</SectionHeading>

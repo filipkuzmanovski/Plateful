@@ -72,8 +72,8 @@ function stubMe() {
 
 async function fillRequired() {
   await userEvent.type(await screen.findByLabelText(/title/i), 'X');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 name/i), 'a');
-  await userEvent.type(screen.getByLabelText(/ingredient 1 text/i), 'b');
+  await userEvent.type(screen.getByLabelText('Ingredient 1'), 'a');
+  await userEvent.type(screen.getByLabelText('Ingredient 1 amount and notes'), 'b');
 }
 
 function stubCreate() {

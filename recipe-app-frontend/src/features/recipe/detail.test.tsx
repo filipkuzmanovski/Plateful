@@ -58,6 +58,34 @@ test('renders title, ingredients, structured steps, badges and macros', async ()
   expectNoEmoji();
 });
 
+test('prefixes the ingredient name when the line does not mention it, and shows the line alone otherwise', async () => {
+  server.use(
+    http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profileFixture)),
+    http.get(`${BASE}/api/recipes/r-1`, () =>
+      HttpResponse.json(
+        recipeFixture({
+          ingredients: [
+            { ingredientName: 'flour', originalText: '2 cups, sifted' },
+            { ingredientName: 'garlic', originalText: '3 cloves garlic, minced' },
+          ],
+        }),
+      ),
+    ),
+    http.get(`${BASE}/api/recipes/r-1/comments`, () => HttpResponse.json(pageOf([]))),
+    http.get(`${BASE}/api/recipes/r-1/ratings/me`, () =>
+      HttpResponse.json({ status: 404, detail: 'none' }, { status: 404 }),
+    ),
+  );
+  renderApp('/recipes/r-1');
+  const flour = await screen.findByText('flour');
+  expect(flour.tagName).toBe('STRONG');
+  expect(screen.getByText(/^, 2 cups, sifted$/)).toBe(flour.parentElement);
+
+  const garlicLine = screen.getByText('3 cloves garlic, minced');
+  expect(garlicLine.querySelector('strong')).toBeNull();
+  expectNoEmoji();
+});
+
 test('rating box pre-fills my rating and un-rates on clicking the same star', async () => {
   stubDetail({ myRating: 4 });
   let deleted = false;
