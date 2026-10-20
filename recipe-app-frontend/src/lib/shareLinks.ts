@@ -21,7 +21,7 @@ export function buildShareLinks({
   title: string;
   image: string | null;
 }): ShareLinks {
-  const url = `${origin}/recipes/${id}`;
+  const url = `${origin}/recipes/${encodeURIComponent(id)}`;
   const text = `${title} on Plateful`;
   const u = encodeURIComponent(url);
   const t = encodeURIComponent(text);

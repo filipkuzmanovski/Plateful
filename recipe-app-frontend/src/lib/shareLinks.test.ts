@@ -33,4 +33,17 @@ describe('buildShareLinks', () => {
     expect(none.pinterest).toBe(`https://pinterest.com/pin/create/button/?url=${url}&description=${text}`);
     expect(none.pinterest).not.toContain('media');
   });
+
+  test('the id is encoded in the URL', () => {
+    expect(buildShareLinks({ ...base, id: 'a/b?c' }).url).toBe('https://plateful.test/recipes/a%2Fb%3Fc');
+  });
+
+  test('a hostile title cannot add parameters or header lines', () => {
+    const evil = buildShareLinks({ ...base, title: 'x&cc=evil@x.com\nBcc: y', image: null });
+    for (const href of [evil.facebook, evil.x, evil.whatsapp, evil.pinterest, evil.email]) {
+      expect(href).not.toContain('&cc=');
+      expect(href).not.toMatch(/[\r\n]/);
+    }
+    expect(evil.email).toContain('subject=x%26cc%3Devil%40x.com%0ABcc%3A%20y&body=');
+  });
 });

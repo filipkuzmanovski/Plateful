@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { ShareRecipe } from './ShareRecipe';
@@ -17,12 +17,28 @@ function setNav(props: Record<string, unknown>) {
   }
 }
 
+function setPointer(coarse: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: coarse && query.includes('pointer: coarse'),
+    media: query,
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+    dispatchEvent: () => false,
+    onchange: null,
+  }));
+}
+
 afterEach(() => {
+  vi.unstubAllGlobals();
   for (const k of ['share', 'canShare', 'clipboard']) Reflect.deleteProperty(navigator, k);
   vi.clearAllMocks();
 });
 
 describe('native share', () => {
+  beforeEach(() => setPointer(true));
+
   test('calls navigator.share with title, text and url and opens no dialog', async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     const canShare = vi.fn().mockReturnValue(true);
@@ -31,6 +47,31 @@ describe('native share', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Share' }));
     expect(canShare).toHaveBeenCalledWith({ title: links.title, text: links.text, url: links.url });
     expect(share).toHaveBeenCalledWith({ title: links.title, text: links.text, url: links.url });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  test('a fine pointer gets the menu even when share exists', async () => {
+    setPointer(false);
+    const share = vi.fn();
+    setNav({ share });
+    render(<ShareRecipe recipe={recipe} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Share' }));
+    expect(share).not.toHaveBeenCalled();
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  test('a second click while the sheet is open does not open the menu', async () => {
+    let finish!: () => void;
+    const share = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    setNav({ share });
+    render(<ShareRecipe recipe={recipe} />);
+    const button = screen.getByRole('button', { name: 'Share' });
+    await userEvent.click(button);
+    await userEvent.click(button);
+    expect(share).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    finish();
+    await waitFor(() => expect(share).toHaveBeenCalledOnce());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -86,7 +127,7 @@ describe('share menu', () => {
       ['Pinterest', links.pinterest], ['Email', links.email],
     ];
     for (const [name, href] of expected) {
-      const a = d.getByRole('link', { name });
+      const a = d.getByRole('link', { name: name === 'Email' ? 'Email' : new RegExp(`^${name} \\(opens in a new tab\\)$`) });
       expect(a).toHaveAttribute('href', href);
       if (name === 'Email') {
         expect(a).not.toHaveAttribute('target');
@@ -121,10 +162,56 @@ describe('share menu', () => {
     expect(screen.getByRole('textbox')).toHaveValue(links.url);
   });
 
+  test('Close and Escape return focus to the Share button', async () => {
+    const user = userEvent.setup();
+    render(<ShareRecipe recipe={recipe} />);
+    const button = screen.getByRole('button', { name: 'Share' });
+    await user.click(button);
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(button).toHaveFocus();
+
+    await user.click(button);
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(button).toHaveFocus();
+  });
+
+  test('More options appears only when navigator.share exists, and calls it', async () => {
+    const user = userEvent.setup();
+    render(<ShareRecipe recipe={recipe} />);
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await screen.findByRole('dialog');
+    expect(screen.queryByRole('button', { name: 'More options' })).not.toBeInTheDocument();
+  });
+
+  test('More options calls navigator.share with the data (fine pointer)', async () => {
+    const user = userEvent.setup();
+    setPointer(false);
+    const share = vi.fn().mockResolvedValue(undefined);
+    setNav({ share });
+    render(<ShareRecipe recipe={recipe} />);
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: 'More options' }));
+    expect(share).toHaveBeenCalledWith({ title: links.title, text: links.text, url: links.url });
+  });
+
+  test('More options ignores an AbortError and keeps the menu', async () => {
+    const user = userEvent.setup();
+    setPointer(false);
+    setNav({ share: vi.fn().mockRejectedValue(new DOMException('x', 'AbortError')) });
+    render(<ShareRecipe recipe={recipe} />);
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: 'More options' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   test('Pinterest link has no media when the recipe has no image', async () => {
     render(<ShareRecipe recipe={{ ...recipe, image: null }} />);
     await userEvent.click(screen.getByRole('button', { name: 'Share' }));
-    const href = (await screen.findByRole('link', { name: 'Pinterest' })).getAttribute('href')!;
+    const href = (await screen.findByRole('link', { name: /^Pinterest/ })).getAttribute('href')!;
     expect(href).not.toContain('media=');
   });
 });
