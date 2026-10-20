@@ -57,6 +57,20 @@ create policy "recipe-photos delete own folder"
         and (storage.foldername(name))[1] = auth.uid()::text
     );
 
+-- public.users has row level security, so a subquery on it from a storage policy runs as
+-- the caller and sees no rows: the admin check would never match. This function runs as
+-- its owner (security definer) and returns only the caller's own flag. Both storage
+-- scripts create it with "create or replace", so either can be run first.
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select u.is_admin from public.users u where u.id = auth.uid()), false)
+$$;
+
 -- Admin moderation: an admin at aal2 can see and delete any photo file, so removing
 -- someone else's recipe or comment can also remove its files. The aal claim keeps a
 -- session without a second factor from using it. SELECT is needed for the same reason as
@@ -69,10 +83,7 @@ create policy "recipe-photos select any (admin)"
     using (
         bucket_id = 'recipe-photos'
         and (auth.jwt() ->> 'aal') = 'aal2'
-        and exists (
-            select 1 from public.users u
-            where u.id = auth.uid() and u.is_admin
-        )
+        and public.is_admin()
     );
 
 drop policy if exists "recipe-photos delete any (admin)" on storage.objects;
@@ -83,8 +94,5 @@ create policy "recipe-photos delete any (admin)"
     using (
         bucket_id = 'recipe-photos'
         and (auth.jwt() ->> 'aal') = 'aal2'
-        and exists (
-            select 1 from public.users u
-            where u.id = auth.uid() and u.is_admin
-        )
+        and public.is_admin()
     );
