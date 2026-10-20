@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { CircleAlert, Pencil, SearchX, Trash2 } from 'lucide-react';
+import { CircleAlert, Pencil, SearchX, ShieldX, Trash2 } from 'lucide-react';
 import { deleteRecipe, getRecipe } from '@/api/recipes';
+import { removeRecipe as removeRecipeAsAdmin } from '@/api/admin';
 import { ApiError } from '@/api/client';
 import { deletePhotos, pathFromPublicUrl } from '@/api/photos';
 import { deleteVideoFiles, pathFromPublicVideoUrl } from '@/api/videos';
@@ -16,6 +17,19 @@ import { RecipeBody } from './RecipeBody';
 import { SaveRecipeButton } from '@/features/saved/SaveRecipeButton';
 import { HiddenRecipePage } from './HiddenRecipePage';
 import { ReviewStatusBanner } from '@/features/review/ReviewStatusBanner';
+import { ReasonDialog } from '@/features/admin/ReasonDialog';
+import type { RecipeDisplay } from '@/lib/types';
+
+/** Best-effort: once a recipe row is gone its photos and video are orphans; the helpers never throw. */
+function cleanUpMedia(recipe: RecipeDisplay | undefined) {
+  const paths = (recipe?.photos ?? []).map(pathFromPublicUrl).filter((p): p is string => p !== null);
+  if (paths.length > 0) void deletePhotos(paths);
+  const video = recipe?.video;
+  const videoFiles = video
+    ? [video.url, video.posterUrl].map(pathFromPublicVideoUrl).filter((p): p is string => p !== null)
+    : [];
+  if (videoFiles.length > 0) void deleteVideoFiles(videoFiles);
+}
 
 export default function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,17 +38,12 @@ export default function RecipeDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [removing, setRemoving] = useState(false);
+  const [reasonError, setReasonError] = useState<string | null>(null);
   const removeRecipe = useMutation({
     mutationFn: (recipeId: string) => deleteRecipe(recipeId),
     onSuccess: (_data, recipeId) => {
-      // The row is gone, so its files are orphans; the helper never throws.
-      const paths = (query.data?.photos ?? []).map(pathFromPublicUrl).filter((p): p is string => p !== null);
-      if (paths.length > 0) void deletePhotos(paths);
-      const video = query.data?.video;
-      const videoFiles = video
-        ? [video.url, video.posterUrl].map(pathFromPublicVideoUrl).filter((p): p is string => p !== null)
-        : [];
-      if (videoFiles.length > 0) void deleteVideoFiles(videoFiles);
+      cleanUpMedia(query.data);
       navigate('/'); // leave first, so the removed query isn't refetched by this page
       queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
       void queryClient.invalidateQueries({ queryKey: ['recipes'] });
@@ -45,6 +54,32 @@ export default function RecipeDetailPage() {
       void refreshProfile(); // deleting a rejected recipe lowers the needs-attention count
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.detail : "Couldn't delete the recipe"),
+  });
+
+  // An admin takes the recipe down with a reason; the author is emailed. The recipe row and its ratings are gone.
+  const adminRemove = useMutation({
+    mutationFn: ({ recipeId, reason }: { recipeId: string; reason: string }) => removeRecipeAsAdmin(recipeId, reason),
+    onSuccess: (_data, { recipeId }) => {
+      cleanUpMedia(query.data);
+      toast.success('Recipe removed');
+      setRemoving(false);
+      navigate('/');
+      queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
+      for (const queryKey of [['recipes'], ['userRecipes'], ['savedRecipes'], ['savedIds'], ['admin']]) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && e.status === 404) {
+        setRemoving(false);
+        toast.error('This recipe was already removed.');
+        navigate('/');
+      } else if (e instanceof ApiError && e.errors?.reason) {
+        setReasonError(e.errors.reason);
+      } else {
+        toast.error(e instanceof ApiError ? e.detail : "Couldn't remove the recipe");
+      }
+    },
   });
 
   if (query.isPending) return <Spinner />;
@@ -70,6 +105,7 @@ export default function RecipeDetailPage() {
   }
   const recipe = query.data;
   const isOwner = !!profile && recipe.user?.id === profile.id;
+  const canRemove = !!profile?.isAdmin && !isOwner;
   // Only an approved recipe is open to feedback; the API refuses writes on the others (409 recipe_not_approved).
   const acceptsFeedback = !recipe.review || recipe.review.status === 'approved';
 
@@ -108,6 +144,29 @@ export default function RecipeDetailPage() {
                 busy={removeRecipe.isPending}
                 onConfirm={() => { if (!removeRecipe.isPending) removeRecipe.mutate(recipe.id); }}
                 onCancel={() => setConfirmDelete(false)}
+              />
+            </>
+          )}
+          {canRemove && (
+            <>
+              <Button
+                variant="danger"
+                className="!px-4 !py-2"
+                onClick={() => { setReasonError(null); setRemoving(true); }}
+              >
+                <ShieldX aria-hidden="true" className="size-3.5" />
+                Remove
+              </Button>
+              <ReasonDialog
+                open={removing}
+                title="Remove this recipe?"
+                description="The author will get an email with your reason."
+                confirmLabel="Remove recipe"
+                busy={adminRemove.isPending}
+                error={reasonError}
+                onCancel={() => setRemoving(false)}
+                onEdit={() => setReasonError(null)}
+                onSubmit={(reason) => { setReasonError(null); adminRemove.mutate({ recipeId: recipe.id, reason }); }}
               />
             </>
           )}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { MessageCircle, Pencil, ThumbsDown, ThumbsUp, Trash2, type LucideIcon } from 'lucide-react';
+import { MessageCircle, Pencil, ShieldX, ThumbsDown, ThumbsUp, Trash2, type LucideIcon } from 'lucide-react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { removeComment } from '@/api/admin';
 import { addComment, deleteComment, editComment, getComments } from '@/api/comments';
 import { deleteMyReaction, getMyReactions, putMyReaction } from '@/api/reactions';
 import { useAuth } from '@/auth/AuthProvider';
@@ -9,6 +10,7 @@ import { ApiError } from '@/api/client';
 import { Button, Spinner } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Pagination } from '@/components/Pagination';
+import { ReasonDialog } from '@/features/admin/ReasonDialog';
 import type { CommentDisplay } from '@/lib/types';
 
 const showError = (e: unknown) =>
@@ -123,6 +125,8 @@ export function CommentsSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [reasonError, setReasonError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -163,6 +167,29 @@ export function CommentsSection({
     onError: showError,
   });
 
+  // An admin takes down someone else's comment with a reason; its author is emailed.
+  const adminRemove = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => removeComment(id, reason),
+    onSuccess: () => {
+      setRemovingId(null);
+      toast.success('Comment removed');
+      if (query.data?.content.length === 1 && page > 0) setPage(page - 1);
+      invalidate();
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && e.status === 404) {
+        // Already gone: close the dialog and let the refetch drop it.
+        setRemovingId(null);
+        toast.error('This comment was already removed.');
+        invalidate();
+      } else if (e instanceof ApiError && e.errors?.reason) {
+        setReasonError(e.errors.reason);
+      } else {
+        showError(e);
+      }
+    },
+  });
+
   if (query.isPending) return <Spinner />;
   if (query.isError) return <p className="text-sm text-danger">Couldn't load comments.</p>;
 
@@ -198,6 +225,7 @@ export function CommentsSection({
         {query.data.content.map((comment) => {
           const isAuthor = profile?.id === comment.user.id;
           const canDelete = isAuthor || (recipeOwnerId !== null && profile?.id === recipeOwnerId);
+          const canRemove = !!profile?.isAdmin && !isAuthor;
           const date = formatDate(comment.createdAt);
           return (
             <li key={comment.id} className="flex gap-3">
@@ -262,6 +290,16 @@ export function CommentsSection({
                       Delete
                     </button>
                   )}
+                  {canRemove && (
+                    <button
+                      aria-label={`Remove comment by ${comment.user.firstName} ${comment.user.lastName}`}
+                      className={`${actionClass} hover:bg-danger/10 hover:text-danger`}
+                      onClick={() => { setReasonError(null); setRemovingId(comment.id); }}
+                    >
+                      <ShieldX aria-hidden="true" className="size-3" />
+                      Remove
+                    </button>
+                  )}
                 </div>
               </div>
             </li>
@@ -284,6 +322,21 @@ export function CommentsSection({
         busy={remove.isPending}
         onConfirm={() => deletingId && remove.mutate(deletingId)}
         onCancel={() => setDeletingId(null)}
+      />
+      <ReasonDialog
+        open={removingId !== null}
+        title="Remove this comment?"
+        description="The author will get an email with your reason."
+        confirmLabel="Remove comment"
+        busy={adminRemove.isPending}
+        error={reasonError}
+        onCancel={() => setRemovingId(null)}
+        onEdit={() => setReasonError(null)}
+        onSubmit={(reason) => {
+          if (!removingId) return;
+          setReasonError(null);
+          adminRemove.mutate({ id: removingId, reason });
+        }}
       />
     </div>
   );
