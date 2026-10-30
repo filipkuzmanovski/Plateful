@@ -103,6 +103,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** Unknown allergen or diet, or too many preference entries -> 400 with the message as detail. */
+    @ExceptionHandler(InvalidPreferencesException.class)
+    ProblemDetail handleInvalidPreferences(InvalidPreferencesException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     /** Unknown sortBy -> 400 in the same shape as bean-validation failures. */
     @ExceptionHandler(InvalidSortException.class)
     ProblemDetail handleInvalidSort(InvalidSortException ex) {

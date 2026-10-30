@@ -75,7 +75,7 @@ class MfaEnforcementFilterTest {
     void postAal1WithoutFactorPasses() throws Exception {
         when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(false);
         when(userService.getOrCreate(any(), any(), any()))
-                .thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0));
+                .thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0, false));
 
         mockMvc.perform(post("/api/users/me").with(token("aal1"))
                         .contentType(MediaType.APPLICATION_JSON).content(PROFILE_JSON))
@@ -113,7 +113,7 @@ class MfaEnforcementFilterTest {
     void postAal2WithFactorPasses() throws Exception {
         when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
         when(userService.getOrCreate(any(), any(), any()))
-                .thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0));
+                .thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0, false));
 
         mockMvc.perform(post("/api/users/me").with(token("aal2"))
                         .contentType(MediaType.APPLICATION_JSON).content(PROFILE_JSON))

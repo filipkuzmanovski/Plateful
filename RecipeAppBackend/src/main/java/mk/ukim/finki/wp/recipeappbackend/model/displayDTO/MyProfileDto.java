@@ -13,9 +13,11 @@ public record MyProfileDto(
         String firstName,
         String lastName,
         boolean isAdmin,
-        long rejectedCount
+        long rejectedCount,
+        boolean hasPreferences
 ) {
-    public static MyProfileDto of(User user, long rejectedCount) {
-        return new MyProfileDto(user.getId(), user.getFirstName(), user.getLastName(), user.isAdmin(), rejectedCount);
+    public static MyProfileDto of(User user, long rejectedCount, boolean hasPreferences) {
+        return new MyProfileDto(user.getId(), user.getFirstName(), user.getLastName(), user.isAdmin(),
+                rejectedCount, hasPreferences);
     }
 }

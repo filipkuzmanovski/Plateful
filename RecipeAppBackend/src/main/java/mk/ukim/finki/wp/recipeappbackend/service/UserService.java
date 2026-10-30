@@ -7,6 +7,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.UserDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeRepository;
+import mk.ukim.finki.wp.recipeappbackend.repository.UserPreferencesRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,10 +24,13 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RecipeRepository recipeRepository;
+    private final UserPreferencesRepository userPreferencesRepository;
 
-    public UserService(UserRepository userRepository, RecipeRepository recipeRepository) {
+    public UserService(UserRepository userRepository, RecipeRepository recipeRepository,
+                       UserPreferencesRepository userPreferencesRepository) {
         this.userRepository = userRepository;
         this.recipeRepository = recipeRepository;
+        this.userPreferencesRepository = userPreferencesRepository;
     }
 
     /**
@@ -72,6 +76,8 @@ public class UserService {
     }
 
     private MyProfileDto toMyProfile(User user) {
-        return MyProfileDto.of(user, recipeRepository.countByUserIdAndStatus(user.getId(), RecipeStatus.REJECTED));
+        return MyProfileDto.of(user,
+                recipeRepository.countByUserIdAndStatus(user.getId(), RecipeStatus.REJECTED),
+                userPreferencesRepository.existsById(user.getId()));
     }
 }

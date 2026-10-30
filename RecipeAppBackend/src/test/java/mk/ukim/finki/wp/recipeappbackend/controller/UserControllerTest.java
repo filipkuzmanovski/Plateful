@@ -59,7 +59,7 @@ class UserControllerTest {
     @Test
     void postMe_passesJwtIdentityToService() throws Exception {
         when(userService.getOrCreate(eq(USER_ID), eq("jane@example.com"), any()))
-                .thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0));
+                .thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0, false));
 
         mockMvc.perform(post("/api/users/me")
                         .with(authed())
@@ -109,7 +109,7 @@ class UserControllerTest {
     @Test
     void putMe_updatesNames() throws Exception {
         when(userService.updateNames(USER_ID, "Janet", "Doe"))
-                .thenReturn(new MyProfileDto(USER_ID, "Janet", "Doe", false, 0));
+                .thenReturn(new MyProfileDto(USER_ID, "Janet", "Doe", false, 0, false));
 
         mockMvc.perform(put("/api/users/me")
                         .with(authed())
@@ -121,7 +121,7 @@ class UserControllerTest {
 
     @Test
     void myProfileIncludesIsAdminAndRejectedCount() throws Exception {
-        when(userService.myProfile(USER_ID)).thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0));
+        when(userService.myProfile(USER_ID)).thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0, false));
 
         mockMvc.perform(get("/api/users/me").with(authed()))
                 .andExpect(status().isOk())
@@ -132,9 +132,27 @@ class UserControllerTest {
     }
 
     @Test
+    void myProfileIncludesHasPreferences() throws Exception {
+        when(userService.myProfile(USER_ID)).thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0, true));
+
+        mockMvc.perform(get("/api/users/me").with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasPreferences").value(true));
+    }
+
+    @Test
+    void myProfileReportsNoPreferencesYet() throws Exception {
+        when(userService.myProfile(USER_ID)).thenReturn(new MyProfileDto(USER_ID, "Jane", "Doe", false, 0, false));
+
+        mockMvc.perform(get("/api/users/me").with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasPreferences").value(false));
+    }
+
+    @Test
     void updateMyProfileIgnoresIsAdmin() throws Exception {
         when(userService.updateNames(USER_ID, "Janet", "Doe"))
-                .thenReturn(new MyProfileDto(USER_ID, "Janet", "Doe", false, 0));
+                .thenReturn(new MyProfileDto(USER_ID, "Janet", "Doe", false, 0, false));
 
         mockMvc.perform(put("/api/users/me")
                         .with(authed())
