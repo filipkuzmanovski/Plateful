@@ -34,6 +34,8 @@ SEED = 20261030
 TOP_PARTNERS = 30
 MIN_STATS_COUNT = 5
 PROGRESS_EVERY = 100_000
+MAX_FIELD_SIZE = 10 * 1024 * 1024  # a stray unbalanced quote then fails fast instead of swallowing the file
+REQUIRED_COLUMNS = ("", "title", "ingredients", "directions", "NER")
 
 MAX_TITLE_LENGTH = 255
 MIN_LINES, MAX_LINES = 3, 20
@@ -72,14 +74,8 @@ class RefRecipe:
 
 # --- reading -----------------------------------------------------------------
 
-def _raise_field_limit():
-    limit = sys.maxsize
-    while True:
-        try:
-            csv.field_size_limit(limit)
-            return
-        except OverflowError:
-            limit //= 2
+class InputError(Exception):
+    """The input file is not a usable RecipeNLG csv."""
 
 
 def _string_list(text):
@@ -106,10 +102,22 @@ def _parse(record):
 
 
 def read_rows(path, stats):
-    """Stream ParsedRows from a RecipeNLG csv. Malformed rows are skipped and counted in stats["skipped"]."""
-    _raise_field_limit()
-    with open(path, encoding="utf-8", errors="replace", newline="") as f:
+    """Stream ParsedRows from a RecipeNLG csv. Malformed rows are skipped and counted in stats["skipped"].
+
+    Raises InputError before reading any row if the header lacks a required column.
+    """
+    csv.field_size_limit(MAX_FIELD_SIZE)
+    with open(path, encoding="utf-8-sig", errors="replace", newline="") as f:
         reader = csv.DictReader(f)
+        try:
+            header = reader.fieldnames
+        except csv.Error as error:
+            raise InputError(f"Cannot read the header of {path}: {error}") from error
+        missing = [c for c in REQUIRED_COLUMNS if c not in (header or [])]
+        if missing:
+            expected = ", ".join(repr(c) for c in REQUIRED_COLUMNS)
+            raise InputError(f"{path} does not look like RecipeNLG's full_dataset.csv: "
+                             f"expected the columns {expected}, but it has {header or 'no header'}.")
         while True:
             try:
                 record = next(reader)
@@ -138,11 +146,12 @@ def count_ingredients(rows):
 
 # --- pass 2: pairings --------------------------------------------------------
 
-def count_pairs(rows, common, top_n=TOP_PARTNERS):
+def count_pairs(rows, common, top_n=TOP_PARTNERS, stats=None):
     """Top partners per common ingredient: {name: [(partner, together_count), ...]}.
 
     Each list is sorted by count descending, then partner name. Pairs are counted once per
-    recipe as integer keys (a * N + b) to keep memory down.
+    recipe as integer keys (a * N + b) to keep memory down. If `stats` is given, stats["pairs"] is
+    kept at the number of distinct pairs seen so far.
     """
     names = sorted(common)
     index = {name: i for i, name in enumerate(names)}
@@ -154,6 +163,8 @@ def count_pairs(rows, common, top_n=TOP_PARTNERS):
             base = a * n
             for b in ids[i + 1:]:
                 pair_counts[base + b] += 1
+        if stats is not None:
+            stats["pairs"] = len(pair_counts)
 
     # Ids follow name order, so for equal counts a larger partner id is the worse entry.
     heaps = {}
@@ -292,7 +303,8 @@ def _bool(value):
 
 
 def _open_csv(path):
-    f = open(path, "w", encoding="utf-8", newline="")
+    # errors="replace": a lone surrogate from json.loads becomes "?" instead of crashing the run at the end
+    f = open(path, "w", encoding="utf-8", errors="replace", newline="")
     return f, csv.writer(f, lineterminator="\n")
 
 
@@ -330,11 +342,21 @@ def write_outputs(out_dir, recipes, stats, pairs):
 
 # --- command line ------------------------------------------------------------
 
-def _with_progress(rows, label):
+def _with_progress(rows, label, extra=None):
     for i, row in enumerate(rows, start=1):
         if i % PROGRESS_EVERY == 0:
-            print(f"  {label}: {i:,} rows", flush=True)
+            print(f"  {label}: {i:,} rows" + (f", {extra()}" if extra else ""), flush=True)
         yield row
+
+
+def check_not_mostly_skipped(read_stats):
+    """Raise InputError if pass 1 skipped more than half of the rows, or found none."""
+    skipped, total = read_stats["skipped"], read_stats["rows"] + read_stats["skipped"]
+    if total == 0:
+        raise InputError("The input file has no data rows.")
+    if skipped * 2 > total:
+        raise InputError(f"{skipped:,} of {total:,} rows were skipped as malformed (more than half), "
+                         "so something is wrong with the input file. Nothing was written.")
 
 
 def _parse_args(argv):
@@ -354,17 +376,29 @@ def main(argv=None):
         print(f"Input file not found: {args.input}\nSee {README} for where to get RecipeNLG's full_dataset.csv.",
               file=sys.stderr)
         return 2
+    try:
+        return _run(args)
+    except InputError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 2
 
+
+def _run(args):
     started = time.monotonic()
     rules = FoodRules.load()
 
     print("Pass 1/3: counting ingredients")
     read_stats = Counter()
     counts = count_ingredients(_with_progress(read_rows(args.input, read_stats), "pass 1"))
+    check_not_mostly_skipped(read_stats)
 
     common = {name for name, count in counts.items() if count >= args.min_common}
     print(f"Pass 2/3: counting pairs among {len(common):,} common ingredients")
-    pairs = count_pairs(_with_progress(read_rows(args.input, Counter()), "pass 2"), common)
+    pair_stats = Counter()
+    pairs = count_pairs(
+        _with_progress(read_rows(args.input, Counter()), "pass 2", lambda: f"{pair_stats['pairs']:,} distinct pairs"),
+        common, stats=pair_stats)
+    print(f"  pass 2: {pair_stats['pairs']:,} distinct pairs counted")
 
     print("Pass 3/3: selecting recipes")
     bucket_stats = Counter()
@@ -377,7 +411,8 @@ def main(argv=None):
     print(f"Rows read: {read_stats['rows']:,}, skipped (malformed): {read_stats['skipped']:,}")
     print("Recipes per bucket: " + ", ".join(f"{k}={bucket_stats[k]:,}" for k in (*MEALS, "untagged"))
           + f", total={len(recipes):,}")
-    print(f"Ingredient stats: {kept_stats:,}; ingredients with pairings: {len(pairs):,}")
+    print(f"Ingredient stats: {kept_stats:,}; ingredients with pairings: {len(pairs):,} "
+          f"({pair_stats['pairs']:,} distinct pairs counted)")
     print(f"Wrote {args.out} in {time.monotonic() - started:.1f}s")
     return 0
 

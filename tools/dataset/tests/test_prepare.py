@@ -76,6 +76,57 @@ def test_read_rows_skips_non_int_ids_and_non_string_lists(tmp_path):
     assert stats["skipped"] == 3
 
 
+def test_read_rows_caps_the_field_size_at_10_mb(fixture_rows):
+    assert prepare.MAX_FIELD_SIZE == 10 * 1024 * 1024
+    assert csv.field_size_limit() == prepare.MAX_FIELD_SIZE  # set by the fixture's read_rows run
+
+
+def test_an_unbalanced_quote_costs_one_skipped_row_not_the_rest_of_the_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(prepare, "MAX_FIELD_SIZE", 2000)
+    good = '{n},Ok {n},"[""1 egg"", ""2 egg"", ""3 egg""]","[""Cook."", ""Serve.""]",l,s,"[""egg""]"\n'
+    path = tmp_path / "quote.csv"
+    path.write_text(
+        ',title,ingredients,directions,link,source,NER\n'
+        + good.format(n=1)
+        + '2,"Stray quote,[x],[y],l,s,[]\n'
+        + "".join(good.format(n=n) for n in range(3, 400)),
+        encoding="utf-8",
+    )
+    stats = Counter()
+    rows = list(read_rows(path, stats))
+    assert stats["skipped"] >= 1
+    assert [r.id for r in rows][0] == 1
+    assert 2 not in [r.id for r in rows]
+    assert len(rows) > 300  # the rows after the broken one are still read
+
+
+def test_read_rows_accepts_a_utf8_bom(tmp_path):
+    path = tmp_path / "bom.csv"
+    path.write_text(
+        ',title,ingredients,directions,link,source,NER\n'
+        '5,Ok,"[""1 egg""]","[""Cook.""]",l,s,"[""egg""]"\n',
+        encoding="utf-8-sig",
+    )
+    rows = list(read_rows(path, Counter()))
+    assert [r.id for r in rows] == [5]
+
+
+def test_read_rows_rejects_a_file_with_the_wrong_header(tmp_path):
+    path = tmp_path / "wrong.csv"
+    path.write_text('id,name,body\n1,a,b\n', encoding="utf-8")
+    with pytest.raises(prepare.InputError) as error:
+        list(read_rows(path, Counter()))
+    message = str(error.value)
+    assert "title" in message and "NER" in message
+
+
+def test_read_rows_rejects_an_empty_file(tmp_path):
+    path = tmp_path / "empty.csv"
+    path.write_text("", encoding="utf-8")
+    with pytest.raises(prepare.InputError):
+        list(read_rows(path, Counter()))
+
+
 # --- count_ingredients -------------------------------------------------------
 
 def test_count_ingredients_counts_recipes_per_name(fixture_rows):
@@ -109,6 +160,13 @@ def test_count_pairs_orders_by_count_then_name():
     rows = [parsed(1, ["a", "z"]), parsed(2, ["a", "z"]), parsed(3, ["a", "m"]), parsed(4, ["a", "b"])]
     pairs = count_pairs(rows, {"a", "b", "m", "z"})
     assert pairs["a"] == [("z", 2), ("b", 1), ("m", 1)]
+
+
+def test_count_pairs_reports_the_distinct_pair_count():
+    rows = [parsed(1, ["a", "b", "c"]), parsed(2, ["a", "b"]), parsed(3, ["c", "d"])]
+    stats = Counter()
+    count_pairs(rows, {"a", "b", "c", "d"}, stats=stats)
+    assert stats["pairs"] == 4  # a-b, a-c, b-c, c-d
 
 
 # --- select_recipes ----------------------------------------------------------
@@ -291,6 +349,18 @@ def test_write_outputs_creates_the_output_directory(tmp_path):
     assert (target / "reference_recipes.csv").exists()
 
 
+def test_write_outputs_survives_a_lone_surrogate(tmp_path):
+    recipe = RefRecipe(
+        id=1, title="Bad \ud800 title", ingredient_lines=["1 egg\udfff"], ingredient_names=["egg"],
+        directions=["Cook."], meal_types=[], allergens=[],
+        vegetarian=True, vegan=True, gluten_free=True, dairy_free=True,
+    )
+    write_outputs(tmp_path, [recipe], Counter({"egg": 9}), {})
+    row = read_csv(tmp_path / "reference_recipes.csv")[1]
+    assert row[1] == "Bad ? title"
+    assert unarray(row[2]) == ["1 egg?"]
+
+
 # --- CLI ---------------------------------------------------------------------
 
 def test_cli_reports_a_missing_input_file(tmp_path, capsys):
@@ -312,3 +382,32 @@ def test_cli_end_to_end_on_the_fixture(tmp_path, capsys):
     pairings = read_csv(out / "ingredient_pairings.csv")
     assert ["egg", "flour", "2"] in pairings
     assert "skipped" in capsys.readouterr().out
+
+
+def test_cli_rejects_a_file_with_the_wrong_header(tmp_path, capsys):
+    path = tmp_path / "wrong.csv"
+    path.write_text("id,name\n1,a\n", encoding="utf-8")
+    code = prepare.main(["--input", str(path), "--out", str(tmp_path / "out")])
+    assert code != 0
+    assert "NER" in capsys.readouterr().err
+    assert not (tmp_path / "out").exists()
+
+
+def test_cli_stops_when_more_than_half_the_rows_are_skipped(tmp_path, capsys):
+    path = tmp_path / "mostly_bad.csv"
+    good = '1,Ok,"[""1 egg""]","[""Cook.""]",l,s,"[""egg""]"\n'
+    bad = "{n},Bad,[not json,[x],l,s,[]\n"
+    path.write_text(
+        ",title,ingredients,directions,link,source,NER\n" + good + "".join(bad.format(n=n) for n in range(2, 5)),
+        encoding="utf-8",
+    )
+    code = prepare.main(["--input", str(path), "--out", str(tmp_path / "out")])
+    assert code != 0
+    assert "skipped" in capsys.readouterr().err
+    assert not (tmp_path / "out").exists()
+
+
+def test_cli_prints_the_distinct_pair_count(tmp_path, capsys):
+    prepare.main(["--input", str(FIXTURE), "--out", str(tmp_path / "out"),
+                  "--min-common", "2", "--per-meal", "2", "--untagged", "2"])
+    assert re.search(r"[\d,]+ distinct pairs", capsys.readouterr().out)
