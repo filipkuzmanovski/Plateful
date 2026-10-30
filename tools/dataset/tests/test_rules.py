@@ -106,7 +106,8 @@ def test_generous_terms(rules, name, key):
 @pytest.mark.parametrize("name,expected", [
     ("oyster mushrooms", set()), ("crab apples", set()), ("cream of tartar", set()),
     ("butter beans", set()), ("eggplant", set()), ("gluten free flour", set()),
-    ("rice flour", set()), ("almond milk", {"tree_nuts"}),
+    ("rice flour", set()), ("almond milk", {"tree_nuts"}), ("gluten free pasta", set()),
+    ("gluten free all purpose flour", set()), ("brown rice flour", set()),
 ])
 def test_known_safe_lookalikes(rules, name, expected):
     assert rules.allergens_in([name]) == expected
@@ -259,3 +260,47 @@ def test_imported_exception_does_not_hide_the_importing_rows_own_terms(tmp_path)
     loaded = FoodRules.load(path)
     assert loaded.diet_flags(["peanut butter"])["vegan"] is True
     assert loaded.diet_flags(["peanut butter honey"])["vegan"] is False
+
+
+# --- deletion-masking (Ruling L) -----------------------------------------------
+
+@pytest.mark.parametrize("name,key", [
+    ("peanut butter and butter", "milk"),
+    ("gluten free flour and wheat flour", "gluten"),
+])
+def test_an_exception_only_masks_its_own_words(rules, name, key):
+    assert key in rules.allergens_in([name])
+
+
+def test_romano_bean_is_not_milk(rules):
+    assert "milk" not in rules.allergens_in(["romano beans"])
+
+
+def test_pigeon_pea_is_vegetarian(rules):
+    assert rules.diet_flags(["pigeon peas"])["vegetarian"] is True
+
+
+def test_coconut_milk_is_dairy_free_and_vegan(rules):
+    flags = rules.diet_flags(["coconut milk"])
+    assert flags["dairy_free"] is True and flags["vegan"] is True
+
+
+def test_goat_cheese_and_goat_meat_is_not_vegetarian(rules):
+    assert rules.diet_flags(["goat cheese and goat meat"])["vegetarian"] is False
+
+
+def test_masking_deletes_every_occurrence_and_the_longest_phrase_first(tmp_path):
+    path = write_rules(tmp_path, "allergen,milk,Milk,milk|butter,butter bean|peanut butter|peanut\n")
+    loaded = FoodRules.load(path)
+    assert loaded.allergens_in(["peanut butter peanut butter butter bean"]) == set()
+    assert loaded.allergens_in(["peanut butter butter bean and milk"]) == {"milk"}
+    # "peanut" alone is deleted after "peanut butter", so "butter" is not left behind
+    assert loaded.allergens_in(["peanut peanut butter"]) == set()
+
+
+def test_normalised_names_are_matched_as_given_without_the_length_cap(rules):
+    line = "one cup of " + "very " * 20 + "finely chopped pecan"
+    assert len(line) > 60
+    assert rules.allergens_in([line], normalised=True) == {"tree_nuts"}
+    assert rules.allergens_in([line]) == set()  # normalise() caps the name at 60 characters
+    assert rules.diet_flags(["", "chicken"], normalised=True)["vegetarian"] is False

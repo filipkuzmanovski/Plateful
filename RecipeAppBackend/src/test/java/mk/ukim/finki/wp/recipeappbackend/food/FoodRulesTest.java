@@ -119,6 +119,53 @@ class FoodRulesTest {
         assertThat(rules.dietViolations(List.of("carrot", "olive oil", "rice"), ALL_DIETS)).isEmpty();
     }
 
+    // --- deletion-masking -------------------------------------------------------------
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource({
+            "peanut butter and butter, milk",
+            "gluten free flour and wheat flour, gluten",
+    })
+    void anExceptionOnlyMasksItsOwnWords(String name, String key) {
+        assertThat(rules.allergensIn(List.of(name))).contains(key);
+    }
+
+    @ParameterizedTest(name = "{0} is not gluten")
+    @CsvSource({"gluten free flour", "gluten free pasta", "gluten free all purpose flour", "brown rice flour"})
+    void glutenFreeLookalikes(String name) {
+        assertThat(rules.allergensIn(List.of(name))).doesNotContain("gluten");
+    }
+
+    @Test
+    void romanoBeanIsNotMilk() {
+        assertThat(rules.allergensIn(List.of("romano beans"))).doesNotContain("milk");
+    }
+
+    @Test
+    void pigeonPeaIsVegetarian() {
+        assertThat(rules.dietViolations(List.of("pigeon peas"), Set.of("vegetarian"))).isEmpty();
+    }
+
+    @Test
+    void goatCheeseIsVegetarianButNeitherVeganNorDairyFree() {
+        assertThat(rules.dietViolations(List.of("goat cheese"), ALL_DIETS)).containsExactlyInAnyOrder("vegan", "dairy_free");
+    }
+
+    @Test
+    void goatCheeseAndGoatMeatIsNotVegetarian() {
+        assertThat(rules.dietViolations(List.of("goat cheese and goat meat"), Set.of("vegetarian")))
+                .containsExactly("vegetarian");
+    }
+
+    @Test
+    void maskingDeletesEveryOccurrenceAndTheLongestPhraseFirst() {
+        FoodRules r = from("allergen,milk,Milk,milk|butter,butter bean|peanut butter|peanut\n");
+        assertThat(r.allergensIn(List.of("peanut butter peanut butter butter bean"))).isEmpty();
+        assertThat(r.allergensIn(List.of("peanut butter butter bean and milk"))).containsExactly("milk");
+        // "peanut" alone is deleted after "peanut butter", so "butter" is not left behind
+        assertThat(r.allergensIn(List.of("peanut peanut butter"))).isEmpty();
+    }
+
     // --- fail fast on a broken file ----------------------------------------------
 
     @Test

@@ -9,9 +9,12 @@ Each row resolves to groups of (terms, exceptions), one group per source row:
 its own terms with its own exceptions, plus the groups of every "@key" it
 references. Exceptions therefore only mask terms of the row that defines them.
 
-Matching: a term matches a name when " " + name + " " contains " " + term + " ".
-A name hits a row when some group has a matching term and none of that group's
-exceptions match the name.
+Matching is deletion-masking, per group: take " " + name + " ", delete every
+whole-word occurrence of each of the group's exception phrases (longest phrase
+first, then alphabetical; each deletion leaves a single space), then the group
+hits when what remains contains " " + term + " " for one of its terms. So
+"peanut butter and butter" still hits milk: only the "peanut butter" part is
+masked. A name hits a row when one of the row's groups hits.
 
 Standard library only.
 """
@@ -31,6 +34,20 @@ def _matches(padded, phrases):
     return any(f" {p} " in padded for p in phrases)
 
 
+def _masked(padded, exceptions):
+    """`padded` with every whole-word occurrence of each exception phrase replaced by one space."""
+    for phrase in exceptions:
+        target = f" {phrase} "
+        while target in padded:
+            padded = padded.replace(target, " ")
+    return padded
+
+
+def _exception_order(phrases):
+    """Longest first, then alphabetical: the deletion order, identical in FoodRules.java."""
+    return tuple(sorted(phrases, key=lambda p: (-len(p), p)))
+
+
 class _Row:
     def __init__(self, kind, key, label, raw_terms, raw_exceptions):
         self.kind = kind
@@ -41,11 +58,8 @@ class _Row:
         self.groups = ()
 
     def hits(self, padded):
-        """True when some group matches a term and none of its own exceptions."""
-        return any(
-            _matches(padded, terms) and not _matches(padded, exceptions)
-            for terms, exceptions in self.groups
-        )
+        """True when some group matches a term in what is left after deleting its own exceptions."""
+        return any(_matches(_masked(padded, exceptions), terms) for terms, exceptions in self.groups)
 
 
 class FoodRules:
@@ -101,7 +115,7 @@ class FoodRules:
             if item.startswith("@"):
                 raise ValueError(f"{key}: references are not allowed in exceptions: {item!r}")
             own_exceptions.add(self._normalised(key, item))
-        groups = [(frozenset(own_terms), frozenset(own_exceptions))] if own_terms else []
+        groups = [(frozenset(own_terms), _exception_order(own_exceptions))] if own_terms else []
         cache[key] = groups + imported
         return cache[key]
 
@@ -117,20 +131,22 @@ class FoodRules:
         return [row.key for row in self._rows if row.kind == "allergen"]
 
     @staticmethod
-    def _padded_names(names):
-        normalised = {normalise(n) for n in names}
-        normalised.discard(None)
-        return [f" {n} " for n in normalised]
+    def _padded_names(names, normalised):
+        """Pads each name. With normalised=True the names are used as given (already normalised text,
+        no length cap, e.g. a whole ingredient line from normalise_words); otherwise each is normalised."""
+        found = {n for n in names if n} if normalised else {normalise(n) for n in names}
+        found.discard(None)
+        return [f" {n} " for n in found]
 
-    def allergens_in(self, names):
-        padded = self._padded_names(names)
+    def allergens_in(self, names, normalised=False):
+        padded = self._padded_names(names, normalised)
         return {
             row.key for row in self._rows
             if row.kind == "allergen" and any(row.hits(p) for p in padded)
         }
 
-    def diet_flags(self, names):
-        padded = self._padded_names(names)
+    def diet_flags(self, names, normalised=False):
+        padded = self._padded_names(names, normalised)
         return {
             row.key: not any(row.hits(p) for p in padded)
             for row in self._rows if row.kind == "diet"

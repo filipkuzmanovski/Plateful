@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,8 +28,12 @@ import org.springframework.stereotype.Component;
  * own exceptions, plus the groups of every referenced row. Exceptions therefore only mask terms of
  * the row that defines them.
  *
- * <p>A term matches a name when {@code " " + name + " "} contains {@code " " + term + " "}. A name hits
- * a row when some group has a matching term and none of that group's exceptions match the name.
+ * <p>Matching is deletion-masking, per group: take {@code " " + name + " "}, delete every whole-word
+ * occurrence of each of the group's exception phrases (longest phrase first, then alphabetical; each
+ * deletion leaves a single space), then the group hits when what remains contains
+ * {@code " " + term + " "} for one of its terms. So "peanut butter and butter" still hits milk: only the
+ * "peanut butter" part is masked. A name hits a row when one of the row's groups hits. This is identical
+ * to {@code rules.py}.
  *
  * <p>Meal rows are validated but not used here; the backend does not tag meals.
  */
@@ -39,8 +44,12 @@ public class FoodRules {
     private static final String HEADER = "kind,key,label,terms,exceptions";
     private static final Set<String> KINDS = Set.of("allergen", "diet", "meal");
 
-    private record Group(Set<String> terms, Set<String> exceptions) {
+    /** {@code exceptions} are in deletion order: longest first, then alphabetical. */
+    private record Group(Set<String> terms, List<String> exceptions) {
     }
+
+    private static final Comparator<String> EXCEPTION_ORDER =
+            Comparator.comparingInt(String::length).reversed().thenComparing(Comparator.naturalOrder());
 
     private static final class Row {
         final String kind;
@@ -60,7 +69,7 @@ public class FoodRules {
 
         boolean hits(String padded) {
             for (Group group : groups) {
-                if (matches(padded, group.terms()) && !matches(padded, group.exceptions())) {
+                if (matches(masked(padded, group.exceptions()), group.terms())) {
                     return true;
                 }
             }
@@ -153,6 +162,18 @@ public class FoodRules {
         return normalised.stream().map(n -> " " + n + " ").toList();
     }
 
+    /** {@code padded} with every whole-word occurrence of each exception phrase replaced by one space. */
+    private static String masked(String padded, List<String> exceptions) {
+        String remaining = padded;
+        for (String phrase : exceptions) {
+            String target = " " + phrase + " ";
+            while (remaining.contains(target)) {
+                remaining = remaining.replace(target, " ");
+            }
+        }
+        return remaining;
+    }
+
     private static boolean matches(String padded, Set<String> phrases) {
         for (String phrase : phrases) {
             if (padded.contains(" " + phrase + " ")) {
@@ -200,7 +221,7 @@ public class FoodRules {
         }
         List<Group> groups = new ArrayList<>();
         if (!ownTerms.isEmpty()) {
-            groups.add(new Group(Set.copyOf(ownTerms), Set.copyOf(ownExceptions)));
+            groups.add(new Group(Set.copyOf(ownTerms), ownExceptions.stream().sorted(EXCEPTION_ORDER).toList()));
         }
         groups.addAll(imported);
         List<Group> result = List.copyOf(groups);
