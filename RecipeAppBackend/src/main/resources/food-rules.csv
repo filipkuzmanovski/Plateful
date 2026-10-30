@@ -1,0 +1,22 @@
+kind,key,label,terms,exceptions
+allergen,gluten,Cereals containing gluten,gluten|wheat|flour|bread|breadcrumb|panko|crouton|cracker|biscuit|pasta|spaghetti|macaroni|noodle|ramen|udon|orzo|lasagna|lasagne|ravioli|gnocchi|fettuccine|linguine|penne|tagliatelle|vermicelli|couscous|semolina|bulgur|farro|spelt|kamut|barley|malt|rye|oat|oatmeal|seitan|flour tortilla|pita|bagel|baguette|bun|pretzel|pastry|puff pastry|phyllo|filo|croissant|cake|cookie|cereal|bran|stuffing|soy sauce|beer|ale|lager,rice flour|almond flour|coconut flour|corn flour|cornflour|buckwheat flour|gluten free|root beer|ginger beer|ginger ale
+allergen,crustaceans,Crustaceans,shrimp|prawn|crab|lobster|crayfish|crawfish|langoustine|scampi|krill|shellfish|shrimp paste,crab apple|lobster mushroom
+allergen,eggs,Eggs,egg|mayonnaise|mayo|meringue|aioli|albumen|eggnog|hollandaise|custard,egg replacer|egg substitute|vegan mayonnaise
+allergen,fish,Fish,fish|salmon|tuna|cod|haddock|halibut|trout|tilapia|mackerel|herring|sardine|anchovy|bass|snapper|swordfish|mahi mahi|pollock|catfish|carp|eel|pike|perch|sole|flounder|plaice|whitefish|bonito|monkfish|grouper|barramundi|turbot|hake|skate|kipper|surimi|roe|caviar|worcestershire|caesar dressing,
+allergen,peanuts,Peanuts,peanut|groundnut|arachis,
+allergen,soy,Soybeans,soy|soya|soybean|tofu|edamame|miso|tempeh|tamari|shoyu|natto|yuba|soy sauce|textured vegetable protein,
+allergen,milk,Milk,milk|butter|buttermilk|cheese|cream|yogurt|yoghurt|whey|ghee|casein|lactose|mozzarella|parmesan|ricotta|mascarpone|cheddar|feta|brie|gouda|gruyere|pecorino|halloumi|paneer|kefir|custard|creamer|half and half|creme fraiche|dulce de leche,peanut butter|almond butter|cashew butter|nut butter|cocoa butter|cacao butter|apple butter|coconut butter|coconut milk|coconut cream|oat milk|soy milk|almond milk|rice milk|cashew milk|hazelnut milk|butter bean|butter lettuce|cream of tartar
+allergen,tree_nuts,Tree nuts,almond|walnut|pecan|cashew|pistachio|hazelnut|macadamia|brazil nut|pine nut|nut|filbert|praline|marzipan|nutella|pesto|frangipane|amaretto|orgeat|gianduja,
+allergen,celery,Celery,celery|celeriac|celery salt|celery seed,
+allergen,mustard,Mustard,mustard|dijon|mustard seed|mustard powder,
+allergen,sesame,Sesame,sesame|tahini|halva|halvah|hummus|gomashio,
+allergen,sulphites,Sulphites,wine|vinegar|dried apricot|dried fruit|dried fig|dried mango|dried peach|dried apple|raisin|sultana|prune|cider|sherry|port|champagne|prosecco|brandy|vermouth|marsala|sulphite|sulfite|metabisulphite,
+allergen,lupin,Lupin,lupin|lupine|lupini,
+allergen,molluscs,Molluscs,clam|mussel|oyster|scallop|squid|octopus|calamari|snail|escargot|whelk|cockle|abalone|cuttlefish|shellfish|oyster sauce,oyster mushroom
+diet,vegetarian,Vegetarian,@fish|@crustaceans|@molluscs|meat|meatball|meatloaf|poultry|beef|veal|pork|lamb|mutton|venison|rabbit|quail|pheasant|bison|chicken|turkey|duck|goose|bacon|ham|hamburger|sausage|salami|pepperoni|prosciutto|pancetta|chorizo|mortadella|bologna|frankfurter|bratwurst|kielbasa|jerky|steak|brisket|sirloin|tenderloin|oxtail|liver|pate|foie gras|bone broth|lard|suet|gelatin|gelatine|isinglass,lamb lettuce
+diet,vegan,Vegan,@vegetarian|@milk|@eggs|honey|beeswax,
+diet,gluten_free,Gluten-free,@gluten,
+diet,dairy_free,Dairy-free,@milk,
+meal,breakfast,Breakfast,breakfast|brunch|pancake|omelette|omelet|granola|porridge|oatmeal|muffin|waffle|french toast|frittata|smoothie|crepe|scone|hash brown|overnight oat|shakshuka|egg benedict,
+meal,lunch,Lunch,salad|sandwich|soup|wrap|quiche|panini|burger|taco|burrito|quesadilla|gazpacho|bruschetta,
+meal,dinner,Dinner,roast|curry|stew|casserole|pasta|lasagna|lasagne|risotto|chili|chilli|pie|stir fry|fajita|enchilada|paella|tagine|bolognese|ragu|schnitzel|meatloaf|pot roast,
