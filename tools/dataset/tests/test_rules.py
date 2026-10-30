@@ -90,7 +90,7 @@ def test_union_across_names(rules):
     ("celery stalks", "celery"), ("dijon mustard", "mustard"), ("tahini", "sesame"),
     ("dried apricots", "sulphites"), ("lupin flour", "lupin"), ("parmesan", "milk"),
     ("pizza dough", "gluten"), ("pie crust", "gluten"), ("naan", "gluten"), ("flatbread", "gluten"),
-    ("cornbread", "gluten"), ("pancake mix", "gluten"), ("corn tortillas", "gluten"),
+    ("cornbread", "gluten"), ("pancake mix", "gluten"), ("corn tortillas", "gluten"), ("chapatis", "gluten"),
     ("sourdough", "gluten"), ("gingerbread", "gluten"), ("wonton wrappers", "gluten"),
     ("graham crackers", "gluten"), ("durum", "gluten"), ("matzo meal", "gluten"),
     ("provolone", "milk"), ("gorgonzola", "milk"), ("parmigiano reggiano", "milk"),
@@ -142,7 +142,8 @@ def test_plain_vegetables_fit_every_diet(rules):
 
 def test_seafood_and_gelatin_are_not_vegetarian(rules):
     for name in ["shrimp", "salmon", "gelatin", "bacon", "oyster sauce", "hot dog", "andouille",
-                 "pastrami", "gammon", "pigeon", "squab", "goat meat", "curry goat"]:
+                 "pastrami", "gammon", "pigeon", "squab", "goat", "ground goat", "goat shank",
+                 "goat ribs", "goat curry", "diced goat", "boneless goat"]:
         assert rules.diet_flags([name])["vegetarian"] is False, name
 
 
@@ -236,3 +237,25 @@ def test_reference_imports_terms_and_exceptions(tmp_path):
 def test_forward_reference_is_fine(tmp_path):
     path = write_rules(tmp_path, "diet,d,D,@a,\nallergen,a,A,egg,\n")
     assert FoodRules.load(path).diet_flags(["egg"])["d"] is False
+
+
+def test_exceptions_only_mask_their_own_rows_terms(rules):
+    flags = rules.diet_flags(["honey roasted peanut butter"])
+    assert flags["vegan"] is False
+    assert flags["vegetarian"] is True
+    assert flags["dairy_free"] is True
+
+
+def test_coconut_milk_is_vegan(rules):
+    assert rules.diet_flags(["coconut milk"])["vegan"] is True
+
+
+def test_imported_exception_does_not_hide_the_importing_rows_own_terms(tmp_path):
+    path = write_rules(
+        tmp_path,
+        "allergen,milk,Milk,milk|butter,peanut butter\n"
+        "diet,vegan,Vegan,@milk|honey,\n",
+    )
+    loaded = FoodRules.load(path)
+    assert loaded.diet_flags(["peanut butter"])["vegan"] is True
+    assert loaded.diet_flags(["peanut butter honey"])["vegan"] is False

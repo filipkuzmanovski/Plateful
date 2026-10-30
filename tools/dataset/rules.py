@@ -3,10 +3,15 @@
 Reads RecipeAppBackend/src/main/resources/food-rules.csv, the single source of
 truth for both Python and (later) Java. Columns: kind,key,label,terms,exceptions.
 Fields hold no commas or quotes; list items are separated by "|". A term written
-"@key" imports that row's terms and exceptions.
+"@key" imports that row's groups.
+
+Each row resolves to groups of (terms, exceptions), one group per source row:
+its own terms with its own exceptions, plus the groups of every "@key" it
+references. Exceptions therefore only mask terms of the row that defines them.
 
 Matching: a term matches a name when " " + name + " " contains " " + term + " ".
-A name that matches any of a row's exceptions is skipped for that row.
+A name hits a row when some group has a matching term and none of that group's
+exceptions match the name.
 
 Standard library only.
 """
@@ -33,14 +38,14 @@ class _Row:
         self.label = label
         self.raw_terms = raw_terms
         self.raw_exceptions = raw_exceptions
-        self.terms = frozenset()
-        self.exceptions = frozenset()
+        self.groups = ()
 
     def hits(self, padded):
-        """True when the space-padded text matches a term and no exception."""
-        if _matches(padded, self.exceptions):
-            return False
-        return _matches(padded, self.terms)
+        """True when some group matches a term and none of its own exceptions."""
+        return any(
+            _matches(padded, terms) and not _matches(padded, exceptions)
+            for terms, exceptions in self.groups
+        )
 
 
 class FoodRules:
@@ -75,8 +80,7 @@ class FoodRules:
     def _resolve_all(self):
         cache = {}
         for row in self._rows:
-            terms, exceptions = self._resolve(row.key, (), cache)
-            row.terms, row.exceptions = frozenset(terms), frozenset(exceptions)
+            row.groups = tuple(self._resolve(row.key, (), cache))
 
     def _resolve(self, key, stack, cache):
         if key in cache:
@@ -84,22 +88,21 @@ class FoodRules:
         if key in stack:
             raise ValueError("reference cycle: " + " -> ".join(stack + (key,)))
         row = self._by_key[key]
-        terms, exceptions = set(), set()
+        own_terms, own_exceptions, imported = set(), set(), []
         for item in row.raw_terms:
             if item.startswith("@"):
                 ref = item[1:]
                 if ref not in self._by_key:
                     raise ValueError(f"{key}: unknown reference {item!r}")
-                ref_terms, ref_exceptions = self._resolve(ref, stack + (key,), cache)
-                terms |= ref_terms
-                exceptions |= ref_exceptions
+                imported.extend(self._resolve(ref, stack + (key,), cache))
             else:
-                terms.add(self._normalised(key, item))
+                own_terms.add(self._normalised(key, item))
         for item in row.raw_exceptions:
             if item.startswith("@"):
                 raise ValueError(f"{key}: references are not allowed in exceptions: {item!r}")
-            exceptions.add(self._normalised(key, item))
-        cache[key] = (terms, exceptions)
+            own_exceptions.add(self._normalised(key, item))
+        groups = [(frozenset(own_terms), frozenset(own_exceptions))] if own_terms else []
+        cache[key] = groups + imported
         return cache[key]
 
     @staticmethod
