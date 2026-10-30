@@ -132,8 +132,17 @@ public class FoodRules {
         return found;
     }
 
-    /** The diets among {@code diets} that {@code names} break; names that normalise to nothing are ignored. */
+    /**
+     * The diets among {@code diets} that {@code names} break; names that normalise to nothing are ignored.
+     * Throws {@link IllegalArgumentException} for a diet key that is not one of {@link #dietKeys()}, so a
+     * typo can never silently pass every recipe.
+     */
     public Set<String> dietViolations(Collection<String> names, Set<String> diets) {
+        for (String diet : diets) {
+            if (!dietKeys.contains(diet)) {
+                throw new IllegalArgumentException("Unknown diet: " + diet);
+            }
+        }
         List<String> padded = paddedNames(names);
         Set<String> broken = new LinkedHashSet<>();
         for (Row row : rows) {

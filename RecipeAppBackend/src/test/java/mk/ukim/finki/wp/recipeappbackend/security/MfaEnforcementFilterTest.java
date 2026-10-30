@@ -2,11 +2,13 @@ package mk.ukim.finki.wp.recipeappbackend.security;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.controller.AdminReviewController;
+import mk.ukim.finki.wp.recipeappbackend.controller.PreferencesController;
 import mk.ukim.finki.wp.recipeappbackend.controller.RecipeController;
 import mk.ukim.finki.wp.recipeappbackend.controller.SavedRecipeController;
 import mk.ukim.finki.wp.recipeappbackend.controller.UserController;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.MyProfileDto;
 import mk.ukim.finki.wp.recipeappbackend.service.AdminReviewService;
+import mk.ukim.finki.wp.recipeappbackend.service.PreferencesService;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import mk.ukim.finki.wp.recipeappbackend.service.SavedRecipeService;
 import mk.ukim.finki.wp.recipeappbackend.service.UserService;
@@ -36,11 +38,13 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({UserController.class, RecipeController.class, SavedRecipeController.class, AdminReviewController.class})
+@WebMvcTest({UserController.class, RecipeController.class, SavedRecipeController.class, AdminReviewController.class,
+        PreferencesController.class})
 @Import(SecurityConfig.class)
 class MfaEnforcementFilterTest {
 
@@ -57,6 +61,8 @@ class MfaEnforcementFilterTest {
     SavedRecipeService savedRecipeService;
     @MockitoBean
     AdminReviewService adminReviewService;
+    @MockitoBean
+    PreferencesService preferencesService;
     @MockitoBean
     AdminGuard adminGuard;
     @MockitoBean
@@ -233,6 +239,28 @@ class MfaEnforcementFilterTest {
     }
 
     @Test
+    void getPreferencesAal1WithFactorIs401() throws Exception {
+        assertGetIsRefused("/api/users/me/preferences");
+    }
+
+    @Test
+    void putPreferencesAal1WithFactorIs401() throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+
+        mockMvc.perform(put("/api/users/me/preferences").with(token("aal1"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allergens\":[\"milk\"]}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("mfa_required"));
+
+        verifyNoInteractions(preferencesService);
+    }
+
+    @Test
+    void encodedPreferencesIs401() throws Exception {
+        assertEncodedMeIsRefused("/api/users/m%65/preferences");
+    }
+
+    @Test
     void adminGetAal1WithFactorIs401() throws Exception {
         assertGetIsRefused("/api/admin/recipes/pending");
     }
@@ -270,7 +298,8 @@ class MfaEnforcementFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("mfa_required"));
 
-        verifyNoInteractions(userService, recipeService, savedRecipeService, adminReviewService, adminGuard);
+        verifyNoInteractions(userService, recipeService, savedRecipeService, adminReviewService, preferencesService,
+                adminGuard);
     }
 
     private void assertEncodedMeIsRefused(String encodedPath) throws Exception {
@@ -280,7 +309,8 @@ class MfaEnforcementFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("mfa_required"));
 
-        verifyNoInteractions(userService, recipeService, savedRecipeService, adminReviewService, adminGuard);
+        verifyNoInteractions(userService, recipeService, savedRecipeService, adminReviewService, preferencesService,
+                adminGuard);
     }
 
     /**

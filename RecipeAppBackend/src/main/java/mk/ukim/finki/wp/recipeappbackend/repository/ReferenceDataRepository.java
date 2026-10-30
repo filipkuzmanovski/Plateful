@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.repository;
 
+import mk.ukim.finki.wp.recipeappbackend.food.IngredientNames;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.ReferenceQuery;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.ReferenceRecipe;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -10,8 +11,10 @@ import java.sql.Array;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Reads the dataset tables ({@code reference_recipes}, {@code ingredient_stats}). They have no JPA
@@ -49,12 +52,15 @@ public class ReferenceDataRepository {
 
     /**
      * The dataset recipes sharing the most names with {@code q.wanted()}, filtered by meal, allergens,
-     * diets and dislikes, fewest ingredients first on ties. All names in {@code q} must already be
-     * normalised. An empty {@code wanted} returns an empty list without querying; an unknown diet
-     * key throws {@link IllegalArgumentException}.
+     * diets and dislikes, fewest ingredients first on ties. The {@code wanted} and {@code dislikes}
+     * names are normalised here with {@link IngredientNames#normalise} (so "Tomatoes" finds "tomato"),
+     * and names that normalise to nothing are dropped. When no wanted name is left this returns an
+     * empty list without querying; an unknown diet key throws {@link IllegalArgumentException}.
      */
     public List<ReferenceRecipe> findClosest(ReferenceQuery q) {
-        if (q.wanted().isEmpty()) {
+        Set<String> wanted = normalised(q.wanted());
+        Set<String> dislikes = normalised(q.dislikes());
+        if (wanted.isEmpty()) {
             return List.of();
         }
         StringBuilder sql = new StringBuilder("""
@@ -65,7 +71,7 @@ public class ReferenceDataRepository {
                 WHERE ingredient_names && CAST(:wanted AS text[])
                 """);
         MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("wanted", textArray(q.wanted()))
+                .addValue("wanted", textArray(wanted))
                 .addValue("limit", q.limit());
         if (q.mealType() != null) {
             sql.append(" AND CAST(:mealType AS text) = ANY(meal_types)\n");
@@ -82,13 +88,13 @@ public class ReferenceDataRepository {
             }
             sql.append(" AND ").append(column).append('\n');
         }
-        if (!q.dislikes().isEmpty()) {
+        if (!dislikes.isEmpty()) {
             // Names hold only [a-z ], so the patterns need no LIKE escaping. Padding with spaces
             // makes the match a whole-word (or whole-phrase) match.
             sql.append(" AND NOT EXISTS (SELECT 1 FROM unnest(ingredient_names) AS n "
                     + "WHERE (' ' || n || ' ') LIKE ANY (CAST(:dislikePatterns AS text[])))\n");
             params.addValue("dislikePatterns",
-                    q.dislikes().stream().map(d -> "% " + d + " %").toArray(String[]::new));
+                    dislikes.stream().map(d -> "% " + d + " %").toArray(String[]::new));
         }
         sql.append(" ORDER BY overlap DESC, cardinality(ingredient_names), id LIMIT :limit");
 
@@ -100,6 +106,14 @@ public class ReferenceDataRepository {
                 list(rs.getArray("directions")),
                 list(rs.getArray("meal_types")),
                 rs.getInt("overlap")));
+    }
+
+    private static Set<String> normalised(Collection<String> names) {
+        Set<String> result = new LinkedHashSet<>();
+        for (String name : names) {
+            IngredientNames.normalise(name).ifPresent(result::add);
+        }
+        return result;
     }
 
     private static String[] textArray(Collection<String> values) {

@@ -157,6 +157,19 @@ class ReferenceRecipeQueryDbTest {
     }
 
     @Test
+    void wantedAndDislikedNamesAreNormalisedFirst() {
+        assertThat(fixtureIds(repository.findClosest(wanting("ZZEggs", "  zzSpinach ")))).startsWith(-2L);
+        List<ReferenceRecipe> result = repository.findClosest(
+                query(Set.of("zzEggs"), null, Set.of(), Set.of(), Set.of("ZZMushrooms", "!!!"), 50));
+        assertThat(fixtureIds(result)).doesNotContain(-3L).contains(-1L, -2L);
+    }
+
+    @Test
+    void wantedNamesThatNormaliseToNothingReturnNothing() {
+        assertThat(repository.findClosest(wanting("!!!", "123", ""))).isEmpty();
+    }
+
+    @Test
     void emptyWantedReturnsNothing() {
         assertThat(repository.findClosest(wanting())).isEmpty();
     }

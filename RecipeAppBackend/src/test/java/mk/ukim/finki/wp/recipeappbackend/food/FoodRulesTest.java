@@ -115,6 +115,15 @@ class FoodRulesTest {
     }
 
     @Test
+    void anUnknownDietKeyIsRejected() {
+        assertThatThrownBy(() -> rules.dietViolations(List.of("bacon"), Set.of("vegetarian", "paleo")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("paleo");
+        assertThatThrownBy(() -> rules.dietViolations(List.of(), Set.of("eggs")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void plainVegetablesFitEveryDiet() {
         assertThat(rules.dietViolations(List.of("carrot", "olive oil", "rice"), ALL_DIETS)).isEmpty();
     }
