@@ -4510,3 +4510,35 @@ Status
 All code and tests are done on the branch. The dataset download, prepare and
 load, and the fresh sign-up, are waiting for you. The whole-branch review
 comes after that.
+
+Final review fixes
+------------------
+  - Egg substitutes count as eggs again (Egg Beaters are egg white).
+  - About 60 missing terms were added to food-rules.csv: crabmeat, Miracle
+    Whip, salad dressing, Bisquick, rolls, saltines, Cool Whip, Velveeta,
+    margarine, chocolate chips, pudding, ranch, teriyaki, hoisin, Jell-O,
+    marshmallow, chuck, ribs, franks, hens, giblets, Spam, fatback and more.
+    Python and Java run the same cases.
+  - Exceptions now delete only their own words before matching, so "peanut
+    butter and butter" is still milk. Python and Java do the same.
+  - prepare.py also tags allergens and diets from each ingredient line, not
+    only the NER names ("chopped pecans halves", "anchovies fillets").
+  - New step: prepare.py writes tools/dataset/out/rules_audit.txt, the 1,500
+    most common names that no rule flags. Skim it after prepare.py. If a line
+    is an allergen or a meat, add the term to food-rules.csv, run prepare.py
+    again, and only then load. The README has this as step 6.
+  - load.py --dry-run prints the row count of each CSV, and the load sets a
+    15 minute statement timeout. The README password commands now decode
+    XML entities.
+  - findClosest normalises its input, an unknown diet key is an error, and a
+    2FA test covers the preferences endpoints. The form shows the saved
+    values after a save, shows cuisine errors, ignores a double submit, and
+    /preferences/setup sends a user who is done to the Preferences tab.
+  - The spec has a new section 11: sub-project 2 must re-check every
+    reference recipe with FoodRules, because imported tags never change.
+
+Tests after the final review fixes
+  - Python (pytest): 258 passing.
+  - Backend quick regression (no database): 512 passing.
+  - Backend DbTests against the live Supabase database: 64 passing.
+  - Frontend: npx vitest run, 560 passing. npm run build succeeded.
