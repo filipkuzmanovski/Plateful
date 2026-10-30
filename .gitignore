@@ -14,3 +14,9 @@ Thumbs.db
 #Claude
 .claude/
 .superpowers/
+
+# Dataset tooling
+tools/dataset/data/
+tools/dataset/out/
+tools/dataset/**/__pycache__/
+tools/dataset/.pytest_cache/
