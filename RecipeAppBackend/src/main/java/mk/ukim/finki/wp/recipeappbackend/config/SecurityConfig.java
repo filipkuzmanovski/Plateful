@@ -54,7 +54,9 @@ public class SecurityConfig {
                                 "/api/recipes/**",
                                 "/api/users/*",
                                 "/api/users/*/recipes",
-                                "/api/comments/*/reactions").permitAll()
+                                "/api/comments/*/reactions",
+                                "/api/food/allergens",
+                                "/api/ingredients/suggest").permitAll()
 
                         // Deny-by-default: every mutation and unknown route.
                         .anyRequest().authenticated()
