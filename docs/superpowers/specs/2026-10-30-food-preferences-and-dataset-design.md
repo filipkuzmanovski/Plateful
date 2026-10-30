@@ -209,7 +209,7 @@ It reads `data/full_dataset.csv` row by row with the standard `csv` module. The 
 
 ### 6.4 Groundwork for sub-project 2 (no endpoint)
 
-`ReferenceRecipeRepository.findClosest(wanted, mealType, excludedAllergens, diets, dislikes, limit)` is a native query:
+`ReferenceDataRepository.findClosest(wanted, mealType, excludedAllergens, diets, dislikes, limit)` is a native query (it lives in `ReferenceDataRepository`, next to the ingredient lookups; it normalises `wanted` and `dislikes` itself):
 - **candidates:** `ingredient_names && :wanted`, plus `:mealType = ANY(meal_types)` when one is given;
 - **hard filters:**
   - `NOT (allergens && :excludedAllergens)`;
@@ -307,3 +307,15 @@ It reads `data/full_dataset.csv` row by row with the standard `csv` module. The 
 - Showing reference recipes to users, anywhere.
 - A meal-type field on Plateful's own recipes. It isn't needed now that the daily meals are always generated.
 - Docker and CI/CD: a separate round after the AI work.
+
+## 11. Carried into sub-project 2
+
+- **Reference tags are frozen at import.** `load.py` only inserts, so the `allergens` and diet flags of a
+  `reference_recipes` row stay as `prepare.py` computed them, even after `food-rules.csv` is fixed later.
+- **So sub-project 2 re-checks every candidate in Java.** Each recipe `ReferenceDataRepository.findClosest`
+  returns must be checked again with `FoodRules.allergensIn` and `FoodRules.dietViolations` on its
+  `ingredient_names`, and dropped if it breaks the user's allergens or diets. This is defence in depth:
+  the SQL filter uses the frozen tags, the Java check uses the current rules, so later rule fixes take
+  effect without re-importing.
+- **Name.** The repository is `ReferenceDataRepository` (section 6.4 first called it
+  `ReferenceRecipeRepository`).

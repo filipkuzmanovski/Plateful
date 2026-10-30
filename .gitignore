@@ -18,5 +18,7 @@ Thumbs.db
 # Dataset tooling
 tools/dataset/data/
 tools/dataset/out/
+tools/dataset/dataset/
+tools/dataset/*.zip
 tools/dataset/**/__pycache__/
 tools/dataset/.pytest_cache/

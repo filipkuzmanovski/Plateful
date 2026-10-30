@@ -37,11 +37,15 @@ education) and download `dataset.zip`.
 
 ### 2. Unzip it
 
-Unzip so the file ends up at:
+The zip holds a `dataset/` folder with `full_dataset.csv` inside it. Move the csv out of that folder so
+it ends up directly at:
 
 ```
 tools/dataset/data/full_dataset.csv
 ```
+
+(not `tools/dataset/data/dataset/full_dataset.csv`). Both the zip and a stray `tools/dataset/dataset/`
+folder are git-ignored, but delete them once the csv is in place.
 
 Create the `data` folder if it does not exist. The unzipped file is about 2 GB.
 
@@ -87,7 +91,7 @@ Git Bash, from `RecipeAppBackend/`:
 
 ```bash
 cd RecipeAppBackend
-export SUPABASE_DB_PASSWORD="$(python -c "import re;s=open('.idea/workspace.xml',encoding='utf-8').read();m=re.search(r'name=\"SUPABASE_DB_PASSWORD\" value=\"([^\"]*)\"',s);print(m.group(1) if m else '')")"
+export SUPABASE_DB_PASSWORD="$(python -c "import re,html;s=open('.idea/workspace.xml',encoding='utf-8').read();m=re.search(r'name=\"SUPABASE_DB_PASSWORD\" value=\"([^\"]*)\"',s);print(html.unescape(m.group(1)) if m else '')")"
 cd ..
 ```
 
@@ -95,9 +99,12 @@ PowerShell, from `RecipeAppBackend\`:
 
 ```powershell
 cd RecipeAppBackend
-$env:SUPABASE_DB_PASSWORD = python -c "import re;s=open('.idea/workspace.xml',encoding='utf-8').read();m=re.search(r'name=\x22SUPABASE_DB_PASSWORD\x22 value=\x22([^\x22]*)\x22',s);print(m.group(1) if m else '')"
+$env:SUPABASE_DB_PASSWORD = python -c "import re,html;s=open('.idea/workspace.xml',encoding='utf-8').read();m=re.search(r'name=\x22SUPABASE_DB_PASSWORD\x22 value=\x22([^\x22]*)\x22',s);print(html.unescape(m.group(1)) if m else '')"
 cd ..
 ```
+
+IntelliJ stores the value XML-escaped (for example `&amp;` for `&`); `html.unescape` turns it back into
+the real password.
 
 The variable only lasts for that terminal window. Do not echo it, paste it into chat, or write it to a
 file.
