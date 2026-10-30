@@ -19,7 +19,7 @@ MAX_NAME_LENGTH = 60
 
 
 def _load_irregulars():
-    with open(IRREGULARS_FILE, encoding="utf-8", newline="") as f:
+    with open(IRREGULARS_FILE, encoding="utf-8-sig", newline="") as f:
         return {row["plural"]: row["singular"] for row in csv.DictReader(f)}
 
 
@@ -29,9 +29,10 @@ _IRREGULARS = _load_irregulars()
 def _clean(text):
     decomposed = unicodedata.normalize("NFKD", text)
     stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
-    lowered = stripped.lower().replace("-", " ")
+    lowered = re.sub(r"\s", " ", stripped.lower().replace("-", " "))
     letters_only = re.sub(r"[^a-z ]", "", lowered)
-    return " ".join(letters_only.split())
+    # A lone "s" is a possessive remnant (e.g. an acute accent standing in for an apostrophe); drop it.
+    return " ".join(w for w in letters_only.split() if w != "s")
 
 
 def _singularise(word):

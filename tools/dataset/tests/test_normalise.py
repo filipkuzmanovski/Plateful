@@ -32,3 +32,7 @@ def test_normalise_words_has_no_length_cap():
 
 def test_repo_root_contains_the_shared_irregulars_file():
     assert (REPO_ROOT / "RecipeAppBackend/src/main/resources/ingredient-irregulars.csv").is_file()
+
+
+def test_normalise_words_drops_lone_s_without_double_space():
+    assert normalise_words("a s b") == "a b"
