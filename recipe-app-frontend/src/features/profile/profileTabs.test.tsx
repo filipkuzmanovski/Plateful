@@ -297,7 +297,7 @@ describe('profile tabs', () => {
 
     mocks.session = { access_token: 't', user: { id: 'u-2', email: 'bob@example.com' } };
     server.use(
-      http.get(`${BASE}/api/users/me`, () => HttpResponse.json({ id: 'u-2', firstName: 'Bob', lastName: 'Smith', isAdmin: false, rejectedCount: 0 })),
+      http.get(`${BASE}/api/users/me`, () => HttpResponse.json({ id: 'u-2', firstName: 'Bob', lastName: 'Smith', isAdmin: false, rejectedCount: 0, hasPreferences: true })),
       http.get(`${BASE}/api/users/u-2/recipes`, () => HttpResponse.json(pageOf([]))),
     );
     fakeSavedServer([recipeFixture({ id: 'b-1', title: 'Account B Salad' })]);

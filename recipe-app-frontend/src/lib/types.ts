@@ -1,6 +1,12 @@
 export interface UserDisplay { id: string; firstName: string; lastName: string; }
 /** The signed-in user's own profile: the public fields plus what only they (and the review flow) need. */
-export interface MyProfile extends UserDisplay { isAdmin: boolean; rejectedCount: number; }
+export interface MyProfile extends UserDisplay { isAdmin: boolean; rejectedCount: number; hasPreferences: boolean; }
+
+export type Diet = 'vegetarian' | 'vegan' | 'gluten_free' | 'dairy_free';
+export interface Preferences {
+  allergens: string[]; diets: Diet[]; dislikedIngredients: string[]; likedIngredients: string[]; likedCuisines: string[];
+}
+export interface Allergen { key: string; label: string }
 export interface IngredientDisplay { ingredientName: string; originalText: string; }
 export interface InstructionStep { number: number; step: string; ingredients: string[]; equipment: string[]; }
 

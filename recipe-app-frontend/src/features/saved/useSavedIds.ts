@@ -32,6 +32,7 @@ export function useSavedIds() {
         // Half signed-in users go where the rest of the app sends them, not back to the password form.
         if (status === 'needs-mfa') navigate('/verify-2fa', { state: { from } });
         else if (status === 'needs-profile') navigate('/complete-profile');
+        else if (status === 'needs-preferences') navigate('/preferences/setup');
         else navigate('/login', { state: { from } });
         return;
       }

@@ -21,7 +21,7 @@ export default function CompleteProfilePage() {
     try {
       const profile = await createMe({ firstName, lastName });
       setProfile(profile);
-      navigate('/me');
+      navigate('/preferences/setup');
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : 'Something went wrong');
     } finally {

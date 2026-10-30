@@ -9,7 +9,7 @@ import { IDLE_WARNING_ATTRIBUTE, useIdleTimeout } from './useIdleTimeout';
 export function IdleSessionGuard() {
   const { status, signOut } = useAuth();
   const navigate = useNavigate();
-  const enabled = status === 'ready' || status === 'needs-mfa' || status === 'needs-profile';
+  const enabled = status === 'ready' || status === 'needs-mfa' || status === 'needs-profile' || status === 'needs-preferences';
 
   const timeOut = () => {
     // A failed sign-out must still send the user to the login page.

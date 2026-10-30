@@ -11,6 +11,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   if (status === 'anonymous') return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
   if (status === 'needs-profile' && location.pathname !== '/complete-profile')
     return <Navigate to="/complete-profile" replace />;
+  if (status === 'needs-preferences' && location.pathname !== '/preferences/setup')
+    return <Navigate to="/preferences/setup" replace />;
   if (status === 'needs-mfa' && location.pathname !== '/verify-2fa')
     return <Navigate to="/verify-2fa" state={{ from: location.pathname + location.search }} replace />;
   return <>{children}</>;

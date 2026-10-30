@@ -6,6 +6,7 @@ import { ChevronDown, LogOut, Plus, UserRound } from 'lucide-react';
 import { getPendingCount } from '@/api/admin';
 import { useAuth } from '@/auth/AuthProvider';
 import { IdleSessionGuard } from '@/auth/IdleSessionGuard';
+import { OnboardingRedirect } from '@/auth/OnboardingRedirect';
 import { ErrorBoundary } from './ErrorBoundary';
 import SiteFooter from './SiteFooter';
 
@@ -121,7 +122,7 @@ export default function AppShell() {
                   </div>
                 )}
               </div>
-            ) : status === 'needs-profile' ? (
+            ) : status === 'needs-profile' || status === 'needs-preferences' ? (
               <button
                 onClick={handleSignOut}
                 className={`${pillLink} ml-1 border border-olive/25 text-olive hover:border-olive/60 hover:bg-cream`}
@@ -155,6 +156,7 @@ export default function AppShell() {
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+        <OnboardingRedirect />
         <ErrorBoundary key={location.pathname}>
           {status === 'needs-profile' && location.pathname !== '/complete-profile' ? (
             <Navigate to="/complete-profile" replace />

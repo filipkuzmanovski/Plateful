@@ -24,7 +24,7 @@ vi.mock('@/auth/supabaseClient', () => ({
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-const ME = { id: 'u-1', firstName: 'Jane', lastName: 'Doe', isAdmin: false, rejectedCount: 0 };
+const ME = { id: 'u-1', firstName: 'Jane', lastName: 'Doe', isAdmin: false, rejectedCount: 0, hasPreferences: true };
 
 function Probe() {
   const { isSaved, isPending, toggle, ready } = useSavedIds();

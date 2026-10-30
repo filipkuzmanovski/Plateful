@@ -7,6 +7,7 @@ import LoginPage from '@/features/auth/LoginPage';
 import SignupPage from '@/features/auth/SignupPage';
 import VerifyTwoFactorPage from '@/features/auth/VerifyTwoFactorPage';
 import CompleteProfilePage from '@/features/profile/CompleteProfilePage';
+import PreferencesSetupPage from '@/features/preferences/PreferencesSetupPage';
 import BrowsePage from '@/features/browse/BrowsePage';
 import RecipeDetailPage from '@/features/recipe/RecipeDetailPage';
 import RecipeFormPage from '@/features/authoring/RecipeFormPage';
@@ -33,6 +34,7 @@ export default function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfilePage /></ProtectedRoute>} />
+        <Route path="/preferences/setup" element={<ProtectedRoute><PreferencesSetupPage /></ProtectedRoute>} />
         {/* Deliberately not wrapped in ProtectedRoute: the page handles every auth status itself. */}
         <Route path="/verify-2fa" element={<VerifyTwoFactorPage />} />
         <Route path="/about" element={<AboutPage />} />

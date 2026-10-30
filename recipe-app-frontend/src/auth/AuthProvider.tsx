@@ -7,7 +7,7 @@ import { ApiError, setMfaRequiredHandler } from '@/api/client';
 import { aalOf } from './aal';
 import type { MyProfile } from '@/lib/types';
 
-type Status = 'loading' | 'anonymous' | 'needs-profile' | 'needs-mfa' | 'ready';
+type Status = 'loading' | 'anonymous' | 'needs-profile' | 'needs-mfa' | 'needs-preferences' | 'ready';
 
 interface AuthState {
   session: Session | null;
@@ -18,6 +18,9 @@ interface AuthState {
   /** Re-reads /api/users/me, e.g. after a recipe save changed the rejected count. Never throws. */
   refreshProfile: () => Promise<void>;
 }
+
+/** A signed-in user without saved food preferences must set them up before using the app. */
+const statusFor = (me: MyProfile): Status => (me.hasPreferences ? 'ready' : 'needs-preferences');
 
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -80,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const me = await getMe();
-        if (isCurrent()) { readyUserId = s.user.id; setProfileState(me); setStatus('ready'); }
+        if (isCurrent()) { readyUserId = s.user.id; setProfileState(me); setStatus(statusFor(me)); }
       } catch (e) {
         if (!isCurrent()) return; // a newer session already took over
         readyUserId = null;
@@ -152,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     status,
     signOut: async () => { await supabase.auth.signOut(); },
-    setProfile: (p) => { setProfileState(p); setStatus('ready'); },
+    setProfile: (p) => { setProfileState(p); setStatus(statusFor(p)); },
     refreshProfile,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

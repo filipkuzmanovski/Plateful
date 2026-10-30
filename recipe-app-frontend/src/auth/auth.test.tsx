@@ -28,7 +28,7 @@ test('logged-in user without a profile is redirected to complete-profile, and co
     ),
     http.post(`${BASE}/api/users/me`, async ({ request }) => {
       posted = await request.json();
-      return HttpResponse.json(profileFixture);
+      return HttpResponse.json({ ...profileFixture, hasPreferences: false }); // a fresh account
     }),
     http.get(`${BASE}/api/recipes`, () =>
       HttpResponse.json({ content: [], page: { size: 12, number: 0, totalElements: 0, totalPages: 0 } }),
@@ -44,7 +44,8 @@ test('logged-in user without a profile is redirected to complete-profile, and co
   await userEvent.type(screen.getByLabelText(/last name/i), 'Doe');
   await userEvent.click(screen.getByRole('button', { name: /save/i }));
 
-  expect(await screen.findByText(/jane doe/i)).toBeInTheDocument(); // landed on /me
+  // a fresh account has no preferences yet, so it lands on their setup
+  expect(await screen.findByRole('heading', { name: 'Your food preferences' })).toBeInTheDocument();
   expect(posted).toEqual({ firstName: 'Jane', lastName: 'Doe' });
 });
 

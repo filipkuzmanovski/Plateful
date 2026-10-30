@@ -63,7 +63,7 @@ test('sign-out then sign-in as another user re-resolves the profile', async () =
     http.get(`${BASE}/api/users/me`, () => {
       meCalls += 1;
       return HttpResponse.json(
-        meCalls === 1 ? profileFixture : { id: 'u-2', firstName: 'Bob', lastName: 'Smith' },
+        meCalls === 1 ? profileFixture : { id: 'u-2', firstName: 'Bob', lastName: 'Smith', hasPreferences: true },
       );
     }),
   );

@@ -60,7 +60,7 @@ export default function VerifyTwoFactorPage() {
 
   if (status === 'loading') return <Spinner />;
   if (status === 'anonymous') return <Navigate to="/login" replace />;
-  if (status === 'ready') return <Navigate to={from} replace />;
+  if (status === 'ready' || status === 'needs-preferences') return <Navigate to={from} replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

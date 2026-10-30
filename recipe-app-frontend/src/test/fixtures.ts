@@ -1,7 +1,7 @@
 import type { CommentDisplay, MyProfile, Page, RecipeDisplay } from '@/lib/types';
 
 export const profileFixture: MyProfile = {
-  id: 'u-1', firstName: 'Jane', lastName: 'Doe', isAdmin: false, rejectedCount: 0,
+  id: 'u-1', firstName: 'Jane', lastName: 'Doe', isAdmin: false, rejectedCount: 0, hasPreferences: true,
 };
 
 export function recipeFixture(overrides: Partial<RecipeDisplay> = {}): RecipeDisplay {
