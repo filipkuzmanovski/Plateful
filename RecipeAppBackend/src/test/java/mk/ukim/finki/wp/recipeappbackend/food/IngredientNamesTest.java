@@ -50,7 +50,7 @@ class IngredientNamesTest {
 
     /** Minimal quote-aware CSV reader: "" escapes a quote, and quoted cells may hold commas or newlines. */
     static List<List<String>> parseCsv(String text) {
-        if (text.startsWith("﻿")) {
+        if (text.startsWith("\uFEFF")) {
             text = text.substring(1);
         }
         List<List<String>> rows = new ArrayList<>();

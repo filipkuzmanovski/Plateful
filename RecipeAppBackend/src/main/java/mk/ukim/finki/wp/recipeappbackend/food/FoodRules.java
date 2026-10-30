@@ -8,6 +8,7 @@ import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -141,7 +142,7 @@ public class FoodRules {
                 keys.add(row.key);
             }
         }
-        return Set.copyOf(keys);
+        return Collections.unmodifiableSet(keys);
     }
 
     private static List<String> paddedNames(Collection<String> names) {
@@ -220,7 +221,7 @@ public class FoodRules {
         try {
             BufferedReader lines = new BufferedReader(reader);
             String header = lines.readLine();
-            if (header != null && header.startsWith("﻿")) {
+            if (header != null && header.startsWith("\uFEFF")) {
                 header = header.substring(1);
             }
             if (header == null || !header.strip().equals(HEADER)) {

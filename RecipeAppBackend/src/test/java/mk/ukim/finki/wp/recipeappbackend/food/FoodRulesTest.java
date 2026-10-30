@@ -30,13 +30,13 @@ class FoodRulesTest {
         assertThat(rules.allergens()).extracting(Allergen::key).containsExactly(
                 "gluten", "crustaceans", "eggs", "fish", "peanuts", "soy", "milk",
                 "tree_nuts", "celery", "mustard", "sesame", "sulphites", "lupin", "molluscs");
-        assertThat(rules.allergenKeys()).containsExactlyInAnyOrderElementsOf(
+        assertThat(rules.allergenKeys()).containsExactlyElementsOf(
                 rules.allergens().stream().map(Allergen::key).toList());
     }
 
     @Test
     void hasTheFourDietKeys() {
-        assertThat(rules.dietKeys()).containsExactlyInAnyOrderElementsOf(ALL_DIETS);
+        assertThat(rules.dietKeys()).containsExactly("vegetarian", "vegan", "gluten_free", "dairy_free");
     }
 
     @Test
@@ -192,7 +192,7 @@ class FoodRulesTest {
 
     @Test
     void toleratesBomCrlfAndBlankLines() {
-        FoodRules r = new FoodRules(new StringReader("﻿" + HEADER.replace("\n", "\r\n")
+        FoodRules r = new FoodRules(new StringReader("\uFEFF" + HEADER.replace("\n", "\r\n")
                 + "\r\nallergen,eggs,Eggs,egg|mayonnaise,\r\n\r\n"));
         assertThat(r.allergens()).containsExactly(new Allergen("eggs", "Eggs"));
         assertThat(r.allergensIn(List.of("mayonnaise"))).containsExactly("eggs");

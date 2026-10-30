@@ -89,7 +89,7 @@ public final class IngredientNames {
             }
             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
             String line = reader.readLine();
-            if (line != null && line.startsWith("﻿")) {
+            if (line != null && line.startsWith("\uFEFF")) {
                 line = line.substring(1);
             }
             if (line == null || !line.strip().equals("plural,singular")) {
