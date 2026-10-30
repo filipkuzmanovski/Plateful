@@ -25,7 +25,9 @@ import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTest
  * array operators are exactly what a fake repository cannot prove. Opt-in: skipped unless
  * SUPABASE_DB_PASSWORD is set. Fixture rows (negative ids) are inserted inside the test
  * transaction, which @DataJpaTest rolls back; results are narrowed to the fixture ids so a later
- * real import cannot disturb the assertions. Flyway is disabled so a test can never migrate the
+ * real import cannot disturb the assertions. Fixture
+ * ingredient names carry a "zz" prefix, so no real dataset recipe can match a query here and the LIMIT
+ * is applied only to fixture rows. Flyway is disabled so a test can never migrate the
  * real database.
  */
 @Tag("db")
@@ -42,11 +44,6 @@ class ReferenceRecipeQueryDbTest {
     // second cached context opens a second Hikari pool, which exhausts the Supabase session-mode limit.
     private ReferenceDataRepository repository;
 
-    @BeforeEach
-    void repository() {
-        repository = new ReferenceDataRepository(new NamedParameterJdbcTemplate(jdbc));
-    }
-
     private void insert(long id, String names, String meals, String allergens,
                         boolean vegetarian, boolean vegan, boolean glutenFree, boolean dairyFree) {
         jdbc.update("INSERT INTO reference_recipes (id, title, ingredient_lines, ingredient_names, directions, "
@@ -57,12 +54,13 @@ class ReferenceRecipeQueryDbTest {
     }
 
     @BeforeEach
-    void fixtures() {
-        insert(-1, "{egg,flour,milk}", "{breakfast}", "{eggs,gluten,milk}", false, false, false, false);
-        insert(-2, "{egg,spinach}", "{breakfast}", "{eggs}", true, false, true, true);
-        insert(-3, "{\"shiitake mushroom\",egg,rice}", "{dinner}", "{eggs}", false, false, true, true);
-        insert(-4, "{chicken,rice}", "{dinner}", "{}", false, false, true, true);
-        insert(-5, "{oat,banana,honey}", "{breakfast}", "{}", true, false, false, true);
+    void setUp() {
+        repository = new ReferenceDataRepository(new NamedParameterJdbcTemplate(jdbc));
+        insert(-1, "{zzegg,zzflour,zzmilk}", "{breakfast}", "{eggs,gluten,milk}", false, false, false, false);
+        insert(-2, "{zzegg,zzspinach}", "{breakfast}", "{eggs}", true, false, true, true);
+        insert(-3, "{\"zzshiitake zzmushroom\",zzegg,zzrice}", "{dinner}", "{eggs}", false, false, true, true);
+        insert(-4, "{zzchicken,zzrice}", "{dinner}", "{}", false, false, true, true);
+        insert(-5, "{zzoat,zzbanana,zzhoney}", "{breakfast}", "{}", true, false, false, true);
     }
 
     private static ReferenceQuery query(Set<String> wanted, String meal, Set<String> allergens,
@@ -80,14 +78,14 @@ class ReferenceRecipeQueryDbTest {
 
     @Test
     void ranksByOverlapAndFillsTheRecipe() {
-        List<ReferenceRecipe> result = repository.findClosest(wanting("egg", "spinach"));
+        List<ReferenceRecipe> result = repository.findClosest(wanting("zzegg", "zzspinach"));
 
         assertThat(fixtureIds(result)).startsWith(-2L);
         ReferenceRecipe best = result.stream().filter(r -> r.id() == -2).findFirst().orElseThrow();
         assertThat(best.overlap()).isEqualTo(2);
         assertThat(best.title()).isEqualTo("Fixture -2");
         assertThat(best.ingredientLines()).containsExactly("1 line");
-        assertThat(best.ingredientNames()).containsExactly("egg", "spinach");
+        assertThat(best.ingredientNames()).containsExactly("zzegg", "zzspinach");
         assertThat(best.directions()).containsExactly("Cook.");
         assertThat(best.mealTypes()).containsExactly("breakfast");
         assertThat(result.stream().filter(r -> r.id() == -1).findFirst().orElseThrow().overlap()).isEqualTo(1);
@@ -96,13 +94,13 @@ class ReferenceRecipeQueryDbTest {
     @Test
     void shorterRecipeWinsATieOnOverlapThenLowerIdFirst() {
         // All three overlap 1 on egg; -2 has 2 names, -1 and -3 have 3 (ordered by id: -3 before -1).
-        assertThat(fixtureIds(repository.findClosest(wanting("egg")))).containsExactly(-2L, -3L, -1L);
+        assertThat(fixtureIds(repository.findClosest(wanting("zzegg")))).containsExactly(-2L, -3L, -1L);
     }
 
     @Test
     void mealTypeRestrictsToThatMeal() {
         List<ReferenceRecipe> result = repository.findClosest(
-                query(Set.of("egg", "rice"), "dinner", Set.of(), Set.of(), Set.of(), 50));
+                query(Set.of("zzegg", "zzrice"), "dinner", Set.of(), Set.of(), Set.of(), 50));
 
         assertThat(fixtureIds(result)).containsExactly(-3L, -4L);
     }
@@ -110,7 +108,7 @@ class ReferenceRecipeQueryDbTest {
     @Test
     void allergensExcludeTheRecipesThatContainThem() {
         List<ReferenceRecipe> result = repository.findClosest(
-                query(Set.of("egg"), null, Set.of("milk"), Set.of(), Set.of(), 50));
+                query(Set.of("zzegg"), null, Set.of("milk"), Set.of(), Set.of(), 50));
 
         assertThat(fixtureIds(result)).doesNotContain(-1L).contains(-2L, -3L);
     }
@@ -118,7 +116,7 @@ class ReferenceRecipeQueryDbTest {
     @Test
     void severalAllergensAreAllExcluded() {
         List<ReferenceRecipe> result = repository.findClosest(
-                query(Set.of("egg", "rice"), null, Set.of("milk", "eggs"), Set.of(), Set.of(), 50));
+                query(Set.of("zzegg", "zzrice"), null, Set.of("milk", "eggs"), Set.of(), Set.of(), 50));
 
         assertThat(fixtureIds(result)).containsExactly(-4L);
     }
@@ -126,7 +124,7 @@ class ReferenceRecipeQueryDbTest {
     @Test
     void veganDietWithABananaOnlyRecipeGivesNothing() {
         List<ReferenceRecipe> result = repository.findClosest(
-                query(Set.of("banana"), null, Set.of(), Set.of("vegan"), Set.of(), 50));
+                query(Set.of("zzbanana"), null, Set.of(), Set.of("vegan"), Set.of(), 50));
 
         assertThat(fixtureIds(result)).isEmpty();
     }
@@ -134,9 +132,9 @@ class ReferenceRecipeQueryDbTest {
     @Test
     void dietsAreCombinedWithAnd() {
         List<ReferenceRecipe> vegetarian = repository.findClosest(
-                query(Set.of("egg", "banana"), null, Set.of(), Set.of("vegetarian"), Set.of(), 50));
+                query(Set.of("zzegg", "zzbanana"), null, Set.of(), Set.of("vegetarian"), Set.of(), 50));
         List<ReferenceRecipe> vegetarianAndGlutenFree = repository.findClosest(
-                query(Set.of("egg", "banana"), null, Set.of(), Set.of("vegetarian", "gluten_free"), Set.of(), 50));
+                query(Set.of("zzegg", "zzbanana"), null, Set.of(), Set.of("vegetarian", "gluten_free"), Set.of(), 50));
 
         assertThat(fixtureIds(vegetarian)).containsExactlyInAnyOrder(-2L, -5L);
         assertThat(fixtureIds(vegetarianAndGlutenFree)).containsExactly(-2L);
@@ -145,7 +143,7 @@ class ReferenceRecipeQueryDbTest {
     @Test
     void dislikedWordMatchesWholeWordsInsideNames() {
         List<ReferenceRecipe> result = repository.findClosest(
-                query(Set.of("egg"), null, Set.of(), Set.of(), Set.of("mushroom"), 50));
+                query(Set.of("zzegg"), null, Set.of(), Set.of(), Set.of("zzmushroom"), 50));
 
         assertThat(fixtureIds(result)).doesNotContain(-3L).contains(-1L, -2L);
     }
@@ -153,7 +151,7 @@ class ReferenceRecipeQueryDbTest {
     @Test
     void dislikedWordDoesNotMatchInsideAnotherWord() {
         List<ReferenceRecipe> result = repository.findClosest(
-                query(Set.of("egg"), null, Set.of(), Set.of(), Set.of("mush", "room"), 50));
+                query(Set.of("zzegg"), null, Set.of(), Set.of(), Set.of("zzmush", "zzroom"), 50));
 
         assertThat(fixtureIds(result)).contains(-1L, -2L, -3L);
     }
@@ -166,13 +164,13 @@ class ReferenceRecipeQueryDbTest {
     @Test
     void limitIsRespected() {
         assertThat(repository.findClosest(
-                query(Set.of("egg"), null, Set.of(), Set.of(), Set.of(), 2))).hasSize(2);
+                query(Set.of("zzegg"), null, Set.of(), Set.of(), Set.of(), 2))).hasSize(2);
     }
 
     @Test
     void unknownDietKeyIsRejected() {
         assertThatThrownBy(() -> repository.findClosest(
-                query(Set.of("egg"), null, Set.of(), Set.of("paleo"), Set.of(), 5)))
+                query(Set.of("zzegg"), null, Set.of(), Set.of("paleo"), Set.of(), 5)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

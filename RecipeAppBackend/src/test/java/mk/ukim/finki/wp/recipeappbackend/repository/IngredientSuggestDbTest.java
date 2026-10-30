@@ -18,7 +18,8 @@ import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTest
 
 /**
  * Runs the real prefix query against the real Postgres. Opt-in: skipped unless SUPABASE_DB_PASSWORD
- * is set. Fixture rows are inserted inside the test transaction, which @DataJpaTest rolls back, and
+ * is set. Fixture names carry a "zz" prefix so they cannot collide with real dataset names
+ * (name is the primary key). Fixture rows are inserted inside the test transaction, which @DataJpaTest rolls back, and
  * Flyway is disabled so a test can never migrate the real database.
  */
 @Tag("db")
@@ -41,31 +42,31 @@ class IngredientSuggestDbTest {
     }
 
     private void insertStats() {
-        jdbc.update("INSERT INTO ingredient_stats (name, recipe_count) VALUES ('garlic', 900), "
-                + "('garlic powder', 300), ('garam masala', 50)");
+        jdbc.update("INSERT INTO ingredient_stats (name, recipe_count) VALUES ('zzgarlic', 900), "
+                + "('zzgarlic powder', 300), ('zzgaram masala', 50)");
     }
 
     @Test
     void suggestsByPrefixMostCommonFirst() {
         insertStats();
 
-        List<String> result = repository.suggestIngredients("gar", 10);
+        List<String> result = repository.suggestIngredients("zzgar", 10);
 
-        assertThat(result).containsSubsequence("garlic", "garlic powder", "garam masala");
+        assertThat(result).containsSubsequence("zzgarlic", "zzgarlic powder", "zzgaram masala");
     }
 
     @Test
     void respectsTheLimit() {
         insertStats();
 
-        assertThat(repository.suggestIngredients("garl", 1)).hasSize(1);
+        assertThat(repository.suggestIngredients("zzgarl", 1)).hasSize(1);
     }
 
     @Test
     void likeWildcardsInThePrefixAreTakenLiterally() {
         insertStats();
 
-        assertThat(repository.suggestIngredients("g_r", 10)).doesNotContain("garlic", "garam masala");
-        assertThat(repository.suggestIngredients("%", 10)).doesNotContain("garlic");
+        assertThat(repository.suggestIngredients("zzg_r", 10)).doesNotContain("zzgarlic", "zzgaram masala");
+        assertThat(repository.suggestIngredients("%", 10)).doesNotContain("zzgarlic");
     }
 }
