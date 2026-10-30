@@ -4,7 +4,7 @@ import { CircleAlert, X } from 'lucide-react';
 import { cuisinesQueryKey, getCuisines } from '@/api/cuisines';
 import { Button } from '@/components/ui';
 
-const MAX_CUISINES = 10;
+const MAX_CUISINES = 10; // the default; callers with a different limit pass `max`
 const MAX_VISIBLE_OPTIONS = 50;
 
 const humanize = (key: string) =>
@@ -18,10 +18,12 @@ export function CuisinePicker({
   value,
   onChange,
   error,
+  max = MAX_CUISINES,
 }: {
   value: string[];
   onChange: (keys: string[]) => void;
   error?: string;
+  max?: number;
 }) {
   const inputId = useId();
   const listId = useId();
@@ -37,7 +39,7 @@ export function CuisinePicker({
     return (key: string) => map.get(key) ?? humanize(key);
   }, [cuisines.data]);
 
-  const atMax = value.length >= MAX_CUISINES;
+  const atMax = value.length >= max;
   const options = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (cuisines.data ?? [])
@@ -68,7 +70,7 @@ export function CuisinePicker({
     setQuery('');
     setActive(0);
     // A disabled input fires no blur, so close explicitly or the list reopens itself later.
-    if (value.length + 1 >= MAX_CUISINES) setOpen(false);
+    if (value.length + 1 >= max) setOpen(false);
   }
 
   function remove(key: string) {
@@ -187,7 +189,7 @@ export function CuisinePicker({
         </div>
       )}
 
-      {atMax && <p className="mt-1.5 text-xs text-olive/70">Up to {MAX_CUISINES} cuisines</p>}
+      {atMax && <p className="mt-1.5 text-xs text-olive/70">Up to {max} cuisines</p>}
       {error && <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{error}</p>}
     </div>
   );

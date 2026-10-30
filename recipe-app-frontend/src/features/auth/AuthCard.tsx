@@ -7,15 +7,18 @@ export function AuthCard({
   subtitle,
   children,
   footer,
+  wide = false,
 }: {
   title: string;
   subtitle?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  /** Roomier card for forms with chip groups. */
+  wide?: boolean;
 }) {
   return (
     <div className="flex justify-center py-4 sm:py-12">
-      <div className="w-full max-w-md">
+      <div className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'}`}>
         <div className="rounded-card bg-paper p-6 shadow-lift ring-1 ring-sand/70 sm:p-9">
           <span
             aria-hidden="true"
