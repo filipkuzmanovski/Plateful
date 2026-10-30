@@ -10,8 +10,8 @@ ON CONFLICT DO NOTHING, so running it again skips every row that is already ther
 tables are loaded in one transaction, so a failure leaves the database untouched. A size guard
 refuses to start if the database would end up over 400 MB.
 
---dry-run connects, checks the tables and the size guard, prints what it found and stops
-before writing anything.
+--dry-run connects, checks the tables and the size guard, prints what it found
+(including the row count of each csv file) and stops before writing anything.
 """
 
 import argparse
@@ -30,6 +30,7 @@ PASSWORD_VARIABLE = "SUPABASE_DB_PASSWORD"
 SIZE_LIMIT = 400 * 1024 * 1024
 SIZE_FACTOR = 2.5  # database growth per byte of csv: row data plus indexes and the primary key
 CHUNK_BYTES = 1024 * 1024
+STATEMENT_TIMEOUT = "SET LOCAL statement_timeout = '15min'"  # the pooler's default can cut a long COPY short
 
 # Loaded in this order. The columns are the csv header written by prepare.py, and also the column list
 # of the COPY and INSERT statements, so extra defaulted columns on a table cannot upset the load.
@@ -118,6 +119,12 @@ def find_csv_files(out_dir):
     return files
 
 
+def count_csv_rows(path):
+    """Data rows in a csv file, not counting the header; a quoted newline does not start a row."""
+    with open(path, encoding="utf-8", newline="") as f:
+        return max(sum(1 for _ in csv.reader(f)) - 1, 0)
+
+
 def check_tables_exist(cur):
     cur.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(%s)",
@@ -165,12 +172,15 @@ def run(args, connect_fn=connect):
                   f"projected after the load: {_mb(projected)} (limit {_mb(SIZE_LIMIT)})")
             check_size(projected)
             if args.dry_run:
+                for path in files.values():
+                    print(f"{path.name}: {count_csv_rows(path):,} rows")
                 print("Dry run: nothing was written.")
                 return 0
 
             results = {}
             with conn.transaction():
                 with conn.cursor() as cur:
+                    cur.execute(STATEMENT_TIMEOUT)  # SET LOCAL: ends with the transaction
                     for table, path in files.items():
                         results[table] = copy_and_insert(cur, table, path)
             for table, (in_file, inserted) in results.items():

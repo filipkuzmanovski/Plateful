@@ -28,6 +28,8 @@ class FakeCursor:
 
     def execute(self, sql, params=None):
         self.db.executed.append(sql)
+        if self.db.in_transaction:
+            self.db.executed_in_transaction.append(sql)
         self.rowcount = -1
         if "information_schema.tables" in sql:
             self._rows = [(t,) for t in self.db.tables]
@@ -65,6 +67,8 @@ class FakeConnection:
         self.executed = []
         self.copied_bytes = 0
         self.transactions = 0
+        self.in_transaction = False
+        self.executed_in_transaction = []
 
     def __enter__(self):
         return self
@@ -78,7 +82,11 @@ class FakeConnection:
     @contextmanager
     def transaction(self):
         self.transactions += 1
-        yield
+        self.in_transaction = True
+        try:
+            yield
+        finally:
+            self.in_transaction = False
 
     def statements(self, prefix):
         return [s for s in self.executed if s.startswith(prefix)]
@@ -201,6 +209,32 @@ def test_dry_run_executes_no_insert_or_copy(with_password, out_dir, capsys):
     out = capsys.readouterr().out
     assert "Dry run" in out and "projected" in out
     assert PASSWORD not in out
+
+
+def test_dry_run_prints_the_row_count_of_each_csv_file(with_password, out_dir, capsys):
+    (out_dir / "reference_recipes.csv").write_text(
+        ",".join(load.TABLE_COLUMNS["reference_recipes"]) + '\n1,"two\nlines"\n2,b\n3,c\n', encoding="utf-8")
+    assert run_main(out_dir, FakeConnection(), "--dry-run") == 0
+    out = capsys.readouterr().out
+    assert "reference_recipes.csv: 3 rows" in out  # a quoted newline does not start a row
+    assert "ingredient_stats.csv: 1 rows" in out
+    assert "ingredient_pairings.csv: 1 rows" in out
+
+
+def test_count_csv_rows_skips_the_header(tmp_path):
+    path = tmp_path / "x.csv"
+    path.write_text("a,b\n", encoding="utf-8")
+    assert load.count_csv_rows(path) == 0
+    path.write_text('a,b\n1,"x\ny"\n2,z\n', encoding="utf-8")
+    assert load.count_csv_rows(path) == 2
+
+
+def test_the_load_sets_a_statement_timeout_inside_the_transaction(with_password, out_dir):
+    conn = FakeConnection()
+    assert run_main(out_dir, conn) == 0
+    assert conn.executed_in_transaction[0] == "SET LOCAL statement_timeout = '15min'"
+    assert "SET LOCAL statement_timeout = '15min'" not in [s for s in conn.executed
+                                                          if s not in conn.executed_in_transaction]
 
 
 def test_missing_tables_ask_for_a_backend_restart(with_password, out_dir):

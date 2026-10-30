@@ -104,8 +104,8 @@ file.
 
 ### 8. Check, then load
 
-First a dry run. It connects, checks the tables exist and that the size limit allows the load, then stops
-without writing anything:
+First a dry run. It connects, checks the tables exist and that the size limit allows the load, prints
+how many rows each CSV holds, then stops without writing anything:
 
 ```
 python tools/dataset/load.py --dry-run
