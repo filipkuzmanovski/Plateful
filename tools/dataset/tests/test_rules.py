@@ -1,9 +1,6 @@
 import pytest
 
-from normalise import REPO_ROOT
-from rules import FoodRules
-
-RULES_FILE = REPO_ROOT / "RecipeAppBackend/src/main/resources/food-rules.csv"
+from rules import RULES_FILE, FoodRules
 HEADER = "kind,key,label,terms,exceptions\n"
 
 
@@ -92,6 +89,15 @@ def test_union_across_names(rules):
     ("tofu", "soy"), ("miso paste", "soy"), ("edamame", "soy"),
     ("celery stalks", "celery"), ("dijon mustard", "mustard"), ("tahini", "sesame"),
     ("dried apricots", "sulphites"), ("lupin flour", "lupin"), ("parmesan", "milk"),
+    ("pizza dough", "gluten"), ("pie crust", "gluten"), ("naan", "gluten"), ("flatbread", "gluten"),
+    ("cornbread", "gluten"), ("pancake mix", "gluten"), ("corn tortillas", "gluten"),
+    ("sourdough", "gluten"), ("gingerbread", "gluten"), ("wonton wrappers", "gluten"),
+    ("graham crackers", "gluten"), ("durum", "gluten"), ("matzo meal", "gluten"),
+    ("provolone", "milk"), ("gorgonzola", "milk"), ("parmigiano reggiano", "milk"),
+    ("queso fresco", "milk"), ("camembert", "milk"), ("burrata", "milk"), ("quark", "milk"),
+    ("goat cheese", "milk"), ("goat milk", "milk"), ("gelato", "milk"),
+    ("mollusks", "molluscs"), ("bearnaise sauce", "eggs"),
+    ("dashi", "fish"), ("smoked lox", "fish"), ("gravlax", "fish"), ("mullet", "fish"),
 ])
 def test_generous_terms(rules, name, key):
     assert key in rules.allergens_in([name])
@@ -135,13 +141,22 @@ def test_plain_vegetables_fit_every_diet(rules):
 
 
 def test_seafood_and_gelatin_are_not_vegetarian(rules):
-    for name in ["shrimp", "salmon", "gelatin", "bacon", "oyster sauce"]:
+    for name in ["shrimp", "salmon", "gelatin", "bacon", "oyster sauce", "hot dog", "andouille",
+                 "pastrami", "gammon", "pigeon", "squab", "goat meat", "curry goat"]:
         assert rules.diet_flags([name])["vegetarian"] is False, name
 
 
 def test_vegetarian_lookalikes_pass(rules):
-    for name in ["oyster mushrooms", "kidney beans", "lamb's lettuce"]:
+    for name in ["oyster mushrooms", "kidney beans", "lamb's lettuce", "goat cheese", "goat milk",
+                 "pigeon peas"]:
         assert rules.diet_flags([name])["vegetarian"] is True, name
+
+
+def test_goat_cheese_is_vegetarian_but_neither_vegan_nor_dairy_free(rules):
+    flags = rules.diet_flags(["goat cheese"])
+    assert flags["vegetarian"] is True
+    assert flags["vegan"] is False
+    assert flags["dairy_free"] is False
 
 
 def test_empty_ingredient_list_fits_all_diets(rules):
