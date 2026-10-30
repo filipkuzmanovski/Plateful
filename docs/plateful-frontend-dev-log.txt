@@ -4371,3 +4371,127 @@ Not yet done
   - Link previews (the photo and title card Facebook or WhatsApp show for a
     pasted link) need server-rendered Open Graph tags. That belongs to the
     deployment round; until then shared links show as plain addresses.
+
+
+
+
+################################################################################
+################################################################################
+ PART 17 — FOOD PREFERENCES AND THE RECIPE DATASET
+ Branch: feature/food-preferences
+################################################################################
+################################################################################
+
+Why this exists
+---------------
+This is the groundwork for the AI features (sub-project 1 of
+docs/ai-features-handoff.md). No AI call is made yet. Two things are needed
+first: Plateful must know what each person can and will not eat, and it needs
+a large pool of real recipes to take inspiration from. Allergies, diet and
+dislikes will be hard filters on everything the AI makes; likes only nudge.
+Spec: docs/superpowers/specs/2026-10-30-food-preferences-and-dataset-design.md
+
+What the user sees
+------------------
+  - Sign-up has a new required step after "Complete your profile":
+      * Allergies: the 14 EU allergens as tick boxes, or "I have no food
+        allergies". One of the two answers is required, so nobody skips it
+        by accident.
+      * Diet: vegetarian, vegan, gluten-free, dairy-free (all optional).
+      * Ingredients I don't eat: chips with suggestions as you type.
+      * What I like: cuisines (up to 20) and favourite ingredients.
+  - Signing in with an account that has no preferences yet lands on this step
+    from any page, except the Privacy Policy, Terms, About and Contact pages
+    (so a person can read them before answering).
+  - Everything is editable later in the new Preferences tab on the profile.
+  - The Privacy Policy has a new "Food preferences." paragraph, and its
+    "Last updated" date is now 30 October 2026 (src/content/site.ts).
+
+Backend
+-------
+  - Flyway V8 adds four tables: user_preferences, reference_recipes,
+    ingredient_stats and ingredient_pairings.
+  - GET and PUT /api/users/me/preferences. Public (no sign-in needed):
+    GET /api/food/allergens and GET /api/ingredients/suggest. The
+    /api/users/me response now has hasPreferences, which drives the
+    "needs-preferences" sign-in state in the frontend.
+  - ReferenceDataRepository.findClosest returns the reference recipes that
+    overlap most with a list of wanted ingredients, after hard filters for
+    the person's allergens, diets and disliked ingredients. Nothing calls it
+    yet; it is the groundwork for the AI step.
+  - Limits: 30 disliked ingredients, 30 liked ingredients, 20 liked
+    cuisines, 60 characters per ingredient name.
+
+The shared rules files
+----------------------
+The same food knowledge is needed in Python (to prepare the dataset) and in
+Java (to filter at request time). If each language kept its own copy, they
+would drift apart, so the rules live in plain files that both read:
+  - RecipeAppBackend/src/main/resources/food-rules.csv: which words mean
+    which allergen, diet or meal. A row can refer to another with @key
+    (vegan imports the vegetarian terms), and exceptions ("peanut butter" is
+    not dairy butter) belong only to the row that defines them.
+  - RecipeAppBackend/src/main/resources/ingredient-irregulars.csv: plurals
+    that are not just "remove the s" (leaves to leaf, cookies to cookie).
+  - tools/dataset/normalise-cases.csv: input and expected output for the
+    name normaliser. pytest and JUnit both run it, so the two normalisers
+    cannot disagree without a test failing.
+Matching is whole-word and ignores accents, so "jalapeño" and "jalapeno" are
+the same ingredient, and a term only matches whole words ("hot dog", not
+"hot dogwood").
+
+The dataset pipeline (tools/dataset/)
+-------------------------------------
+  - prepare.py reads all ~2.2 million RecipeNLG recipes. It counts which
+    ingredients appear together across every one of them (the pairing
+    statistics), then samples about 50,000 as reference recipes: up to
+    15,000 each for breakfast, lunch and dinner, plus 5,000 untagged. The
+    sample uses seed 20261030, so a rerun picks the same recipes.
+  - load.py puts the result in the database. It only inserts, in one
+    transaction, so a failure leaves nothing half-loaded. It refuses to run
+    if the database would pass 400 MB (the free plan is 500 MB). There is no
+    delete or replace mode on purpose, and --dry-run shows what it would do.
+  - tools/dataset/README.md has the exact steps.
+  - Why it is behind the scenes: RecipeNLG's terms allow non-commercial
+    research and education only. So its recipes are never shown on the
+    site, never copied into user recipes, and only used as ingredient
+    inspiration. The data files (tools/dataset/data and tools/dataset/out)
+    are git-ignored and never committed.
+
+Review catches worth remembering
+--------------------------------
+  - A lone "s" left over from plural handling produced stray spaces in
+    ingredient names; such words are dropped now.
+  - Term gaps: pizza dough, provolone, hot dog and goat were missing from the
+    allergen and meat lists.
+  - An exception could mask a real match: "peanut butter" hid "honey" for
+    vegan. Exceptions are now scoped to the row that defines them.
+  - The database tests insert their own fixture rows with "zz" names inside
+    a rolled-back transaction, so they never depend on, or collide with, the
+    real dataset.
+  - Using @Import in a database test forks a new Spring context per class and
+    exceeds Supabase's 15-connection pooler limit, so it is avoided.
+
+Tests
+-----
+  - Python (pytest): 181 passing.
+  - Backend quick regression (no database): 443 passing.
+  - Backend DbTests against the live Supabase database: 62 passing.
+  - Frontend: npx vitest run, 556 passing. npm run build succeeded.
+
+Your manual steps
+-----------------
+  1. Download RecipeNLG (the site errored once; retry, or use another
+     browser; a mirror's file should be checked against its MD5). See
+     tools/dataset/README.md.
+  2. Run prepare.py, then load.py --dry-run, then load.py.
+  3. In Supabase, open Authentication -> Users and delete the old users.
+     There is no migration path for old accounts on purpose.
+  4. Sign up again through the new flow.
+  5. Set is_admin for your account with SQL, then enrol 2FA again.
+
+Status
+------
+All code and tests are done on the branch. The dataset download, prepare and
+load, and the fresh sign-up, are waiting for you. The whole-branch review
+comes after that.
