@@ -4420,7 +4420,8 @@ Backend
     the person's allergens, diets and disliked ingredients. Nothing calls it
     yet; it is the groundwork for the AI step.
   - Limits: 30 disliked ingredients, 30 liked ingredients, 20 liked
-    cuisines, 60 characters per ingredient name.
+    cuisines. An ingredient name that is longer than 60 characters once
+    cleaned up is not a request error: it becomes empty and is dropped.
 
 The shared rules files
 ----------------------
@@ -4481,14 +4482,28 @@ Tests
 
 Your manual steps
 -----------------
-  1. Download RecipeNLG (the site errored once; retry, or use another
-     browser; a mirror's file should be checked against its MD5). See
-     tools/dataset/README.md.
-  2. Run prepare.py, then load.py --dry-run, then load.py.
-  3. In Supabase, open Authentication -> Users and delete the old users.
-     There is no migration path for old accounts on purpose.
-  4. Sign up again through the new flow.
-  5. Set is_admin for your account with SQL, then enrol 2FA again.
+The exact commands are in tools/dataset/README.md; this is the order.
+  1. Download RecipeNLG. You must accept its terms yourself (non-commercial
+     research and education) on the download page. The site errored once:
+     retry later or use another browser. A mirror's file must match the MD5
+     in the README. Unzip it to tools/dataset/data/full_dataset.csv.
+  2. Install the Python packages (pip install -r tools/dataset/
+     requirements.txt) and set SUPABASE_DB_PASSWORD in your shell without
+     printing it. The README shows how.
+  3. Run prepare.py, then load.py --dry-run, then load.py. The backend
+     restart that applies Flyway V8 has already been done (30 October 2026,
+     V8 is live in the dev database). If load.py ever says to restart the
+     backend so Flyway applies V8, do that first and run it again.
+  4. Delete the old users in Supabase under Authentication -> Users (not
+     only the public.users table). Know what that does first:
+       * Recipes they wrote stay on the site with no author (user_id is set
+         to null).
+       * Their ratings, comments, reactions and saves are deleted.
+       * Their uploaded photos and videos stay in storage under the old
+         user folders. Deleting those by hand is optional cleanup.
+     There is no migration path for old accounts, on purpose.
+  5. Sign up again through the new flow.
+  6. Set is_admin for your account with SQL, then enrol 2FA again.
 
 Status
 ------
