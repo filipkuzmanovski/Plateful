@@ -13,8 +13,10 @@ from prepare import (
     count_pairs,
     read_rows,
     select_recipes,
+    write_audit,
     write_outputs,
 )
+from normalise import normalise
 from rules import FoodRules
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mini_dataset.csv"
@@ -281,6 +283,74 @@ def test_select_computes_tags_allergens_and_flags(fixture_rows, rules):
     assert chosen[15].vegan is True       # plain rice
 
 
+def only(rules, row):
+    chosen = select_recipes([row], rules, per_meal=5, untagged=5, seed=1)
+    assert len(chosen) == 1
+    return chosen[0]
+
+
+def test_tags_come_from_the_lines_too_pecans_halves(rules):
+    name = normalise("chopped pecans halves")  # "chopped pecans halve": the NER form misses "pecan"
+    assert "tree_nuts" not in rules.allergens_in([name])
+    row = parsed(1, [name, "sugar"], title="Nut Bars",
+                 lines=["1 c. chopped pecans halves", "1 c. sugar", "2 c. water"])
+    assert "tree_nuts" in only(rules, row).allergens
+
+
+def test_tags_come_from_the_lines_too_anchovies_fillets(rules):
+    name = normalise("anchovies fillets")
+    assert "fish" not in rules.allergens_in([name])
+    row = parsed(1, [name, "garlic"], title="Bagna Cauda",
+                 lines=["4 anchovies fillets, mashed", "2 cloves garlic", "1 c. olive oil"])
+    recipe = only(rules, row)
+    assert "fish" in recipe.allergens
+    assert recipe.vegetarian is False
+
+
+def test_an_item_missing_from_the_ner_is_tagged_from_its_line(rules):
+    row = parsed(1, ["flour", "sugar"], title="Plain Cake Mix",
+                 lines=["2 c. flour", "1 c. sugar", "2 eggs, beaten"])
+    recipe = only(rules, row)
+    assert "eggs" in recipe.allergens
+    assert recipe.vegan is False
+    assert recipe.ingredient_names == ["flour", "sugar"]  # the stored names are still the NER names
+
+
+def test_lines_are_matched_without_the_name_length_cap(rules):
+    line = "1 c. of the very best extra finely and freshly chopped toasted walnuts"
+    assert normalise(line) is None
+    row = parsed(1, ["sugar"], title="Long Line", lines=[line, "1 c. sugar", "1 c. water"])
+    assert "tree_nuts" in only(rules, row).allergens
+
+
+def test_line_tagging_runs_only_for_recipes_admitted_to_a_pool(rules, monkeypatch):
+    calls = []
+    original = prepare._tag_names
+    monkeypatch.setattr(prepare, "_tag_names", lambda row: calls.append(row.id) or original(row))
+    rows = [parsed(i, ["rice"], title=f"Rice {chr(97 + i % 26)}{chr(97 + i // 26)}", lines=["1", "2", "3"]) for i in range(500)]
+    chosen = select_recipes(rows, rules, per_meal=1, untagged=2, seed=4)
+    assert len(chosen) == 5
+    assert len(calls) < 100  # a full scan would tag all 500
+
+
+# --- write_audit -------------------------------------------------------------
+
+def test_write_audit_lists_the_most_frequent_unflagged_names(tmp_path, rules):
+    counts = Counter({"salt": 90, "butter": 80, "sugar": 70, "chicken": 60, "water": 70, "onion": 10})
+    path = write_audit(tmp_path, counts, rules, limit=3)
+    assert path == tmp_path / "rules_audit.txt"
+    assert path.read_text(encoding="utf-8").splitlines() == ["salt\t90", "sugar\t70", "water\t70"]
+
+
+def test_write_audit_defaults_to_1500_names(tmp_path, rules):
+    assert prepare.AUDIT_SIZE == 1500
+    counts = Counter({f"plainname {chr(97 + i % 26)}{chr(97 + i // 26 % 26)}{chr(97 + i // 676)}": 2000 - i
+                      for i in range(1600)})
+    lines = write_audit(tmp_path, counts, rules).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1500
+    assert lines[0].endswith("\t2000")
+
+
 # --- write_outputs -----------------------------------------------------------
 
 def unarray(text):
@@ -381,7 +451,27 @@ def test_cli_end_to_end_on_the_fixture(tmp_path, capsys):
     assert (out / "ingredient_stats.csv").exists()
     pairings = read_csv(out / "ingredient_pairings.csv")
     assert ["egg", "flour", "2"] in pairings
-    assert "skipped" in capsys.readouterr().out
+    out_text = capsys.readouterr().out
+    assert "skipped" in out_text
+    assert str(out / "rules_audit.txt") in out_text
+
+
+def test_cli_writes_the_rules_audit_on_the_fixture(tmp_path, rules):
+    out = tmp_path / "out"
+    prepare.main(["--input", str(FIXTURE), "--out", str(out),
+                  "--min-common", "2", "--per-meal", "2", "--untagged", "2"])
+    lines = (out / "rules_audit.txt").read_text(encoding="utf-8").splitlines()
+    entries = [line.split("\t") for line in lines]
+    assert all(len(e) == 2 for e in entries)
+    names = [name for name, _ in entries]
+    numbers = [int(count) for _, count in entries]
+    assert numbers == sorted(numbers, reverse=True)
+    assert "sugar" in names and "rice" in names
+    assert "egg" not in names and "butter" not in names and "chicken" not in names and "honey" not in names
+    for name in names:
+        assert rules.allergens_in([name]) == set() and all(rules.diet_flags([name]).values()), name
+    sugar = dict(entries)["sugar"]
+    assert sugar == "3"  # rows 12, 13 and 16
 
 
 def test_cli_rejects_a_file_with_the_wrong_header(tmp_path, capsys):

@@ -7,6 +7,8 @@ Three streaming passes over the input (the file is ~2 GB, so it is re-read, neve
   1. count recipes per normalised ingredient name           -> ingredient_stats.csv
   2. count pairs among "common" ingredients, keep top 30    -> ingredient_pairings.csv
   3. tag, filter and sample recipes (seeded, reproducible)  -> reference_recipes.csv
+Then rules_audit.txt: the most frequent names that no allergen or diet rule flags, to skim
+for rule gaps before loading.
 
 Standard library only (plus the sibling normalise.py and rules.py).
 """
@@ -33,6 +35,8 @@ MEALS = ("breakfast", "lunch", "dinner")  # bucket order: a multi-tag recipe fil
 SEED = 20261030
 TOP_PARTNERS = 30
 MIN_STATS_COUNT = 5
+AUDIT_SIZE = 1500
+AUDIT_FILE = "rules_audit.txt"
 PROGRESS_EVERY = 100_000
 MAX_FIELD_SIZE = 10 * 1024 * 1024  # a stray unbalanced quote then fails fast instead of swallowing the file
 REQUIRED_COLUMNS = ("", "title", "ingredients", "directions", "NER")
@@ -269,9 +273,17 @@ def select_recipes(rows, rules, per_meal, untagged, seed, stats=None):
     return chosen
 
 
+def _tag_names(row):
+    """The texts allergens and diets are tagged from: the normalised NER names plus every ingredient line
+    in normalise_words form (uncapped). The NER often keeps a line's plural or drops an item, e.g.
+    "chopped pecans halves" or a line "2 eggs" with no "egg" name, so the lines catch what it misses."""
+    return [*row.ingredient_names, *(normalise_words(line) for line in row.ingredient_lines)]
+
+
 def _build(row, title, tags, rules):
-    flags = rules.diet_flags(row.ingredient_names)
-    found = rules.allergens_in(row.ingredient_names)
+    names = _tag_names(row)  # only for recipes admitted to a pool, so pass 3 stays fast
+    flags = rules.diet_flags(names, normalised=True)
+    found = rules.allergens_in(names, normalised=True)
     return RefRecipe(
         id=row.id,
         title=title,
@@ -340,6 +352,25 @@ def write_outputs(out_dir, recipes, stats, pairs):
                 writer.writerow([ingredient, partner, count])
 
 
+def write_audit(out_dir, counts, rules, limit=AUDIT_SIZE):
+    """Write the `limit` most frequent names that hit no allergen and pass every diet, one per line as
+    "name<TAB>count", most frequent first (ties by name). Returns the file's path."""
+    path = Path(out_dir) / AUDIT_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    written = 0
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        for name, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
+            if written >= limit:
+                break
+            flagged = rules.allergens_in([name], normalised=True) or not all(
+                rules.diet_flags([name], normalised=True).values())
+            if flagged:
+                continue
+            f.write(f"{name}\t{count}\n")
+            written += 1
+    return path
+
+
 # --- command line ------------------------------------------------------------
 
 def _with_progress(rows, label, extra=None):
@@ -406,6 +437,7 @@ def _run(args):
                              rules, args.per_meal, args.untagged, SEED, stats=bucket_stats)
 
     write_outputs(args.out, recipes, counts, pairs)
+    audit = write_audit(args.out, counts, rules)
 
     kept_stats = sum(1 for c in counts.values() if c >= MIN_STATS_COUNT)
     print(f"Rows read: {read_stats['rows']:,}, skipped (malformed): {read_stats['skipped']:,}")
@@ -414,6 +446,8 @@ def _run(args):
     print(f"Ingredient stats: {kept_stats:,}; ingredients with pairings: {len(pairs):,} "
           f"({pair_stats['pairs']:,} distinct pairs counted)")
     print(f"Wrote {args.out} in {time.monotonic() - started:.1f}s")
+    print(f"Rules audit: {audit}")
+    print("  Skim it before loading; see step 6 of the README.")
     return 0
 
 

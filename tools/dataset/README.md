@@ -68,7 +68,17 @@ prints progress every 100,000 rows. It writes the three CSVs into `tools/dataset
 message if the input does not look like RecipeNLG's `full_dataset.csv`, or if more than half of its rows
 could not be read.
 
-### 6. Set the database password
+It also writes `tools/dataset/out/rules_audit.txt` and prints its path at the end.
+
+### 6. Skim the rules audit
+
+`rules_audit.txt` lists the 1,500 most frequent ingredient names that no allergen or diet rule flags, one
+per line with how many recipes use it, most frequent first. Open it and skim it. If any line is an
+allergen (for example a cheese, a nut, a wheat product) or a meat or fish, add a term for it to
+`RecipeAppBackend/src/main/resources/food-rules.csv`, run `prepare.py` again, and only then load.
+The loader only ever inserts, so tags that go into the database stay as they are.
+
+### 7. Set the database password
 
 `load.py` reads the password from the environment variable `SUPABASE_DB_PASSWORD`. Set it without
 printing it. The password is stored in the backend's IntelliJ settings (`RecipeAppBackend/.idea/workspace.xml`); the commands below read it from there.
@@ -92,7 +102,7 @@ cd ..
 The variable only lasts for that terminal window. Do not echo it, paste it into chat, or write it to a
 file.
 
-### 7. Check, then load
+### 8. Check, then load
 
 First a dry run. It connects, checks the tables exist and that the size limit allows the load, then stops
 without writing anything:
