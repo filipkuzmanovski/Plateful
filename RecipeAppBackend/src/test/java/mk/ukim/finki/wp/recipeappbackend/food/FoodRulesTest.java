@@ -166,6 +166,67 @@ class FoodRulesTest {
         assertThat(r.allergensIn(List.of("peanut peanut butter"))).isEmpty();
     }
 
+    // --- final-review term gaps (the same cases as test_rules.py) ---------------------
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource({
+            "egg substitute, eggs",
+            "egg replacer, eggs",
+            "crabmeat, crustaceans",
+            "imitation crabmeat, crustaceans",
+            "miracle whip, eggs",
+            "salad dressing, eggs",
+            "bisquick, gluten",
+            "pie shell, gluten",
+            "unbaked pie shell, gluten",
+            "crescent rolls, gluten",
+            "dinner rolls, gluten",
+            "saltines, gluten",
+            "shortcake, gluten",
+            "tempura batter, gluten",
+            "cool whip, milk",
+            "whipped topping, milk",
+            "velveeta, milk",
+            "margarine, milk",
+            "chocolate chips, milk",
+            "semi sweet chocolate chips, milk",
+            "white chocolate, milk",
+            "monterey jack, milk",
+            "neufchatel, milk",
+            "sherbet, milk",
+            "buttercream, milk",
+            "pudding mix, milk",
+            "alfredo sauce, milk",
+            "ranch dressing, milk",
+            "eggnog, milk",
+            "eggnog, eggs",
+            "peanut butter chocolate chips, milk",
+            "teriyaki sauce, soy",
+            "teriyaki sauce, gluten",
+            "hoisin sauce, soy",
+            "hoisin sauce, gluten",
+    })
+    void termGapsAreCaught(String name, String key) {
+        assertThat(rules.allergensIn(List.of(name))).contains(key);
+    }
+
+    @Test
+    void eggSubstituteIsNotVegan() {
+        assertThat(rules.dietViolations(List.of("egg substitute"), Set.of("vegan"))).containsExactly("vegan");
+    }
+
+    @ParameterizedTest(name = "{0} is not vegetarian")
+    @CsvSource({"crabmeat", "imitation crabmeat", "jell-o", "jello", "marshmallows", "ground chuck", "chuck roast", "ground round", "short ribs", "spareribs", "wieners", "franks", "cornish hens", "fryer", "giblets", "spam", "fatback"})
+    void meatGapsAreNotVegetarian(String name) {
+        assertThat(rules.dietViolations(List.of(name), Set.of("vegetarian", "vegan")))
+                .containsExactlyInAnyOrder("vegetarian", "vegan");
+    }
+
+    @Test
+    void aFrankLookalikeStaysVegetarian() {
+        assertThat(rules.dietViolations(List.of("frank's red hot sauce"), Set.of("vegetarian"))).isEmpty();
+    }
+
     // --- fail fast on a broken file ----------------------------------------------
 
     @Test

@@ -304,3 +304,57 @@ def test_normalised_names_are_matched_as_given_without_the_length_cap(rules):
     assert rules.allergens_in([line], normalised=True) == {"tree_nuts"}
     assert rules.allergens_in([line]) == set()  # normalise() caps the name at 60 characters
     assert rules.diet_flags(["", "chicken"], normalised=True)["vegetarian"] is False
+
+
+# --- final-review term gaps --------------------------------------------------------
+# Each of these used to hit no allergen and pass every diet.
+
+TERM_GAPS = [
+    ("egg substitute", "eggs"), ("egg replacer", "eggs"),
+    ("crabmeat", "crustaceans"), ("imitation crabmeat", "crustaceans"),
+    ("miracle whip", "eggs"), ("salad dressing", "eggs"),
+    ("bisquick", "gluten"), ("pie shell", "gluten"), ("unbaked pie shell", "gluten"),
+    ("crescent rolls", "gluten"), ("dinner rolls", "gluten"), ("saltines", "gluten"),
+    ("shortcake", "gluten"), ("tempura batter", "gluten"),
+    ("cool whip", "milk"), ("whipped topping", "milk"), ("velveeta", "milk"), ("margarine", "milk"),
+    ("chocolate chips", "milk"), ("semi sweet chocolate chips", "milk"), ("white chocolate", "milk"),
+    ("monterey jack", "milk"), ("neufchatel", "milk"), ("sherbet", "milk"), ("buttercream", "milk"),
+    ("pudding mix", "milk"), ("alfredo sauce", "milk"), ("ranch dressing", "milk"), ("eggnog", "milk"),
+    ("eggnog", "eggs"), ("peanut butter chocolate chips", "milk"),
+    ("teriyaki sauce", "soy"), ("teriyaki sauce", "gluten"),
+    ("hoisin sauce", "soy"), ("hoisin sauce", "gluten"),
+]
+
+
+@pytest.mark.parametrize("name,key", TERM_GAPS)
+def test_term_gaps_are_caught(rules, name, key):
+    assert key in rules.allergens_in([name])
+
+
+def test_egg_substitute_is_not_vegan(rules):
+    assert rules.diet_flags(["egg substitute"])["vegan"] is False
+
+
+@pytest.mark.parametrize("name", [
+    "crabmeat", "imitation crabmeat", "jell-o", "jello", "marshmallows", "ground chuck", "chuck roast",
+    "ground round", "short ribs", "spareribs", "wieners", "franks", "cornish hens", "fryer", "giblets",
+    "spam", "fatback",
+])
+def test_meat_gaps_are_not_vegetarian(rules, name):
+    flags = rules.diet_flags([name])
+    assert flags["vegetarian"] is False and flags["vegan"] is False
+
+
+def test_a_frank_lookalike_stays_vegetarian(rules):
+    assert rules.diet_flags(["frank's red hot sauce"])["vegetarian"] is True
+
+
+def test_every_term_word_but_the_last_survives_singularising_every_word(rules):
+    """Ingredient lines are matched in normalise_words form, which singularises every word; a term
+    whose earlier word changed under that would never match a line."""
+    from normalise import _singularise
+    for row in rules._rows:
+        for terms, _ in row.groups:
+            for term in terms:
+                words = term.split()
+                assert all(_singularise(w) == w for w in words[:-1]), (row.key, term)
