@@ -48,7 +48,9 @@ function CheckChip({
 /**
  * The food preferences form, shared by the sign-up setup step and (later) the profile. Allergies are
  * required: pick some, or tick "I have no food allergies". `onSave` throws to report a failure; the
- * form shows an ApiError's detail.
+ * form shows an ApiError's cuisine field message under the cuisine picker, otherwise its detail. The
+ * form keeps its own state after `initial`, so a caller that wants the saved values shown remounts it
+ * (gives it a new `key`).
  */
 export function PreferencesForm({
   initial,
@@ -69,6 +71,7 @@ export function PreferencesForm({
   const [cuisines, setCuisines] = useState<string[]>(initial?.likedCuisines ?? []);
   const [allergyError, setAllergyError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cuisineError, setCuisineError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const allergenList = useQuery({ queryKey: allergensQueryKey, queryFn: getAllergens, staleTime: Infinity });
@@ -91,14 +94,21 @@ export function PreferencesForm({
     setDiets((cur) => (on ? [...cur, key] : cur.filter((k) => k !== key)));
   }
 
+  function changeCuisines(next: string[]) {
+    setCuisines(next);
+    setCuisineError(null);
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (busy) return; // a second submit while the first save is in flight
     if (!noAllergies && allergens.length === 0) {
       setAllergyError(ALLERGY_ERROR);
       return;
     }
     setBusy(true);
     setError(null);
+    setCuisineError(null);
     try {
       await onSave({
         allergens: noAllergies ? [] : allergens,
@@ -108,7 +118,8 @@ export function PreferencesForm({
         likedCuisines: cuisines,
       });
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : 'Something went wrong');
+      if (err instanceof ApiError && err.errors?.cuisines) setCuisineError(err.errors.cuisines);
+      else setError(err instanceof ApiError ? err.detail : 'Something went wrong');
     } finally {
       setBusy(false);
     }
@@ -174,7 +185,7 @@ export function PreferencesForm({
       <fieldset className="space-y-5">
         <legend className={legendClass}>What I like</legend>
         <IngredientChipInput label="Favourite ingredients" values={liked} onChange={setLiked} max={MAX_LIKED} />
-        <CuisinePicker value={cuisines} onChange={setCuisines} max={MAX_CUISINES} />
+        <CuisinePicker value={cuisines} onChange={changeCuisines} max={MAX_CUISINES} error={cuisineError ?? undefined} />
       </fieldset>
 
       {error && <FormError>{error}</FormError>}

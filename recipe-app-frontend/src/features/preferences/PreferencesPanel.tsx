@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError } from '@/api/client';
@@ -22,6 +23,8 @@ export function PreferencesPanel() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const userId = profile?.id ?? '';
+  // Bumped after each save so the form remounts from what the server stored (it may drop or normalise names).
+  const [savedVersion, setSavedVersion] = useState(0);
   const preferences = useQuery({
     queryKey: preferencesQueryKey(userId),
     queryFn: loadPreferences,
@@ -31,6 +34,7 @@ export function PreferencesPanel() {
   async function onSave(p: Preferences) {
     const saved = await savePreferences(p);
     queryClient.setQueryData(preferencesQueryKey(userId), saved);
+    setSavedVersion((v) => v + 1);
     toast.success('Preferences saved');
   }
 
@@ -51,7 +55,12 @@ export function PreferencesPanel() {
       <p className="mb-6 text-sm text-olive/70">
         We use these to suggest recipes. Allergies and ingredients you avoid are always filtered out.
       </p>
-      <PreferencesForm initial={preferences.data ?? undefined} submitLabel="Save preferences" onSave={onSave} />
+      <PreferencesForm
+        key={savedVersion}
+        initial={preferences.data ?? undefined}
+        submitLabel="Save preferences"
+        onSave={onSave}
+      />
     </section>
   );
 }

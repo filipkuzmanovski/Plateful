@@ -120,6 +120,29 @@ describe('preferences panel', () => {
     expect(screen.getByRole('checkbox', { name: 'Peanuts' })).toBeChecked();
   });
 
+  test('afterSavingTheFormShowsWhatTheServerStored', async () => {
+    const puts = stub(saved);
+    server.use(
+      http.put(`${BASE}/api/users/me/preferences`, async ({ request }) => {
+        const body = (await request.json()) as Preferences;
+        puts.push(body);
+        // The server drops names that normalise to nothing, such as "123".
+        return HttpResponse.json({ ...body, dislikedIngredients: body.dislikedIngredients.filter((n) => n !== '123') });
+      }),
+    );
+    renderApp('/me?tab=preferences');
+    await ready();
+
+    await userEvent.type(screen.getByLabelText("Ingredients I don't eat"), '123{Enter}');
+    expect(screen.getByRole('button', { name: 'Remove 123' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+
+    expect(await screen.findByText('Preferences saved')).toBeInTheDocument();
+    expect(puts).toEqual([{ ...saved, dislikedIngredients: ['okra', '123'] }]);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove 123' })).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Remove okra' })).toBeInTheDocument();
+  });
+
   test('a404ShowsTheEmptyForm', async () => {
     const puts = stub(null);
     renderApp('/me?tab=preferences');

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -37,7 +37,13 @@ const newQueryClient = () =>
   new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 
 function LocationProbe() {
-  return <span data-testid="path">{useLocation().pathname}</span>;
+  const location = useLocation();
+  return (
+    <>
+      <span data-testid="path">{location.pathname}</span>
+      <span data-testid="search">{location.search}</span>
+    </>
+  );
 }
 
 /** Stubs the reference data and records PUT bodies and suggest queries. */
@@ -61,10 +67,10 @@ function stubServer(suggestions: string[] = []) {
   return { puts, suggests };
 }
 
-/** A signed-in user who has not saved preferences yet, on the setup page. */
-function renderSetup() {
+/** A signed-in user on the setup page; by default one who has not saved preferences yet. */
+function renderSetup(initiallyHasPreferences = false) {
   mocks.session = { access_token: 't', user: { id: 'u-1', email: 'jane@example.com' } };
-  let hasPreferences = false;
+  let hasPreferences = initiallyHasPreferences;
   server.use(http.get(`${BASE}/api/users/me`, () => HttpResponse.json({ ...profileFixture, hasPreferences })));
   const view = render(
     <QueryClientProvider client={newQueryClient()}>
@@ -231,6 +237,65 @@ describe('setup page', () => {
     // Landed on home as a ready user, not bounced back to the setup page.
     expect(await screen.findByRole('button', { name: /Jane/ })).toBeInTheDocument();
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/);
+  });
+
+  it('sends a user who already has preferences to the profile preferences tab', async () => {
+    stubServer();
+    server.use(
+      http.get(`${BASE}/api/users/u-1/recipes`, () => HttpResponse.json(pageOf([]))),
+      http.get(`${BASE}/api/users/me/preferences`, () =>
+        HttpResponse.json({ allergens: [], diets: [], dislikedIngredients: [], likedIngredients: [], likedCuisines: [] }),
+      ),
+    );
+    renderSetup(true);
+
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/me$/));
+    expect(screen.getByTestId('search')).toHaveTextContent('?tab=preferences');
+    expect(await screen.findByRole('tab', { name: 'Preferences' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('heading', { name: 'Your food preferences' })).not.toBeInTheDocument();
+  });
+
+  it('sends one PUT for a double submit', async () => {
+    const { puts } = stubServer();
+    server.use(
+      http.put(`${BASE}/api/users/me/preferences`, async ({ request }) => {
+        const body = await request.json();
+        puts.push(body);
+        await new Promise((r) => setTimeout(r, 50));
+        return HttpResponse.json(body);
+      }),
+    );
+    const view = renderSetup();
+    await setupReady();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Milk' }));
+    view.markSaved();
+    const form = screen.getByRole('button', { name: 'Save preferences' }).closest('form')!;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/));
+    expect(puts).toHaveLength(1);
+  });
+
+  it('shows a cuisine validation message under the cuisine picker', async () => {
+    stubServer();
+    server.use(
+      http.put(`${BASE}/api/users/me/preferences`, () =>
+        HttpResponse.json(
+          { detail: 'Validation failed', errors: { cuisines: 'Unknown cuisine: atlantis' } },
+          { status: 400 },
+        ),
+      ),
+    );
+    renderSetup();
+    await setupReady();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Milk' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unknown cuisine: atlantis');
+    expect(screen.queryByText('Validation failed')).not.toBeInTheDocument();
+    expect(screen.getByTestId('path')).toHaveTextContent('/preferences/setup');
+    expectNoEmoji();
   });
 
   it('shows the server detail when the save fails', async () => {
