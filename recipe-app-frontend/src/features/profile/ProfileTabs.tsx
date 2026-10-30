@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 const TABS = [
   { key: 'mine', label: 'My recipes' },
   { key: 'saved', label: 'Saved' },
+  { key: 'preferences', label: 'Preferences' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -12,23 +13,26 @@ const tabId = (key: TabKey) => `profile-tab-${key}`;
 const panelId = (key: TabKey) => `profile-panel-${key}`;
 
 /**
- * The "My recipes" / "Saved" tabs on the user's own profile. The selected tab lives in the URL
- * (`?tab=saved`; anything else is "My recipes"). Arrow keys move focus and select (automatic activation).
- * Only the selected panel's content is rendered, so the Saved list is not fetched until it is opened.
+ * The "My recipes" / "Saved" / "Preferences" tabs on the user's own profile. The selected tab lives in the URL
+ * (`?tab=saved` or `?tab=preferences`; anything else is "My recipes"). Arrow keys move focus and select (automatic activation).
+ * Only the selected panel's content is rendered, so the Saved list and preferences are not fetched until opened.
  */
 export function ProfileTabs({
   mine,
   saved,
+  preferences,
   needsAttention = 0,
 }: {
   mine: ReactNode;
   saved: ReactNode;
+  preferences: ReactNode;
   /** Rejected recipes the author should look at; shown in the "My recipes" label when above 0. */
   needsAttention?: number;
 }) {
   const [params, setParams] = useSearchParams();
-  const selected: TabKey = params.get('tab') === 'saved' ? 'saved' : 'mine';
-  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ mine: null, saved: null });
+  const tabParam = params.get('tab');
+  const selected: TabKey = TABS.find((t) => t.key === tabParam)?.key ?? 'mine';
+  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ mine: null, saved: null, preferences: null });
 
   function select(key: TabKey) {
     const next = new URLSearchParams(params);
@@ -54,14 +58,14 @@ export function ProfileTabs({
     tabRefs.current[key]?.focus();
   }
 
-  const content: Record<TabKey, ReactNode> = { mine, saved };
+  const content: Record<TabKey, ReactNode> = { mine, saved, preferences };
 
   return (
     <div className="mt-10">
       <div className="mb-6 flex items-center gap-4 after:h-px after:flex-1 after:bg-sand">
         <div
           role="tablist"
-          aria-label="Your recipes"
+          aria-label="Your recipes and preferences"
           onKeyDown={onKeyDown}
           className="inline-flex items-center gap-1 rounded-full bg-paper p-1 shadow-card ring-1 ring-sand/70"
         >

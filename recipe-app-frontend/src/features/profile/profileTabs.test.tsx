@@ -94,6 +94,15 @@ function fakeSavedServer(recipes: RecipeDisplay[]) {
   return state;
 }
 
+/** The Preferences tab's endpoints, with nothing saved yet (GET answers 404). */
+function stubPreferencesApi() {
+  server.use(
+    http.get(`${BASE}/api/food/allergens`, () => HttpResponse.json([{ key: 'milk', label: 'Milk' }])),
+    http.get(`${BASE}/api/recipes/cuisines`, () => HttpResponse.json([])),
+    http.get(`${BASE}/api/users/me/preferences`, () => HttpResponse.json({ detail: 'none' }, { status: 404 })),
+  );
+}
+
 const soup = recipeFixture({ id: 's-1', title: 'Saved Soup' });
 
 beforeEach(() => {
@@ -174,16 +183,43 @@ describe('profile tabs', () => {
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/));
   });
 
-  test('arrowKeysMoveTabs', async () => {
+  test('hasThreeTabsInOrder', async () => {
     signedIn();
     fakeSavedServer([soup]);
     renderAt('/me');
 
+    await screen.findByRole('tab', { name: 'My recipes' });
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['My recipes', 'Saved', 'Preferences']);
+  });
+
+  test('preferencesTabFollowsUrl', async () => {
+    signedIn();
+    fakeSavedServer([soup]);
+    stubPreferencesApi();
+    renderAt('/me?tab=preferences');
+
+    const tab = await screen.findByRole('tab', { name: 'Preferences' });
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'My recipes' })).toHaveAttribute('aria-selected', 'false');
+    expect(await screen.findByRole('button', { name: 'Save preferences' })).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Preferences');
+    expect(screen.queryByText('My Own Pie')).not.toBeInTheDocument();
+    expectNoEmoji();
+  });
+
+  test('arrowKeysMoveTabs', async () => {
+    signedIn();
+    fakeSavedServer([soup]);
+    stubPreferencesApi();
+    renderAt('/me');
+
     const mineTab = await screen.findByRole('tab', { name: 'My recipes' });
     const savedTab = screen.getByRole('tab', { name: 'Saved' });
+    const prefsTab = screen.getByRole('tab', { name: 'Preferences' });
     // Roving tabindex: only the selected tab is in the page's tab order.
     expect(mineTab).toHaveAttribute('tabindex', '0');
     expect(savedTab).toHaveAttribute('tabindex', '-1');
+    expect(prefsTab).toHaveAttribute('tabindex', '-1');
 
     mineTab.focus();
     await userEvent.keyboard('{ArrowRight}');
@@ -194,12 +230,23 @@ describe('profile tabs', () => {
     expect(await screen.findByText('Saved Soup')).toBeInTheDocument();
     expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('tab')).toBe('saved');
 
+    await userEvent.keyboard('{ArrowRight}');
+    expect(prefsTab).toHaveFocus();
+    expect(prefsTab).toHaveAttribute('aria-selected', 'true');
+    expect(prefsTab).toHaveAttribute('tabindex', '0');
+    expect(savedTab).toHaveAttribute('tabindex', '-1');
+    expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('tab')).toBe('preferences');
+
     await userEvent.keyboard('{ArrowRight}'); // wraps to the first tab
     expect(mineTab).toHaveFocus();
     expect(mineTab).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText('My Own Pie')).toBeInTheDocument();
 
     await userEvent.keyboard('{ArrowLeft}'); // wraps to the last tab
+    expect(prefsTab).toHaveFocus();
+    expect(prefsTab).toHaveAttribute('aria-selected', 'true');
+
+    await userEvent.keyboard('{ArrowLeft}');
     expect(savedTab).toHaveFocus();
     expect(savedTab).toHaveAttribute('aria-selected', 'true');
 
@@ -207,8 +254,8 @@ describe('profile tabs', () => {
     expect(mineTab).toHaveFocus();
     expect(mineTab).toHaveAttribute('aria-selected', 'true');
     await userEvent.keyboard('{End}');
-    expect(savedTab).toHaveFocus();
-    expect(savedTab).toHaveAttribute('aria-selected', 'true');
+    expect(prefsTab).toHaveFocus();
+    expect(prefsTab).toHaveAttribute('aria-selected', 'true');
   });
 
   test('tabsAreWiredToTheirPanel', async () => {

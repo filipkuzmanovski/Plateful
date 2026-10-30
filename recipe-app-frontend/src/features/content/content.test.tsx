@@ -161,6 +161,19 @@ describe('Privacy Policy', () => {
     expect(main).toHaveTextContent('authentication and photo and video storage');
   });
 
+  test('describes the food preferences it collects', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const main = screen.getByRole('main');
+    expect(main).toHaveTextContent(
+      'Food preferences. When you sign up we ask about food allergies, your diet, and ingredients you like or avoid. ' +
+        'Allergy and diet details can say something about your health, so we use them only to filter and personalise ' +
+        'recipe suggestions for you. They are never shown to other people. You can change them at any time on your ' +
+        'profile, and they are deleted together with your account.',
+    );
+    expectNoEmoji(main);
+  });
+
   test('has section headings as h2', async () => {
     renderApp('/privacy');
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });

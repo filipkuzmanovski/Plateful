@@ -9,6 +9,7 @@ import { RecipeCard } from '@/components/RecipeCard';
 import { Pagination } from '@/components/Pagination';
 import { Button, Field, SectionHeading, Spinner, TextInput } from '@/components/ui';
 import { SavedRecipesPanel } from '@/features/saved/SavedRecipesPanel';
+import { PreferencesPanel } from '@/features/preferences/PreferencesPanel';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfileTabs } from './ProfileTabs';
 import { TwoFactorSettings } from './TwoFactorSettings';
@@ -99,6 +100,7 @@ export default function MyProfilePage() {
           </>
         }
         saved={<SavedRecipesPanel />}
+        preferences={<PreferencesPanel />}
         needsAttention={profile.rejectedCount}
       />
     </div>

@@ -39,6 +39,12 @@ export default function PrivacyPage() {
                 <Strong>Content you post:</Strong> recipes, photos and videos, ratings, comments, likes and dislikes.
               </li>
               <li>
+                <Strong>Food preferences.</Strong> When you sign up we ask about food allergies, your diet, and
+                ingredients you like or avoid. Allergy and diet details can say something about your health, so we use
+                them only to filter and personalise recipe suggestions for you. They are never shown to other people.
+                You can change them at any time on your profile, and they are deleted together with your account.
+              </li>
+              <li>
                 <Strong>Security:</Strong> the two-factor authentication devices you set up, which are managed by our
                 authentication provider.
               </li>
