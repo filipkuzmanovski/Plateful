@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.ai;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
@@ -35,6 +36,46 @@ public class GroqRecipeAi implements RecipeAi {
         this.url = baseUrl + PATH;
     }
 
+    /** Keywords Groq's strict mode may reject; the draft parser enforces every one of these bounds anyway. */
+    static final Set<String> UNSUPPORTED_KEYWORDS =
+            Set.of("minLength", "maxLength", "minimum", "maximum", "minItems", "maxItems");
+
+    /** A deep copy of the schema without {@link #UNSUPPORTED_KEYWORDS} at any level; the input is not changed. */
+    static Map<String, Object> withoutBounds(Map<String, Object> schema) {
+        return copyMap(schema);
+    }
+
+    /** Copies a schema node, dropping the unsupported keywords; a node under "properties" is a name map. */
+    private static Map<String, Object> copyMap(Map<?, ?> map) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            String key = String.valueOf(entry.getKey());
+            if (UNSUPPORTED_KEYWORDS.contains(key)) {
+                continue;
+            }
+            Object value = entry.getValue();
+            if ("properties".equals(key) && value instanceof Map<?, ?> props) {
+                // property names are data, not keywords: keep them all, clean each property's schema
+                Map<String, Object> cleaned = new LinkedHashMap<>();
+                props.forEach((name, schema) -> cleaned.put(String.valueOf(name), copyValue(schema)));
+                copy.put(key, cleaned);
+            } else {
+                copy.put(key, copyValue(value));
+            }
+        }
+        return copy;
+    }
+
+    private static Object copyValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return copyMap(map);
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(GroqRecipeAi::copyValue).toList();
+        }
+        return value;
+    }
+
     public String name() {
         return NAME;
     }
@@ -44,7 +85,7 @@ public class GroqRecipeAi implements RecipeAi {
         Map<String, Object> jsonSchema = new LinkedHashMap<>();
         jsonSchema.put("name", "recipe");
         jsonSchema.put("strict", true);
-        jsonSchema.put("schema", request.jsonSchema());
+        jsonSchema.put("schema", withoutBounds(request.jsonSchema()));
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);

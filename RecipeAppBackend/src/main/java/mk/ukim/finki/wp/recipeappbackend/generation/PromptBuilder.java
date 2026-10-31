@@ -23,6 +23,10 @@ import org.springframework.stereotype.Component;
  * ingredients, and the "never use" list. The list is the plain terms of their allergens and diets plus their
  * dislikes, presented as "Never use these ingredients": the words for allergies and diets are never sent, so
  * the provider learns nothing about health. No name, email or id is ever passed in.
+ *
+ * <p>The strings the user supplied (ingredients, liked and disliked ingredients, liked cuisines) are passed
+ * through unfiltered. So the guarantee that the texts never contain the words for allergies and diets covers
+ * the template text and the dataset examples only, not those user-supplied strings.
  */
 @Component
 public class PromptBuilder {

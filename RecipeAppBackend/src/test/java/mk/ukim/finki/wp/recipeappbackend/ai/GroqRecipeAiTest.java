@@ -13,6 +13,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Map;
+import mk.ukim.finki.wp.recipeappbackend.generation.RecipeSchema;
+import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -84,6 +86,46 @@ class GroqRecipeAiTest {
         ai.complete(request());
 
         server.verify();
+    }
+
+    @Test
+    void sentSchemaHasNoBoundKeywordsAnywhere_andCallersSchemaIsUntouched() {
+        Map<String, Object> schema = RecipeSchema.meals(java.util.Set.of("breakfast", "dinner"));
+        String before = schema.toString();
+        String[] bodies = new String[1];
+        server.expect(requestTo(URL))
+                .andExpect(request -> bodies[0] = ((MockClientHttpRequest) request).getBodyAsString())
+                .andExpect(jsonPath("$.response_format.json_schema.schema.type").value("object"))
+                .andExpect(jsonPath("$.response_format.json_schema.schema.additionalProperties").value(false))
+                .andExpect(jsonPath("$.response_format.json_schema.schema.required[0]").value("breakfast"))
+                .andExpect(jsonPath("$.response_format.json_schema.schema.properties.dinner.properties.steps.items.type")
+                        .value("string"))
+                .andExpect(jsonPath("$.response_format.json_schema.schema.properties.dinner.properties.ingredients"
+                        + ".items.additionalProperties").value(false))
+                .andExpect(jsonPath("$.response_format.json_schema.schema.properties.dinner.properties.ingredients"
+                        + ".items.required[1]").value("amount"))
+                .andExpect(jsonPath("$.response_format.json_schema.schema.properties.dinner.properties.cuisine.type[1]")
+                        .value("null"))
+                .andRespond(withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+
+        ai.complete(new AiRequest("SYS", "USER", schema, 1.0, 2048));
+
+        server.verify();
+        for (String keyword : List.of("minLength", "maxLength", "minimum", "maximum", "minItems", "maxItems")) {
+            assertThat(bodies[0]).as(keyword).doesNotContain("\"" + keyword + "\"");
+        }
+        assertThat(schema.toString()).isEqualTo(before);
+        assertThat(schema.toString()).contains("minLength", "maxItems", "minimum");
+    }
+
+    @Test
+    void withoutBounds_keepsPropertiesNamedLikeKeywords() {
+        Map<String, Object> schema = Map.of("type", "object", "required", List.of("minimum"),
+                "additionalProperties", false,
+                "properties", Map.of("minimum", Map.of("type", "integer", "minimum", 1, "maximum", 5)));
+        Map<String, Object> cleaned = GroqRecipeAi.withoutBounds(schema);
+        assertThat(cleaned).containsKeys("type", "required", "additionalProperties", "properties");
+        assertThat(cleaned.get("properties")).isEqualTo(Map.of("minimum", Map.of("type", "integer")));
     }
 
     @Test
