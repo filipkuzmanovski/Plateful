@@ -6,9 +6,11 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -153,7 +155,43 @@ class GeminiRecipeAiTest {
 
         assertThatThrownBy(() -> ai.complete(request()))
                 .isInstanceOf(AiUnavailableException.class)
-                .satisfies(e -> assertThat(e.getMessage()).doesNotContain(KEY));
+                .satisfies(e -> {
+                    for (Throwable t = e; t != null; t = t.getCause()) {
+                        assertThat(String.valueOf(t.getMessage())).doesNotContain(KEY);
+                    }
+                });
+    }
+
+    @Test
+    void candidateWithoutContent_isUnavailable() {
+        server.expect(requestTo(URL)).andRespond(withSuccess(
+                "{\"candidates\":[{\"finishReason\":\"SAFETY\"}]}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> ai.complete(request()))
+                .isInstanceOf(AiUnavailableException.class);
+    }
+
+    @Test
+    void promptFeedbackBlock_isUnavailable() {
+        server.expect(requestTo(URL)).andRespond(withSuccess(
+                "{\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> ai.complete(request()))
+                .isInstanceOf(AiUnavailableException.class);
+    }
+
+    @Test
+    void transportFailure_isUnavailableWithoutKey() {
+        server.expect(requestTo(URL)).andRespond(withException(new SocketTimeoutException("Read timed out")));
+
+        assertThatThrownBy(() -> ai.complete(request()))
+                .isInstanceOf(AiUnavailableException.class)
+                .hasMessage("gemini timeout")
+                .satisfies(e -> {
+                    for (Throwable t = e; t != null; t = t.getCause()) {
+                        assertThat(String.valueOf(t.getMessage())).doesNotContain(KEY);
+                    }
+                });
     }
 
     @Test

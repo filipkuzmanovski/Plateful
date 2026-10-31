@@ -54,6 +54,8 @@ public class GroqRecipeAi implements RecipeAi {
         body.put("response_format", Map.of("type", "json_schema", "json_schema", jsonSchema));
         body.put("temperature", request.temperature());
         body.put("max_completion_tokens", request.maxOutputTokens());
+        // gpt-oss reasoning tokens count against max_completion_tokens and the TPM limit
+        body.put("reasoning_effort", "low");
         String payload = AiHttp.toJson(NAME, body);
 
         AiHttp.Response response = AiHttp.execute(NAME, () -> client.post()

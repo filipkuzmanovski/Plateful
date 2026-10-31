@@ -6,9 +6,11 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +78,7 @@ class GroqRecipeAiTest {
                 .andExpect(jsonPath("$.response_format.json_schema.schema.type").value("object"))
                 .andExpect(jsonPath("$.temperature").value(1.0))
                 .andExpect(jsonPath("$.max_completion_tokens").value(2048))
+                .andExpect(jsonPath("$.reasoning_effort").value("low"))
                 .andRespond(withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
 
         ai.complete(request());
@@ -172,7 +175,25 @@ class GroqRecipeAiTest {
 
         assertThatThrownBy(() -> ai.complete(request()))
                 .isInstanceOf(AiUnavailableException.class)
-                .satisfies(e -> assertThat(e.getMessage()).doesNotContain(KEY));
+                .satisfies(e -> {
+                    for (Throwable t = e; t != null; t = t.getCause()) {
+                        assertThat(String.valueOf(t.getMessage())).doesNotContain(KEY);
+                    }
+                });
+    }
+
+    @Test
+    void transportFailure_isUnavailableWithoutKey() {
+        server.expect(requestTo(URL)).andRespond(withException(new SocketTimeoutException("Read timed out")));
+
+        assertThatThrownBy(() -> ai.complete(request()))
+                .isInstanceOf(AiUnavailableException.class)
+                .hasMessage("groq timeout")
+                .satisfies(e -> {
+                    for (Throwable t = e; t != null; t = t.getCause()) {
+                        assertThat(String.valueOf(t.getMessage())).doesNotContain(KEY);
+                    }
+                });
     }
 
     @Test
