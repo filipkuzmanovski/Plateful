@@ -118,18 +118,18 @@ public class SafetyCheck {
 
     /**
      * The requested ingredients the user cannot have, one {@link Conflict} per ingredient and reason, in the
-     * order of {@code requested}. Names are in free-text form ({@link IngredientNames#normaliseText}), so
-     * "almonds, chopped" is checked word by word; names with nothing left are ignored.
+     * order of {@code requested}. {@link Conflict#ingredient()} is the requested string exactly as passed (the
+     * frontend matches it to the user's chip); matching uses both normalised forms, so "Almonds, chopped" is
+     * checked word by word. Names with nothing left to match simply have no conflicts.
      */
     public List<Conflict> conflicts(Collection<String> requested, UserFoodProfile p) {
         validate(p);
         List<Conflict> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (String raw : requested) {
-            String name = IngredientNames.normaliseText(raw);
-            if (!name.isEmpty() && seen.add(name)) {
+            if (raw != null && seen.add(raw)) {
                 for (String reason : reasonsFor(raw, p)) {
-                    out.add(new Conflict(name, reason));
+                    out.add(new Conflict(raw, reason));
                 }
             }
         }

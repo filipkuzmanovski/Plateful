@@ -211,7 +211,7 @@ class SafetyCheckTest {
     void conflicts_namesAllergyLabel() {
         List<SafetyCheck.Conflict> conflicts =
                 safety.conflicts(List.of("Peanut butter"), profile(Set.of("peanuts"), Set.of(), Set.of()));
-        assertThat(conflicts).containsExactly(new SafetyCheck.Conflict("peanut butter", "allergy: Peanuts"));
+        assertThat(conflicts).containsExactly(new SafetyCheck.Conflict("Peanut butter", "allergy: Peanuts"));
     }
 
     @Test
@@ -219,8 +219,8 @@ class SafetyCheckTest {
         UserFoodProfile p = profile(Set.of(), Set.of("vegetarian"), Set.of("pea"));
         Collection<String> requested = List.of("Bacon", "green peas", "tomato");
         assertThat(safety.conflicts(requested, p)).containsExactly(
-                new SafetyCheck.Conflict("bacon", "diet: Vegetarian"),
-                new SafetyCheck.Conflict("green pea", "dislike"));
+                new SafetyCheck.Conflict("Bacon", "diet: Vegetarian"),
+                new SafetyCheck.Conflict("green peas", "dislike"));
     }
 
     @Test
@@ -291,8 +291,8 @@ class SafetyCheckTest {
 
     @Test
     void conflicts_flagPunctuatedNames() {
-        assertThat(safety.conflicts(List.of("almonds, chopped"), profile(Set.of("tree_nuts"), Set.of(), Set.of())))
-                .containsExactly(new SafetyCheck.Conflict("almond chopped", "allergy: Tree nuts"));
+        assertThat(safety.conflicts(List.of("Almonds, chopped"), profile(Set.of("tree_nuts"), Set.of(), Set.of())))
+                .containsExactly(new SafetyCheck.Conflict("Almonds, chopped", "allergy: Tree nuts"));
     }
 
     // --- staples cover only with descriptors ----------------------------------------------------
