@@ -13,9 +13,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * The hard filter for AI recipes (spec section 5.3), enforced in code whatever the prompt said: no
- * ingredient or step may hit one of the user's allergens, break one of their diets or contain a disliked
- * name as a whole word, and (outside {@link Mode#ANY}) the ingredients the user did not list are limited.
- * Pantry staples get no exemption from the safety rules.
+ * ingredient, amount, title, description or step may hit one of the user's allergens, break one of their
+ * diets or contain a disliked name as a whole word, and (outside {@link Mode#ANY}) the ingredients the user
+ * did not list are limited. Pantry staples get no exemption from the safety rules.
  *
  * <p>Reasons in {@link DraftProblem} go back to the provider, so they name the ingredient but never say
  * "allergy" or "diet". {@link Conflict} reasons are for the user and do.
@@ -53,20 +53,35 @@ public class SafetyCheck {
     }
 
     public SafetyResult check(RecipeDraft d, UserFoodProfile p, Set<String> userIngredients, Mode mode) {
+        validate(p);
+        // Names in free-text form ("Almonds, sliced" -> "almond sliced"); extras are reported in that form.
         List<String> names = new ArrayList<>();
         for (RecipeDraft.Ingredient ingredient : d.ingredients()) {
-            IngredientNames.normalise(ingredient.name()).ifPresent(names::add);
+            String name = IngredientNames.normaliseText(ingredient.name());
+            if (!name.isEmpty()) {
+                names.add(name);
+            }
+            if (!reasonsFor(ingredient.name(), p).isEmpty()) {
+                String shown = name.isEmpty() ? ingredient.name().strip() : name;
+                return rejected("The recipe used " + shown + ", which is not allowed.", Set.of());
+            }
         }
-
-        for (String name : names) {
-            if (!conflictsOf(name, p).isEmpty()) {
-                return rejected("The recipe used " + name + ", which is not allowed.", Set.of());
+        for (RecipeDraft.Ingredient ingredient : d.ingredients()) {
+            Hit hit = textHit(ingredient.amount(), p);
+            if (hit != null) {
+                return rejected(hit.sentence("The recipe text"), Set.of());
+            }
+        }
+        for (String text : List.of(d.title(), d.description())) {
+            Hit hit = textHit(text, p);
+            if (hit != null) {
+                return rejected(hit.sentence("The recipe text"), Set.of());
             }
         }
         for (String step : d.steps()) {
-            String offender = stepOffender(step, p);
-            if (offender != null) {
-                return rejected(offender, Set.of());
+            Hit hit = textHit(step, p);
+            if (hit != null) {
+                return rejected(hit.sentence("A step"), Set.of());
             }
         }
 
@@ -74,14 +89,17 @@ public class SafetyCheck {
             return new SafetyResult(Optional.empty(), Set.of());
         }
 
-        Set<String> covering = new LinkedHashSet<>();
-        for (String mine : userIngredients) {
-            IngredientNames.normalise(mine).ifPresent(covering::add);
+        Set<String> mine = new LinkedHashSet<>();
+        for (String raw : userIngredients) {
+            String name = IngredientNames.normaliseText(raw);
+            if (!name.isEmpty()) {
+                mine.add(name);
+            }
         }
-        covering.addAll(staples.names());
         Set<String> extras = new LinkedHashSet<>();
         for (String name : names) {
-            if (covering.stream().noneMatch(c -> covers(name, c))) {
+            boolean covered = staples.covers(name) || mine.stream().anyMatch(m -> covers(name, m));
+            if (!covered) {
                 extras.add(name);
             }
         }
@@ -100,76 +118,127 @@ public class SafetyCheck {
 
     /**
      * The requested ingredients the user cannot have, one {@link Conflict} per ingredient and reason, in the
-     * order of {@code requested}. Names are normalised; names that normalise to nothing are ignored.
+     * order of {@code requested}. Names are in free-text form ({@link IngredientNames#normaliseText}), so
+     * "almonds, chopped" is checked word by word; names with nothing left are ignored.
      */
     public List<Conflict> conflicts(Collection<String> requested, UserFoodProfile p) {
+        validate(p);
         List<Conflict> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (String raw : requested) {
-            IngredientNames.normalise(raw).ifPresent(name -> {
-                if (seen.add(name)) {
-                    for (String reason : conflictsOf(name, p)) {
-                        out.add(new Conflict(name, reason));
-                    }
+            String name = IngredientNames.normaliseText(raw);
+            if (!name.isEmpty() && seen.add(name)) {
+                for (String reason : reasonsFor(raw, p)) {
+                    out.add(new Conflict(name, reason));
                 }
-            });
+            }
         }
         return out;
     }
 
-    /** The user-facing reasons ("allergy: Peanuts", "diet: Vegan", "dislike") a normalised name breaks. */
-    private List<String> conflictsOf(String name, UserFoodProfile p) {
-        List<String> reasons = new ArrayList<>();
-        for (String key : rules.allergensIn(List.of(name))) {
-            if (p.allergens().contains(key)) {
-                reasons.add("allergy: " + rules.label(key));
+    /** Fails closed: a profile key the rules do not know must never silently pass every recipe. */
+    private void validate(UserFoodProfile p) {
+        for (String key : p.allergens()) {
+            if (!rules.allergenKeys().contains(key)) {
+                throw new IllegalArgumentException("Unknown allergen: " + key);
             }
         }
-        if (!p.diets().isEmpty()) {
-            for (String key : rules.dietViolations(List.of(name), p.diets())) {
-                reasons.add("diet: " + rules.label(key));
+        for (String key : p.diets()) {
+            if (!rules.dietKeys().contains(key)) {
+                throw new IllegalArgumentException("Unknown diet: " + key);
             }
         }
-        String padded = " " + name + " ";
-        if (p.dislikes().stream().anyMatch(dislike -> hasWord(padded, dislike))) {
-            reasons.add("dislike");
-        }
-        return reasons;
     }
 
-    /** A retry-prompt sentence when the step text breaks a rule, else null. */
-    private String stepOffender(String step, UserFoodProfile p) {
-        String text = IngredientNames.normaliseText(step);
-        if (text.isEmpty()) {
+    /**
+     * The user-facing reasons ("allergy: Peanuts", "diet: Vegan", "dislike") an ingredient name breaks. The
+     * name is checked in both forms, because the ingredient form glues punctuation and singularises only the
+     * last word ("Almonds, sliced" would be "almonds sliced"): as an ingredient name and as free text.
+     */
+    private List<String> reasonsFor(String rawName, UserFoodProfile p) {
+        Set<String> reasons = new LinkedHashSet<>();
+        Optional<String> normalised = IngredientNames.normalise(rawName);
+        if (normalised.isPresent()) {
+            String name = normalised.get();
+            for (String key : rules.allergensIn(List.of(name))) {
+                if (p.allergens().contains(key)) {
+                    reasons.add("allergy: " + rules.label(key));
+                }
+            }
+            if (!p.diets().isEmpty()) {
+                for (String key : rules.dietViolations(List.of(name), p.diets())) {
+                    reasons.add("diet: " + rules.label(key));
+                }
+            }
+            if (dislikedIn(" " + name + " ", p)) {
+                reasons.add("dislike");
+            }
+        }
+        String text = IngredientNames.normaliseText(rawName);
+        if (!text.isEmpty()) {
+            for (String key : rules.allergensInText(rawName)) {
+                if (p.allergens().contains(key)) {
+                    reasons.add("allergy: " + rules.label(key));
+                }
+            }
+            if (!p.diets().isEmpty()) {
+                for (String key : rules.dietViolationsInText(rawName, p.diets())) {
+                    reasons.add("diet: " + rules.label(key));
+                }
+            }
+            if (dislikedIn(" " + text + " ", p)) {
+                reasons.add("dislike");
+            }
+        }
+        return new ArrayList<>(reasons);
+    }
+
+    /** A rule hit in free text; {@code term} names it when it could be found, else null. */
+    private record Hit(String term) {
+        String sentence(String subject) {
+            return term == null
+                    ? subject + " used an ingredient that is not allowed."
+                    : subject + " mentioned " + term + ", which is not allowed.";
+        }
+    }
+
+    /** The first rule that the free text breaks (allergen, diet, dislike), or null. */
+    private Hit textHit(String text, UserFoodProfile p) {
+        String cleaned = IngredientNames.normaliseText(text);
+        if (cleaned.isEmpty()) {
             return null;
         }
-        String padded = " " + text + " ";
+        String padded = " " + cleaned + " ";
 
-        Set<String> allergens = new LinkedHashSet<>(rules.allergensInText(step));
-        allergens.retainAll(p.allergens());
-        if (!allergens.isEmpty()) {
-            String key = allergens.iterator().next();
-            return stepSentence(termIn(padded, rules.excludedTerms(Set.of(key), Set.of())));
+        for (String key : rules.allergensInText(text)) {
+            if (p.allergens().contains(key)) {
+                return new Hit(termIn(padded, rules.excludedTerms(Set.of(key), Set.of())));
+            }
         }
         if (!p.diets().isEmpty()) {
-            Set<String> broken = rules.dietViolationsInText(step, p.diets());
-            if (!broken.isEmpty()) {
-                String key = broken.iterator().next();
-                return stepSentence(termIn(padded, rules.excludedTerms(Set.of(), Set.of(key))));
+            for (String key : rules.dietViolationsInText(text, p.diets())) {
+                return new Hit(termIn(padded, rules.excludedTerms(Set.of(), Set.of(key))));
             }
         }
         for (String dislike : p.dislikes()) {
-            if (hasWord(padded, dislike)) {
-                return stepSentence(dislike);
+            if (hasWord(padded, dislike) || hasWord(padded, IngredientNames.normaliseWords(dislike))) {
+                return new Hit(dislike);
             }
         }
         return null;
     }
 
-    private static String stepSentence(String term) {
-        return term == null
-                ? "A step used an ingredient that is not allowed."
-                : "A step used " + term + ", which is not allowed.";
+    /**
+     * Whether a disliked name is in {@code padded}: the stored form (an {@code IngredientNames.normalise}
+     * result) or its free-text form, which differ for multi-word names ("brussels sprout" / "brussel sprout").
+     */
+    private static boolean dislikedIn(String padded, UserFoodProfile p) {
+        for (String dislike : p.dislikes()) {
+            if (hasWord(padded, dislike) || hasWord(padded, IngredientNames.normaliseWords(dislike))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The first of {@code terms} that is a whole word (or phrase) in {@code padded}, or null. */
@@ -183,7 +252,7 @@ public class SafetyCheck {
     }
 
     private static boolean hasWord(String padded, String phrase) {
-        return padded.contains(" " + phrase + " ");
+        return !phrase.isEmpty() && padded.contains(" " + phrase + " ");
     }
 
     /** Two names cover each other when one contains the other as whole words. */

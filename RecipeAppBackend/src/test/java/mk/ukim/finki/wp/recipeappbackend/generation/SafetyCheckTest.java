@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.generation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Collection;
 import java.util.List;
@@ -240,5 +241,132 @@ class SafetyCheckTest {
         assertThat(p.dislikes()).containsExactly("green pea");
         assertThat(p.likedIngredients()).containsExactly("tomato");
         assertThat(p.likedCuisines()).containsExactly("italian");
+    }
+
+    // --- ingredient names with punctuation or descriptors -------------------------------------
+
+    private SafetyCheck.SafetyResult checkIngredient(String name, UserFoodProfile p) {
+        return safety.check(draft(List.of("tomato", name, "basil"), SERVE), p, Set.of(), SafetyCheck.Mode.ANY);
+    }
+
+    @Test
+    void punctuatedNames_stillHitAllergens() {
+        assertThat(checkIngredient("Almonds, sliced", profile(Set.of("tree_nuts"), Set.of(), Set.of())).problem())
+                .isPresent();
+        assertThat(checkIngredient("Eggs, beaten", profile(Set.of("eggs"), Set.of(), Set.of())).problem())
+                .isPresent();
+        assertThat(checkIngredient("Anchovies in oil", profile(Set.of("fish"), Set.of(), Set.of())).problem())
+                .isPresent();
+        SafetyCheck.SafetyResult slash =
+                checkIngredient("cashews/peanuts", profile(Set.of("peanuts"), Set.of(), Set.of()));
+        String reason = reasonOf(slash);
+        assertThat(reason).contains("not allowed");
+        assertNoForbiddenWords(reason);
+    }
+
+    @Test
+    void punctuatedNames_stillHitDislikes() {
+        assertThat(checkIngredient("Peas, frozen", profile(Set.of(), Set.of(), Set.of("pea"))).problem())
+                .isPresent();
+    }
+
+    @Test
+    void punctuatedNames_stillHitDiets() {
+        assertThat(checkIngredient("Bacon, diced", profile(Set.of(), Set.of("vegan"), Set.of())).problem())
+                .isPresent();
+    }
+
+    @Test
+    void punctuatedName_coveredByUsersIngredient_andExtrasAreReportedAsText() {
+        SafetyCheck.SafetyResult covered = safety.check(
+                draft(List.of("Almonds, sliced", "tomato", "basil"), SERVE), noRestrictions(),
+                Set.of("almond", "tomato", "basil"), SafetyCheck.Mode.ONLY_MINE);
+        assertThat(covered.problem()).isEmpty();
+
+        SafetyCheck.SafetyResult extra = safety.check(
+                draft(List.of("Almonds, sliced", "tomato", "basil"), SERVE), noRestrictions(),
+                Set.of("tomato", "basil"), SafetyCheck.Mode.STAPLES_AND_EXTRAS);
+        assertThat(extra.extras()).containsExactly("almond sliced");
+    }
+
+    @Test
+    void conflicts_flagPunctuatedNames() {
+        assertThat(safety.conflicts(List.of("almonds, chopped"), profile(Set.of("tree_nuts"), Set.of(), Set.of())))
+                .containsExactly(new SafetyCheck.Conflict("almond chopped", "allergy: Tree nuts"));
+    }
+
+    // --- staples cover only with descriptors ----------------------------------------------------
+
+    @Test
+    void stapleDescriptors_areCovered_otherIngredientsAreExtras() {
+        UserFoodProfile none = noRestrictions();
+        for (String covered : new String[] {"extra virgin olive oil", "freshly ground black pepper",
+                "all purpose flour", "unsalted butter", "pepper"}) {
+            SafetyCheck.SafetyResult r = safety.check(draft(List.of("tomato", covered, "basil"), SERVE), none,
+                    Set.of("tomato", "basil"), SafetyCheck.Mode.ONLY_MINE);
+            assertThat(r.problem()).as(covered).isEmpty();
+            assertThat(r.extras()).as(covered).isEmpty();
+        }
+        for (String extra : new String[] {"bell pepper", "sesame oil"}) {
+            SafetyCheck.SafetyResult r = safety.check(draft(List.of("tomato", extra, "basil"), SERVE), none,
+                    Set.of("tomato", "basil"), SafetyCheck.Mode.STAPLES_AND_EXTRAS);
+            assertThat(r.extras()).as(extra).containsExactly(extra);
+        }
+    }
+
+    // --- all draft text is scanned ----------------------------------------------------------------
+
+    private static RecipeDraft withText(String title, String description, String amount) {
+        return new RecipeDraft(title, description, 2, 5, 10, null,
+                List.of(new RecipeDraft.Ingredient("noodles", amount), new RecipeDraft.Ingredient("basil", "1"),
+                        new RecipeDraft.Ingredient("pasta", "1")),
+                List.of("Mix.", "Serve."));
+    }
+
+    @Test
+    void amountTitleAndDescription_areScanned() {
+        UserFoodProfile milk = profile(Set.of("milk"), Set.of(), Set.of());
+        String amount = reasonOf(safety.check(withText("Dish", "A dish.", "1 cup (or use cream)"), milk, Set.of(),
+                SafetyCheck.Mode.ANY));
+        assertThat(amount).isEqualTo("The recipe text mentioned cream, which is not allowed.");
+        assertNoForbiddenWords(amount);
+
+        assertThat(reasonOf(safety.check(withText("Dish", "Finished with a dollop of yogurt", "1"), milk, Set.of(),
+                SafetyCheck.Mode.ANY))).contains("yogurt").contains("not allowed");
+
+        assertThat(reasonOf(safety.check(withText("Creamy Peanut Noodles", "A dish.", "1"),
+                profile(Set.of("peanuts"), Set.of(), Set.of()), Set.of(), SafetyCheck.Mode.ANY)))
+                .contains("peanut").contains("not allowed");
+    }
+
+    // --- dislikes stored in ingredient form -----------------------------------------------------
+
+    @Test
+    void multiWordDislike_matchesFreeTextForm() {
+        UserFoodProfile p = UserFoodProfile.of(
+                mk.ukim.finki.wp.recipeappbackend.model.entities.UserPreferences.builder()
+                        .dislikedIngredients(List.of("Brussels sprouts")).build());
+        assertThat(p.dislikes()).containsExactly("brussels sprout");
+        SafetyCheck.SafetyResult r = safety.check(
+                draft(List.of("pasta", "tomato", "basil"), "Roast the Brussels sprouts.", "Serve."), p, Set.of(),
+                SafetyCheck.Mode.ANY);
+        assertThat(r.problem()).isPresent();
+        assertThat(checkIngredient("Brussels sprouts", p).problem()).isPresent();
+    }
+
+    // --- fail closed ---------------------------------------------------------------------------------
+
+    @Test
+    void unknownAllergenOrDietKey_throws() {
+        UserFoodProfile bad = profile(Set.of("peanutz"), Set.of(), Set.of());
+        assertThatThrownBy(() -> safety.check(
+                draft(List.of("tomato", "basil", "pasta"), SERVE), bad, Set.of(), SafetyCheck.Mode.ANY))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> safety.conflicts(List.of("tomato"), bad))
+                .isInstanceOf(IllegalArgumentException.class);
+        UserFoodProfile badDiet = profile(Set.of(), Set.of("carnivore"), Set.of());
+        assertThatThrownBy(() -> safety.check(
+                draft(List.of("tomato", "basil", "pasta"), SERVE), badDiet, Set.of(), SafetyCheck.Mode.ANY))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

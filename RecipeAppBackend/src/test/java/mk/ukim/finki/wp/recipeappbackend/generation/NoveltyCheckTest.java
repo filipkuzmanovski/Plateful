@@ -105,6 +105,17 @@ class NoveltyCheckTest {
     }
 
     @Test
+    void staplesWithDescriptorsAreRemovedToo() {
+        RecipeDraft d = draft("Alpha Dish", Set.of("chicken", "tomato", "extra virgin olive oil", "unsalted butter"));
+        ComparedRecipe c = new ComparedRecipe("Zeta Meal", Set.of("chicken", "tomato", "olive oil", "sugar"));
+        assertThat(novelty.check(d, List.of(c)).score()).isEqualTo(1.0);
+        // a non-staple that merely contains a staple word is kept: sesame oil is not olive oil
+        RecipeDraft d2 = draft("Alpha Dish", Set.of("chicken", "sesame oil"));
+        ComparedRecipe c2 = new ComparedRecipe("Zeta Meal", Set.of("chicken", "olive oil"));
+        assertThat(novelty.check(d2, List.of(c2)).score()).isEqualTo(0.5);
+    }
+
+    @Test
     void stopWordsAreRemovedFromTitles() {
         RecipeDraft d = draft("Easy Chicken with Rice", Set.of("x one", "x two"));
         ComparedRecipe c = new ComparedRecipe("Chicken Rice", Set.of("y one", "y two"));
@@ -123,12 +134,12 @@ class NoveltyCheckTest {
     void problemNamesTheClosestTitle() {
         Set<String> rest = Set.of("chicken", "tomato", "rice", "onion", "garlic");
         RecipeDraft d = draft("Alpha Dish", rest);
-        ComparedRecipe close = new ComparedRecipe("Chicken Tomato Bake",
+        ComparedRecipe identical = new ComparedRecipe("Chicken Tomato Bake",
                 Set.of("chicken", "tomato", "rice", "onion", "garlic"));
-        ComparedRecipe closer = new ComparedRecipe("Chicken Tomato Rice Bake",
+        ComparedRecipe nearby = new ComparedRecipe("Chicken Tomato Rice Bake",
                 Set.of("chicken", "tomato", "rice", "onion", "garlic", "pea"));
         ComparedRecipe far = new ComparedRecipe("Fruit Salad", Set.of("apple", "pear"));
-        NoveltyCheck.NoveltyResult r = novelty.check(d, List.of(far, closer, close));
+        NoveltyCheck.NoveltyResult r = novelty.check(d, List.of(far, nearby, identical));
         assertThat(r.problem()).isPresent();
         assertThat(r.problem().get().reason())
                 .isEqualTo("Too similar to 'Chicken Tomato Bake'. Make something more different.");

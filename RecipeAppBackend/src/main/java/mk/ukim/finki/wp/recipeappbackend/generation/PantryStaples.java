@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import mk.ukim.finki.wp.recipeappbackend.food.IngredientNames;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,6 +19,12 @@ import org.springframework.stereotype.Component;
 public class PantryStaples {
 
     private static final String RESOURCE = "/pantry-staples.txt";
+
+    /** Words that may surround a staple name without making it a different ingredient. */
+    static final Set<String> DESCRIPTORS = Set.of(
+            "extra", "virgin", "black", "white", "ground", "freshly", "cracked", "fine", "coarse", "kosher",
+            "sea", "table", "granulated", "caster", "powdered", "all", "purpose", "plain", "self", "raising",
+            "rising", "light", "dark", "unsalted", "salted", "cold", "softened", "melted", "distilled");
 
     private final Set<String> names;
 
@@ -55,5 +62,41 @@ public class PantryStaples {
     /** Whether {@code normalisedName} (an {@code IngredientNames.normalise} result) is a staple. */
     public boolean isStaple(String normalisedName) {
         return normalisedName != null && names.contains(normalisedName);
+    }
+
+    /**
+     * Whether a staple covers {@code name} (a normalised name, any word form): the name equals a staple, or it
+     * contains a staple as whole words and every other word is a {@link #DESCRIPTORS descriptor}. So
+     * "extra virgin olive oil" and "unsalted butter" are covered, "sesame oil" and "bell pepper" are not. The
+     * reverse direction (a staple containing the name) never counts.
+     */
+    public boolean covers(String name) {
+        if (name == null) {
+            return false;
+        }
+        String text = IngredientNames.normaliseText(name);
+        if (text.isEmpty()) {
+            return false;
+        }
+        String padded = " " + text + " ";
+        for (String staple : names) {
+            String phrase = " " + staple + " ";
+            int at = padded.indexOf(phrase);
+            if (at < 0) {
+                continue;
+            }
+            String rest = padded.substring(0, at) + " " + padded.substring(at + phrase.length());
+            boolean onlyDescriptors = true;
+            for (String word : rest.split(" ")) {
+                if (!word.isEmpty() && !DESCRIPTORS.contains(word)) {
+                    onlyDescriptors = false;
+                    break;
+                }
+            }
+            if (onlyDescriptors) {
+                return true;
+            }
+        }
+        return false;
     }
 }

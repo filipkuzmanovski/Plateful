@@ -42,7 +42,7 @@ public class NoveltyCheck {
         for (RecipeDraft.Ingredient ingredient : d.ingredients()) {
             IngredientNames.normalise(ingredient.name()).ifPresent(draftNames::add);
         }
-        draftNames.removeIf(staples::isStaple);
+        draftNames.removeIf(staples::covers);
         Set<String> draftTitle = titleWords(d.title());
 
         double bestScore = 0.0;
@@ -50,7 +50,7 @@ public class NoveltyCheck {
         String closestTitle = null;
         for (ComparedRecipe c : compared) {
             Set<String> names = new LinkedHashSet<>(c.names());
-            names.removeIf(staples::isStaple);
+            names.removeIf(staples::covers);
             double ingredientSimilarity = jaccard(draftNames, names);
             double titleSimilarity = jaccard(draftTitle, titleWords(c.title()));
             bestScore = Math.max(bestScore, ingredientSimilarity);
