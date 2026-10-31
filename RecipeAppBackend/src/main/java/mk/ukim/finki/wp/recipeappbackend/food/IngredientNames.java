@@ -51,6 +51,21 @@ public final class IngredientNames {
         return Optional.of(result);
     }
 
+    /**
+     * Free-text form (a recipe title or step): the same cleaning as {@link #normalise}, but every word is
+     * singularised and there is no length limit. Never null; empty when nothing is left.
+     */
+    public static String normaliseWords(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String[] words = clean(raw);
+        for (int i = 0; i < words.length; i++) {
+            words[i] = singularise(words[i]);
+        }
+        return String.join(" ", words);
+    }
+
     private static String[] clean(String text) {
         String decomposed = Normalizer.normalize(text, Normalizer.Form.NFKD);
         String stripped = COMBINING_MARKS.matcher(decomposed).replaceAll("");

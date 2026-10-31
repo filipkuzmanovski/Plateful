@@ -16,6 +16,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -151,6 +153,90 @@ public class FoodRules {
             }
         }
         return broken;
+    }
+
+    /**
+     * The allergen keys present in free {@code text} (a recipe step): the text is normalised with
+     * {@link IngredientNames#normaliseWords} (every word singularised, no length limit) and run through the
+     * same matcher as {@link #allergensIn}. Null or empty text has none.
+     */
+    public Set<String> allergensInText(String text) {
+        String padded = paddedText(text);
+        Set<String> found = new LinkedHashSet<>();
+        if (padded == null) {
+            return found;
+        }
+        for (Row row : rows) {
+            if (row.kind.equals("allergen") && row.hits(padded)) {
+                found.add(row.key);
+            }
+        }
+        return found;
+    }
+
+    /**
+     * The diets among {@code diets} that free {@code text} breaks; see {@link #allergensInText}. Throws
+     * {@link IllegalArgumentException} for an unknown diet key, like {@link #dietViolations}.
+     */
+    public Set<String> dietViolationsInText(String text, Set<String> diets) {
+        for (String diet : diets) {
+            if (!dietKeys.contains(diet)) {
+                throw new IllegalArgumentException("Unknown diet: " + diet);
+            }
+        }
+        String padded = paddedText(text);
+        Set<String> broken = new LinkedHashSet<>();
+        if (padded == null) {
+            return broken;
+        }
+        for (Row row : rows) {
+            if (row.kind.equals("diet") && diets.contains(row.key) && row.hits(padded)) {
+                broken.add(row.key);
+            }
+        }
+        return broken;
+    }
+
+    /**
+     * The plain terms of the given allergen and diet rows, including every row they reference, sorted.
+     * Exceptions are never included. Throws {@link IllegalArgumentException} for an unknown key.
+     */
+    public SortedSet<String> excludedTerms(Set<String> allergens, Set<String> diets) {
+        SortedSet<String> terms = new TreeSet<>();
+        for (String key : allergens) {
+            if (!allergenKeys.contains(key)) {
+                throw new IllegalArgumentException("Unknown allergen: " + key);
+            }
+            addTerms(byKey.get(key), terms);
+        }
+        for (String key : diets) {
+            if (!dietKeys.contains(key)) {
+                throw new IllegalArgumentException("Unknown diet: " + key);
+            }
+            addTerms(byKey.get(key), terms);
+        }
+        return terms;
+    }
+
+    /** The label of the allergen, diet or meal row with this key; {@link IllegalArgumentException} if unknown. */
+    public String label(String key) {
+        Row row = byKey.get(key);
+        if (row == null) {
+            throw new IllegalArgumentException("Unknown food rule key: " + key);
+        }
+        return row.label;
+    }
+
+    private static void addTerms(Row row, Set<String> into) {
+        for (Group group : row.groups) {
+            into.addAll(group.terms());
+        }
+    }
+
+    /** {@code " " + normaliseWords(text) + " "}, or null when nothing is left. */
+    private static String paddedText(String text) {
+        String words = IngredientNames.normaliseWords(text);
+        return words.isEmpty() ? null : " " + words + " ";
     }
 
     private Set<String> keysOf(String kind) {

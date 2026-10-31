@@ -314,4 +314,59 @@ class FoodRulesTest {
         assertThat(r.allergens()).containsExactly(new Allergen("eggs", "Eggs"));
         assertThat(r.allergensIn(List.of("mayonnaise"))).containsExactly("eggs");
     }
+
+    // --- free text and excluded terms ------------------------------------------
+
+    @Test
+    void allergensInTextFindsSingularisedWords() {
+        assertThat(rules.allergensInText("Garnish with chopped peanuts")).containsExactly("peanuts");
+    }
+
+    @Test
+    void allergensInTextAppliesExceptions() {
+        assertThat(rules.allergensInText("Spread the peanut butter")).containsExactly("peanuts");
+    }
+
+    @Test
+    void allergensInTextIsEmptyForNullOrBlank() {
+        assertThat(rules.allergensInText(null)).isEmpty();
+        assertThat(rules.allergensInText("  !! ")).isEmpty();
+    }
+
+    @Test
+    void dietViolationsInTextFindsBacon() {
+        assertThat(rules.dietViolationsInText("Top with crispy bacon", Set.of("vegetarian")))
+                .containsExactly("vegetarian");
+        assertThat(rules.dietViolationsInText("Top with crispy bacon", Set.of("gluten_free"))).isEmpty();
+    }
+
+    @Test
+    void dietViolationsInTextRejectsUnknownDiet() {
+        assertThatThrownBy(() -> rules.dietViolationsInText("toast", Set.of("keto")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void excludedTermsForMilkIncludeButterButNotItsExceptions() {
+        assertThat(rules.excludedTerms(Set.of("milk"), Set.of()))
+                .contains("butter").doesNotContain("peanut butter");
+    }
+
+    @Test
+    void excludedTermsForVeganFollowReferences() {
+        assertThat(rules.excludedTerms(Set.of(), Set.of("vegan"))).contains("honey", "chicken");
+    }
+
+    @Test
+    void excludedTermsAreSortedAndEmptyForNothing() {
+        assertThat(rules.excludedTerms(Set.of(), Set.of())).isEmpty();
+        assertThat(rules.excludedTerms(Set.of("milk", "eggs"), Set.of()).stream().toList()).isSorted();
+    }
+
+    @Test
+    void labelOfAnyKnownKey() {
+        assertThat(rules.label("gluten")).isEqualTo("Cereals containing gluten");
+        assertThat(rules.label("vegan")).isNotBlank();
+        assertThatThrownBy(() -> rules.label("nope")).isInstanceOf(IllegalArgumentException.class);
+    }
 }
