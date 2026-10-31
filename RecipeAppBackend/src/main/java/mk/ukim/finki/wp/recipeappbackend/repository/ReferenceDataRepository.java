@@ -1,8 +1,10 @@
 package mk.ukim.finki.wp.recipeappbackend.repository;
 
 import mk.ukim.finki.wp.recipeappbackend.food.IngredientNames;
+import mk.ukim.finki.wp.recipeappbackend.model.projection.Pairing;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.ReferenceQuery;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.ReferenceRecipe;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -14,6 +16,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -30,6 +33,15 @@ public class ReferenceDataRepository {
             "vegan", "vegan",
             "gluten_free", "gluten_free",
             "dairy_free", "dairy_free");
+
+    private static final RowMapper<ReferenceRecipe> REFERENCE_ROWS = (rs, rowNum) -> new ReferenceRecipe(
+            rs.getLong("id"),
+            rs.getString("title"),
+            list(rs.getArray("ingredient_lines")),
+            list(rs.getArray("ingredient_names")),
+            list(rs.getArray("directions")),
+            list(rs.getArray("meal_types")),
+            rs.getInt("overlap"));
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -73,15 +85,73 @@ public class ReferenceDataRepository {
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("wanted", textArray(wanted))
                 .addValue("limit", q.limit());
-        if (q.mealType() != null) {
+        appendFilters(sql, params, q.mealType(), q.allergens(), q.diets(), dislikes);
+        sql.append(" ORDER BY overlap DESC, cardinality(ingredient_names), id LIMIT :limit");
+
+        return jdbc.query(sql.toString(), params, REFERENCE_ROWS);
+    }
+
+    /**
+     * Random dataset recipes for {@code mealType} (null means any meal) with the same hard filters as
+     * {@link #findClosest}: allergens, diets and dislikes (the dislikes are normalised here). Their
+     * {@code overlap} is 0. The frozen tags are only a pre-filter, so callers re-check each recipe in Java.
+     * {@code ORDER BY random()} scans the matching rows (about 15,000 per meal), which is fast enough here.
+     */
+    public List<ReferenceRecipe> randomForMeal(String mealType, Set<String> allergens, Set<String> diets,
+                                               Set<String> dislikes, int limit) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT id, title, ingredient_lines, ingredient_names, directions, meal_types,
+                       0 AS overlap
+                FROM reference_recipes
+                WHERE TRUE
+                """);
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("limit", limit);
+        appendFilters(sql, params, mealType, allergens, diets, normalised(dislikes));
+        sql.append(" ORDER BY random() LIMIT :limit");
+        return jdbc.query(sql.toString(), params, REFERENCE_ROWS);
+    }
+
+    /**
+     * The ingredients that most often share a recipe with {@code ingredient}, most common first, as the
+     * share of the ingredient's recipes that also contain the partner (from {@code ingredient_pairings} and
+     * {@code ingredient_stats}). The name is normalised here; a name with nothing left, or an unknown one,
+     * gives an empty list.
+     */
+    public List<Pairing> pairings(String ingredient, int limit) {
+        Optional<String> name = IngredientNames.normalise(ingredient);
+        if (name.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query("""
+                        SELECT p.partner, p.together_count, s.recipe_count
+                        FROM ingredient_pairings p
+                        JOIN ingredient_stats s ON s.name = p.ingredient
+                        WHERE p.ingredient = :ingredient AND s.recipe_count > 0
+                        ORDER BY p.together_count DESC, p.partner
+                        LIMIT :limit
+                        """,
+                new MapSqlParameterSource().addValue("ingredient", name.get()).addValue("limit", limit),
+                (rs, rowNum) -> new Pairing(
+                        rs.getString("partner"),
+                        (int) Math.min(100, Math.round(100.0 * rs.getInt("together_count") / rs.getInt("recipe_count")))));
+    }
+
+    /**
+     * The filter clauses shared by {@link #findClosest} and {@link #randomForMeal}; {@code sql} must already
+     * have a WHERE clause. {@code dislikes} must already be normalised. An unknown diet key throws
+     * {@link IllegalArgumentException}.
+     */
+    private static void appendFilters(StringBuilder sql, MapSqlParameterSource params, String mealType,
+                                      Set<String> allergens, Set<String> diets, Set<String> dislikes) {
+        if (mealType != null) {
             sql.append(" AND CAST(:mealType AS text) = ANY(meal_types)\n");
-            params.addValue("mealType", q.mealType());
+            params.addValue("mealType", mealType);
         }
-        if (!q.allergens().isEmpty()) {
+        if (!allergens.isEmpty()) {
             sql.append(" AND NOT (allergens && CAST(:allergens AS text[]))\n");
-            params.addValue("allergens", textArray(q.allergens()));
+            params.addValue("allergens", textArray(allergens));
         }
-        for (String diet : q.diets()) {
+        for (String diet : diets) {
             String column = DIET_COLUMNS.get(diet);
             if (column == null) {
                 throw new IllegalArgumentException("Unknown diet: " + diet);
@@ -96,16 +166,6 @@ public class ReferenceDataRepository {
             params.addValue("dislikePatterns",
                     dislikes.stream().map(d -> "% " + d + " %").toArray(String[]::new));
         }
-        sql.append(" ORDER BY overlap DESC, cardinality(ingredient_names), id LIMIT :limit");
-
-        return jdbc.query(sql.toString(), params, (rs, rowNum) -> new ReferenceRecipe(
-                rs.getLong("id"),
-                rs.getString("title"),
-                list(rs.getArray("ingredient_lines")),
-                list(rs.getArray("ingredient_names")),
-                list(rs.getArray("directions")),
-                list(rs.getArray("meal_types")),
-                rs.getInt("overlap")));
     }
 
     private static Set<String> normalised(Collection<String> names) {

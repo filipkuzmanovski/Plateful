@@ -136,6 +136,16 @@ public class SafetyCheck {
         return out;
     }
 
+    /**
+     * Whether a raw ingredient name or ingredient line ("1 cup peanuts/almonds") breaks none of the user's
+     * allergens, diets or dislikes. It runs the same per-name check as {@link #check} and {@link #conflicts}
+     * (ingredient form and free-text form). Fails closed on an unknown profile key.
+     */
+    public boolean allowed(String rawName, UserFoodProfile p) {
+        validate(p);
+        return rawName == null || reasonsFor(rawName, p).isEmpty();
+    }
+
     /** Fails closed: a profile key the rules do not know must never silently pass every recipe. */
     private void validate(UserFoodProfile p) {
         for (String key : p.allergens()) {

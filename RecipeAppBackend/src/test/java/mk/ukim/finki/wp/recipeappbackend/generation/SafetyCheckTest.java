@@ -369,4 +369,16 @@ class SafetyCheckTest {
                 draft(List.of("tomato", "basil", "pasta"), SERVE), badDiet, Set.of(), SafetyCheck.Mode.ANY))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void allowed_checksALineInBothForms_andFailsClosed() {
+        UserFoodProfile peanuts = profile(Set.of("peanuts"), Set.of(), Set.of());
+        assertThat(safety.allowed("1 cup peanuts/almonds", peanuts)).isFalse();
+        assertThat(safety.allowed("1 cup rice", peanuts)).isTrue();
+        assertThat(safety.allowed("2 tbsp ghee", profile(Set.of("milk"), Set.of(), Set.of()))).isFalse();
+        assertThat(safety.allowed("200 g chicken", profile(Set.of(), Set.of("vegetarian"), Set.of()))).isFalse();
+        assertThat(safety.allowed("1 cup chopped olives", profile(Set.of(), Set.of(), Set.of("olive")))).isFalse();
+        assertThatThrownBy(() -> safety.allowed("rice", profile(Set.of("nope"), Set.of(), Set.of())))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
