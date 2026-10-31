@@ -369,4 +369,39 @@ class FoodRulesTest {
         assertThat(rules.label("vegan")).isNotBlank();
         assertThatThrownBy(() -> rules.label("nope")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void allergensInTextSplitsOnPunctuation() {
+        assertThat(rules.allergensInText("Garnish with peanuts/almonds")).containsExactlyInAnyOrder("peanuts", "tree_nuts");
+        assertThat(rules.allergensInText("milk,butter")).contains("milk");
+        assertThat(rules.allergensInText("flour,eggs")).contains("gluten", "eggs");
+        assertThat(rules.allergensInText("Stir in the peanuts\u2014almonds optional")).contains("peanuts", "tree_nuts");
+        assertThat(rules.allergensInText("Add 2tbsp(30g)butter.")).contains("milk");
+    }
+
+    @Test
+    void allergensInTextTreatsHyphensAsWordBreaks() {
+        // the hyphen is a word break, so the "gluten free flour" exception applies exactly as in ingredient names
+        assertThat(rules.allergensInText("Use gluten-free flour")).doesNotContain("gluten");
+        assertThat(rules.allergensInText("Use gluten-free flour and whole-wheat bread")).contains("gluten");
+    }
+
+    @Test
+    void dietViolationsInTextSplitsOnPunctuation() {
+        assertThat(rules.dietViolationsInText("Serve with rice/bacon", Set.of("vegetarian")))
+                .containsExactly("vegetarian");
+    }
+
+    @Test
+    void dietViolationsInTextRejectsUnknownDietEvenForEmptyText() {
+        assertThatThrownBy(() -> rules.dietViolationsInText("", Set.of("bogus")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void everyShippedTermIsAlreadyInFreeTextForm() {
+        Set<String> all = rules.excludedTerms(rules.allergenKeys(), rules.dietKeys());
+        assertThat(all).isNotEmpty();
+        assertThat(all).allSatisfy(term -> assertThat(IngredientNames.normaliseWords(term)).isEqualTo(term));
+    }
 }

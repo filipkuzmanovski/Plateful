@@ -157,7 +157,7 @@ public class FoodRules {
 
     /**
      * The allergen keys present in free {@code text} (a recipe step): the text is normalised with
-     * {@link IngredientNames#normaliseWords} (every word singularised, no length limit) and run through the
+     * {@link IngredientNames#normaliseText} (punctuation separates words, every word singularised, no length limit) and run through the
      * same matcher as {@link #allergensIn}. Null or empty text has none.
      */
     public Set<String> allergensInText(String text) {
@@ -233,9 +233,9 @@ public class FoodRules {
         }
     }
 
-    /** {@code " " + normaliseWords(text) + " "}, or null when nothing is left. */
+    /** {@code " " + normaliseText(text) + " "}, or null when nothing is left. */
     private static String paddedText(String text) {
-        String words = IngredientNames.normaliseWords(text);
+        String words = IngredientNames.normaliseText(text);
         return words.isEmpty() ? null : " " + words + " ";
     }
 

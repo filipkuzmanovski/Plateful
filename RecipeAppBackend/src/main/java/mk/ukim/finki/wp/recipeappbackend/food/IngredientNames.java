@@ -29,6 +29,8 @@ public final class IngredientNames {
     // Python's \s on str is Unicode-aware (and includes the ASCII separators \x1c-\x1f).
     private static final Pattern WHITESPACE = Pattern.compile("(?U)[\\s\\x1c-\\x1f]");
     private static final Pattern NOT_LETTER_OR_SPACE = Pattern.compile("[^a-z ]");
+    // Anything that is not a letter, a combining mark, whitespace or an apostrophe separates words in free text.
+    private static final Pattern TEXT_SEPARATORS = Pattern.compile("[^\\p{L}\\p{M}\\s'\u2019]");
     private static final Pattern SPACES = Pattern.compile(" +");
 
     private IngredientNames() {
@@ -64,6 +66,20 @@ public final class IngredientNames {
             words[i] = singularise(words[i]);
         }
         return String.join(" ", words);
+    }
+
+    /**
+     * The free-text form, for recipe steps and other prose: every character that is not a letter, a combining
+     * mark, whitespace or an apostrophe becomes a space (so "peanuts/almonds", "milk,butter" and an em dash
+     * separate words instead of gluing them), then {@link #normaliseWords} applies. Not a twin of anything in
+     * the dataset tools; {@link #normalise} and {@link #normaliseWords} stay exact twins of Python. Never
+     * null; empty when nothing is left.
+     */
+    public static String normaliseText(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return normaliseWords(TEXT_SEPARATORS.matcher(raw).replaceAll(" "));
     }
 
     private static String[] clean(String text) {

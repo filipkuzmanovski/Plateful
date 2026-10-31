@@ -68,6 +68,22 @@ class IngredientNamesTest {
         assertThat(IngredientNames.normaliseWords("a s b")).isEqualTo("a b");
     }
 
+    @Test
+    void normaliseTextTurnsPunctuationIntoWordBreaks() {
+        assertThat(IngredientNames.normaliseText("Chef's peanuts/almonds")).isEqualTo("chef peanut almond");
+        assertThat(IngredientNames.normaliseText("milk,butter")).isEqualTo("milk butter");
+        assertThat(IngredientNames.normaliseText("and/or")).isEqualTo("and or");
+        assertThat(IngredientNames.normaliseText("salt\u2014pepper")).isEqualTo("salt pepper");
+        assertThat(IngredientNames.normaliseText("Serve with crème-fraîche!")).isEqualTo("serve with creme fraiche");
+        assertThat(IngredientNames.normaliseText("2tbsp(30g)oil")).isEqualTo("tbsp g oil");
+    }
+
+    @Test
+    void normaliseTextIsEmptyNotNullWhenNothingIsLeft() {
+        assertThat(IngredientNames.normaliseText(null)).isEmpty();
+        assertThat(IngredientNames.normaliseText("1/2 - 3!")).isEmpty();
+    }
+
     /** Minimal quote-aware CSV reader: "" escapes a quote, and quoted cells may hold commas or newlines. */
     static List<List<String>> parseCsv(String text) {
         if (text.startsWith("\uFEFF")) {

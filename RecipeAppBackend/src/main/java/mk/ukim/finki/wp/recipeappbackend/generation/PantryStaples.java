@@ -31,7 +31,7 @@ public class PantryStaples {
             String line;
             while ((line = reader.readLine()) != null) {
                 String name = line.strip();
-                if (name.startsWith("﻿")) {
+                if (name.startsWith("\uFEFF")) {
                     name = name.substring(1);
                 }
                 if (!name.isEmpty()) {
