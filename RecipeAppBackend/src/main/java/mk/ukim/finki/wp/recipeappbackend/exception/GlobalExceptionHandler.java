@@ -1,5 +1,8 @@
 package mk.ukim.finki.wp.recipeappbackend.exception;
 
+import mk.ukim.finki.wp.recipeappbackend.ai.AiNotConfiguredException;
+import mk.ukim.finki.wp.recipeappbackend.ai.AiQuotaExceededException;
+import mk.ukim.finki.wp.recipeappbackend.ai.AiUnavailableException;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.InvalidCuisineException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.photo.InvalidPhotoException;
@@ -20,6 +23,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -130,6 +134,73 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail handleInvalidVideo(InvalidVideoException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
         problem.setProperty("errors", Map.of("video", ex.getMessage()));
+        return problem;
+    }
+
+    /** A bad generate request (ingredient count, meal type, or conflicts with the user's food preferences): 400. */
+    @ExceptionHandler(GenerationRequestException.class)
+    ProblemDetail handleGenerationRequest(GenerationRequestException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setProperty("code", "invalid_request");
+        if (!ex.getConflicts().isEmpty()) {
+            List<Map<String, String>> conflicts = ex.getConflicts().stream()
+                    .map(c -> Map.of("ingredient", c.ingredient(), "reason", c.reason()))
+                    .toList();
+            problem.setProperty("conflicts", conflicts);
+        }
+        return problem;
+    }
+
+    /** No food preferences saved yet: 409. */
+    @ExceptionHandler(NoPreferencesException.class)
+    ProblemDetail handleNoPreferences(NoPreferencesException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", "no_preferences");
+        return problem;
+    }
+
+    /** All of today's AI generations used: 429. */
+    @ExceptionHandler(DailyLimitException.class)
+    ProblemDetail handleDailyLimit(DailyLimitException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problem.setProperty("code", "daily_limit");
+        return problem;
+    }
+
+    /** Every attempt failed the checks: 422. */
+    @ExceptionHandler(GenerationFailedException.class)
+    ProblemDetail handleGenerationFailed(GenerationFailedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatusCode.valueOf(422), ex.getMessage());
+        problem.setProperty("code", "generation_failed");
+        return problem;
+    }
+
+    /** Every AI provider is quota-limited: 503. The exception message is for logs only. */
+    @ExceptionHandler(AiQuotaExceededException.class)
+    ProblemDetail handleAiQuota(AiQuotaExceededException ex) {
+        log.warn("AI quota reached: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "The free AI limit is reached for now. Try again later.");
+        problem.setProperty("code", "ai_quota");
+        return problem;
+    }
+
+    /** The AI providers failed in some other way: 503. The exception message is for logs only. */
+    @ExceptionHandler(AiUnavailableException.class)
+    ProblemDetail handleAiUnavailable(AiUnavailableException ex) {
+        log.warn("AI unavailable: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "The AI service isn't responding. Try again in a minute.");
+        problem.setProperty("code", "ai_unavailable");
+        return problem;
+    }
+
+    /** No AI key configured: 503. */
+    @ExceptionHandler(AiNotConfiguredException.class)
+    ProblemDetail handleAiNotConfigured(AiNotConfiguredException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "AI features aren't set up on this server.");
+        problem.setProperty("code", "ai_not_configured");
         return problem;
     }
 
