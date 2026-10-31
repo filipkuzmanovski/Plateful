@@ -169,7 +169,7 @@ class AiStateRepositoryDbTest {
         UUID l = newRecipe(u, "daily", "L", 0, false);
         UUID d = newRecipe(u, "daily", "D", 0, false);
         assertThat(repository.claimDailySet(u, DAY)).isTrue();
-        repository.finishDailySet(u, DAY, b, l, d);
+        assertThat(repository.finishDailySet(u, DAY, b, l, d)).isTrue();
         setState(u, DAY, "ready", 600);
 
         assertThat(repository.claimDailySet(u, DAY)).isFalse();
@@ -210,47 +210,84 @@ class AiStateRepositoryDbTest {
     }
 
     @Test
-    void cleanup_keepsLatestReadySetAndSavedRecipes() {
+    void finishAndFail_onlyChangeAGeneratingRow() {
         UUID u = newUser();
+        UUID b = newRecipe(u, "daily", "B", 0, false);
+        UUID l = newRecipe(u, "daily", "L", 0, false);
+        UUID d = newRecipe(u, "daily", "D", 0, false);
+        UUID other = newRecipe(u, "daily", "X", 0, false);
+
+        // No row at all.
+        assertThat(repository.finishDailySet(u, DAY, b, l, d)).isFalse();
+        assertThat(repository.failDailySet(u, DAY)).isFalse();
+
+        // A ready row is not overwritten by a late finish or fail.
+        assertThat(repository.claimDailySet(u, DAY)).isTrue();
+        assertThat(repository.finishDailySet(u, DAY, b, l, d)).isTrue();
+        assertThat(repository.finishDailySet(u, DAY, other, other, other)).isFalse();
+        assertThat(repository.failDailySet(u, DAY)).isFalse();
+        DailySetRow ready = repository.findDailySet(u, DAY).orElseThrow();
+        assertThat(ready.status()).isEqualTo("ready");
+        assertThat(ready.breakfastId()).isEqualTo(b);
+
+        // A failed row is not turned ready by a late finish.
+        LocalDate next = DAY.plusDays(1);
+        assertThat(repository.claimDailySet(u, next)).isTrue();
+        assertThat(repository.failDailySet(u, next)).isTrue();
+        assertThat(repository.finishDailySet(u, next, b, l, d)).isFalse();
+        DailySetRow failed = repository.findDailySet(u, next).orElseThrow();
+        assertThat(failed.status()).isEqualTo("failed");
+        assertThat(failed.breakfastId()).isNull();
+    }
+
+    @Test
+    void cleanup_keepsLatestReadySetAndSavedRecipes() {
+        UUID a = newUser();
+        UUID b = newUser();
         LocalDate today = LocalDate.of(2031, 6, 1);
-        // Old ready sets: only the user's latest ready one survives, with its three recipes.
-        UUID ob = newRecipe(u, "daily", "old-b", 60, false);
-        UUID ol = newRecipe(u, "daily", "old-l", 60, false);
-        UUID od = newRecipe(u, "daily", "old-d", 60, false);
-        UUID kb = newRecipe(u, "daily", "keep-b", 40, false);
-        UUID kl = newRecipe(u, "daily", "keep-l", 40, false);
-        UUID kd = newRecipe(u, "daily", "keep-d", 40, false);
-        insertSet(u, today.minusDays(60), "ready", ob, ol, od, 0);
-        insertSet(u, today.minusDays(40), "ready", kb, kl, kd, 0);
-        // An old failed set goes.
-        insertSet(u, today.minusDays(45), "failed", null, null, null, 0);
-        // A recent set stays, and so do its recipes.
-        UUID rb = newRecipe(u, "daily", "recent-b", 1, false);
-        UUID rl = newRecipe(u, "daily", "recent-l", 1, false);
-        UUID rd = newRecipe(u, "daily", "recent-d", 1, false);
-        insertSet(u, today.minusDays(1), "ready", rb, rl, rd, 0);
+        // User A has two old ready sets: only the later one (the latest ready) survives, with its recipes.
+        UUID aOld1 = newRecipe(a, "daily", "a-old-b", 60, false);
+        UUID aOld2 = newRecipe(a, "daily", "a-old-l", 60, false);
+        UUID aOld3 = newRecipe(a, "daily", "a-old-d", 60, false);
+        UUID aKeep1 = newRecipe(a, "daily", "a-keep-b", 40, false);
+        UUID aKeep2 = newRecipe(a, "daily", "a-keep-l", 40, false);
+        UUID aKeep3 = newRecipe(a, "daily", "a-keep-d", 40, false);
+        insertSet(a, today.minusDays(60), "ready", aOld1, aOld2, aOld3, 0);
+        insertSet(a, today.minusDays(40), "ready", aKeep1, aKeep2, aKeep3, 0);
+        // An old failed set goes; a recent generating set (not ready) stays because it is recent.
+        insertSet(a, today.minusDays(45), "failed", null, null, null, 0);
+        insertSet(a, today.minusDays(1), "generating", null, null, null, 0);
+        // User B's latest ready set is OLDER than A's. "Latest ready" is per user, so it still survives;
+        // B's earlier ready set goes.
+        UUID bOld = newRecipe(b, "daily", "b-old", 80, false);
+        UUID bKeep = newRecipe(b, "daily", "b-keep", 50, false);
+        insertSet(b, today.minusDays(80), "ready", bOld, bOld, bOld, 0);
+        insertSet(b, today.minusDays(50), "ready", bKeep, bKeep, bKeep, 0);
         // Loose recipes: an old unsaved cook recipe goes, an old saved one stays, a recent one stays.
-        UUID oldCook = newRecipe(u, "cook", "old-cook", 50, false);
-        UUID savedCook = newRecipe(u, "cook", "saved-cook", 50, true);
-        UUID recentCook = newRecipe(u, "cook", "recent-cook", 2, false);
+        UUID oldCook = newRecipe(a, "cook", "old-cook", 50, false);
+        UUID savedCook = newRecipe(a, "cook", "saved-cook", 50, true);
+        UUID recentCook = newRecipe(a, "cook", "recent-cook", 2, false);
 
         int[] counts = repository.cleanupOlderThan(today.minusDays(30), OffsetDateTime.now().minusDays(30));
 
         assertThat(counts).hasSize(2);
-        assertThat(counts[0]).isGreaterThanOrEqualTo(2);
-        assertThat(counts[1]).isGreaterThanOrEqualTo(4);
-        assertThat(setExists(u, today.minusDays(60))).isFalse();
-        assertThat(setExists(u, today.minusDays(45))).isFalse();
-        assertThat(setExists(u, today.minusDays(40))).isTrue();
-        assertThat(setExists(u, today.minusDays(1))).isTrue();
-        assertThat(recipeExists(ob)).isFalse();
-        assertThat(recipeExists(ol)).isFalse();
-        assertThat(recipeExists(od)).isFalse();
+        assertThat(counts[0]).isGreaterThanOrEqualTo(3);
+        assertThat(counts[1]).isGreaterThanOrEqualTo(5);
+        assertThat(setExists(a, today.minusDays(60))).isFalse();
+        assertThat(setExists(a, today.minusDays(45))).isFalse();
+        assertThat(setExists(a, today.minusDays(40))).isTrue();
+        assertThat(setExists(a, today.minusDays(1))).isTrue();
+        assertThat(setExists(b, today.minusDays(80))).isFalse();
+        assertThat(setExists(b, today.minusDays(50))).isTrue();
+        assertThat(recipeExists(aOld1)).isFalse();
+        assertThat(recipeExists(aOld2)).isFalse();
+        assertThat(recipeExists(aOld3)).isFalse();
+        assertThat(recipeExists(bOld)).isFalse();
         assertThat(recipeExists(oldCook)).isFalse();
-        assertThat(recipeExists(kb)).isTrue();
-        assertThat(recipeExists(kl)).isTrue();
-        assertThat(recipeExists(kd)).isTrue();
-        assertThat(recipeExists(rb)).isTrue();
+        assertThat(recipeExists(aKeep1)).isTrue();
+        assertThat(recipeExists(aKeep2)).isTrue();
+        assertThat(recipeExists(aKeep3)).isTrue();
+        assertThat(recipeExists(bKeep)).isTrue();
         assertThat(recipeExists(savedCook)).isTrue();
         assertThat(recipeExists(recentCook)).isTrue();
     }

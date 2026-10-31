@@ -104,17 +104,23 @@ public class AiStateRepository {
                 .stream().findFirst();
     }
 
-    public void finishDailySet(UUID userId, LocalDate date, UUID breakfastId, UUID lunchId, UUID dinnerId) {
-        jdbc.update("UPDATE daily_meal_sets SET status = 'ready', breakfast_id = :b, lunch_id = :l, "
-                        + "dinner_id = :d WHERE user_id = :user AND meal_date = :date",
+    /**
+     * Marks the set {@code ready} with its three recipes. Only a row still {@code generating}
+     * changes, so a stale owner whose claim was taken over cannot overwrite the new result. True
+     * when a row changed.
+     */
+    public boolean finishDailySet(UUID userId, LocalDate date, UUID breakfastId, UUID lunchId, UUID dinnerId) {
+        return jdbc.update("UPDATE daily_meal_sets SET status = 'ready', breakfast_id = :b, lunch_id = :l, "
+                        + "dinner_id = :d WHERE user_id = :user AND meal_date = :date AND status = 'generating'",
                 new MapSqlParameterSource().addValue("user", userId).addValue("date", date)
-                        .addValue("b", breakfastId).addValue("l", lunchId).addValue("d", dinnerId));
+                        .addValue("b", breakfastId).addValue("l", lunchId).addValue("d", dinnerId)) > 0;
     }
 
-    public void failDailySet(UUID userId, LocalDate date) {
-        jdbc.update("UPDATE daily_meal_sets SET status = 'failed', attempted_at = now() "
-                        + "WHERE user_id = :user AND meal_date = :date",
-                new MapSqlParameterSource().addValue("user", userId).addValue("date", date));
+    /** Marks a {@code generating} set {@code failed} (and restarts the cooldown). True when a row changed. */
+    public boolean failDailySet(UUID userId, LocalDate date) {
+        return jdbc.update("UPDATE daily_meal_sets SET status = 'failed', attempted_at = now() "
+                        + "WHERE user_id = :user AND meal_date = :date AND status = 'generating'",
+                new MapSqlParameterSource().addValue("user", userId).addValue("date", date)) > 0;
     }
 
     /**
