@@ -15,7 +15,12 @@ const BY_CODE: Record<string, string> = {
   invalid_photo: 'Use 1 to 3 photos (JPEG, up to 1 MB each).',
   scan_limit: "You've used today's 10 photo scans. More tomorrow.",
   scan_failed: "Couldn't read the photo. Try again or type your ingredients.",
+  no_dish: "Couldn't find a dish in this post. Try a screenshot that shows the food or the recipe.",
+  invalid_post: 'Add a caption (up to 2,200 characters) or 1 to 2 screenshots.',
 };
+
+/** Shown on the post tab in place of the scan's `invalid_photo` wording (at most 2 screenshots there). */
+export const SCREENSHOT_INVALID = 'Use 1 or 2 screenshots (JPEG, up to 1 MB each).';
 
 /** Shown when the browser can't decode a picked photo (for example HEIC in Chrome on Windows) or can't shrink it enough. */
 export const PHOTO_UNREADABLE = "This photo type can't be opened here. Try a JPEG or take a new photo.";

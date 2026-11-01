@@ -84,6 +84,17 @@ describe('saved AI recipes tab', () => {
     expectNoEmoji();
   });
 
+  it('postRecipe_isLabelledFromAPost', async () => {
+    fakeAiServer([summary({ id: 'a-5', kind: 'post', title: 'Charred Corn and Feta Salad' })]);
+    renderApp('/me?tab=ai');
+
+    await screen.findByRole('link', { name: 'Charred Corn and Feta Salad' });
+    const row = within(screen.getByRole('tabpanel')).getAllByRole('listitem')[0];
+    expect(row).toHaveTextContent('From a post');
+    expect(row).not.toHaveTextContent('Cook');
+    expectNoEmoji();
+  });
+
   it('shows the empty message', async () => {
     fakeAiServer([]);
     renderApp('/me?tab=ai');

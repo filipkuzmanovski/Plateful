@@ -38,6 +38,9 @@ export function AiRecipeView({ recipe, actions }: { recipe: GeneratedRecipe; act
   const main = recipe.ingredients.filter((i) => !i.extra);
   const extras = recipe.ingredients.filter((i) => i.extra);
   const made = providerLine(recipe.provider);
+  const swapLine = recipe.swaps.length > 0
+    ? `Swapped for your food preferences: ${recipe.swaps.map((s) => `${s.from} → ${s.to}`).join(', ')}.`
+    : null;
 
   const ingredientItem = (i: { name: string; amount: string }, idx: number) => (
     <li key={idx} className="rounded-xl px-3 py-2.5 text-[15px] leading-relaxed text-olive">
@@ -96,6 +99,13 @@ export function AiRecipeView({ recipe, actions }: { recipe: GeneratedRecipe; act
           <h1 className="font-serif text-4xl leading-[1.05] font-semibold tracking-tight text-balance text-olive sm:text-5xl">
             {recipe.title}
           </h1>
+          {recipe.kind === 'post' && (
+            <div className="mt-3 space-y-1 text-sm text-olive/80">
+              <p>Based on an Instagram post</p>
+              {recipe.origin === 'dish' && <p>The post had no recipe, so this is the AI&apos;s own take on the dish.</p>}
+              {swapLine && <p>{swapLine}</p>}
+            </div>
+          )}
           {recipe.description && <p className="mt-4 text-[15px] leading-relaxed text-olive/85">{recipe.description}</p>}
           {actions && <div className="mt-5 flex flex-wrap gap-2">{actions}</div>}
 

@@ -37,6 +37,7 @@ function recipeFor(overrides: Partial<GeneratedRecipe> = {}): GeneratedRecipe {
     diets: { vegetarian: true, vegan: false, glutenFree: true, dairyFree: false },
     allergens: [{ key: 'milk', label: 'Milk' }, { key: 'eggs', label: 'Eggs' }],
     saved: false, createdAt: '2026-10-31T10:00:00Z', provider: 'groq',
+    origin: null, swaps: [],
     ...overrides,
   };
 }
@@ -141,6 +142,72 @@ describe('AI recipe page', () => {
     await user.click(savedButton);
     await screen.findByRole('button', { name: 'Save' });
     await waitFor(() => expect(calls).toEqual(['PUT', 'DELETE']));
+    expectNoEmoji();
+  });
+});
+
+describe('post recipes', () => {
+  const OWN_TAKE = "The post had no recipe, so this is the AI's own take on the dish.";
+
+  it('postRecipe_showsBasedOnAPost', async () => {
+    signedIn();
+    server.use(
+      http.get(`${BASE}/api/users/me/ai-recipes/a-1`, () =>
+        HttpResponse.json(recipeFor({ kind: 'post', mealType: null, origin: 'recipe' }))),
+    );
+    renderApp('/ai-recipes/a-1');
+
+    expect(await screen.findByText('Based on an Instagram post')).toBeInTheDocument();
+    expect(screen.queryByText(OWN_TAKE)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Swapped for your food preferences/)).not.toBeInTheDocument();
+    expect(screen.getByText(AI_NOTE)).toBeInTheDocument();
+    expect(screen.getByText('Contains: Milk, Eggs')).toBeInTheDocument();
+    expect(screen.getByText('Made with Groq')).toBeInTheDocument();
+    expectNoEmoji();
+  });
+
+  it('dishOrigin_showsOwnTakeNote', async () => {
+    signedIn();
+    server.use(
+      http.get(`${BASE}/api/users/me/ai-recipes/a-1`, () =>
+        HttpResponse.json(recipeFor({ kind: 'post', mealType: null, origin: 'dish' }))),
+    );
+    renderApp('/ai-recipes/a-1');
+
+    expect(await screen.findByText('Based on an Instagram post')).toBeInTheDocument();
+    expect(screen.getByText(OWN_TAKE)).toBeInTheDocument();
+    expectNoEmoji();
+  });
+
+  it('swaps_showTheSwapLine', async () => {
+    signedIn();
+    server.use(
+      http.get(`${BASE}/api/users/me/ai-recipes/a-1`, () =>
+        HttpResponse.json(recipeFor({
+          kind: 'post', mealType: null, origin: 'recipe',
+          swaps: [{ from: 'peanuts', to: 'toasted sunflower seeds' }, { from: 'butter', to: 'olive oil' }],
+        }))),
+    );
+    renderApp('/ai-recipes/a-1');
+
+    expect(await screen.findByText(
+      'Swapped for your food preferences: peanuts \u2192 toasted sunflower seeds, butter \u2192 olive oil.',
+    )).toBeInTheDocument();
+    expectNoEmoji();
+  });
+
+  it('cookRecipe_showsNoneOfThese', async () => {
+    signedIn();
+    server.use(
+      http.get(`${BASE}/api/users/me/ai-recipes/a-1`, () =>
+        HttpResponse.json(recipeFor({ swaps: [{ from: 'a', to: 'b' }], origin: 'dish' }))),
+    );
+    renderApp('/ai-recipes/a-1');
+
+    expect(await screen.findByRole('heading', { name: 'Tomato Egg Skillet' })).toBeInTheDocument();
+    expect(screen.queryByText('Based on an Instagram post')).not.toBeInTheDocument();
+    expect(screen.queryByText(OWN_TAKE)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Swapped for your food preferences/)).not.toBeInTheDocument();
     expectNoEmoji();
   });
 });

@@ -24,6 +24,17 @@ export const scanPhotos = (photos: Blob[]) => {
   return api<ScanResult>(`${BASE}/ai-recipes/scan`, { method: 'POST', body: form });
 };
 
+/**
+ * Sends the pasted caption (only when not blank) and 0 to 2 shrunken JPEGs as `screenshots` parts; the browser
+ * sets the multipart Content-Type. Can take up to a minute: the AI reads and writes inside the request.
+ */
+export const importPost = (caption: string | null, screenshots: Blob[]) => {
+  const form = new FormData();
+  if (caption && caption.trim()) form.append('caption', caption);
+  screenshots.forEach((blob, i) => form.append('screenshots', blob, `screenshot-${i + 1}.jpg`));
+  return api<GenerateResult>(`${BASE}/ai-recipes/import`, { method: 'POST', body: form });
+};
+
 export const getAiRecipe = (id: string) => api<GeneratedRecipe>(`${BASE}/ai-recipes/${encodeURIComponent(id)}`);
 
 export const listSavedAiRecipes = (page: number, size: number = PAGE_SIZE): Promise<Page<GeneratedRecipeSummary>> =>

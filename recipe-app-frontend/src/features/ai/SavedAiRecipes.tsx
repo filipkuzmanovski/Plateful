@@ -13,6 +13,7 @@ import { aiErrorMessage } from './aiMessages';
 const MEAL_LABEL: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
 
 function kindLabel(r: GeneratedRecipeSummary): string {
+  if (r.kind === 'post') return 'From a post';
   return r.kind === 'daily' && r.mealType ? MEAL_LABEL[r.mealType] : 'Cook';
 }
 

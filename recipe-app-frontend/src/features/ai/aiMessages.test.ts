@@ -1,5 +1,5 @@
 import { ApiError } from '@/api/client';
-import { aiErrorMessage, PHOTO_UNREADABLE } from './aiMessages';
+import { aiErrorMessage, PHOTO_UNREADABLE, SCREENSHOT_INVALID } from './aiMessages';
 
 const err = (status: number, code: string) => new ApiError(status, 'server detail', undefined, code);
 
@@ -17,5 +17,21 @@ describe('aiErrorMessage for the photo scan', () => {
   });
   it('exposes the unreadable-photo copy', () => {
     expect(PHOTO_UNREADABLE).toBe("This photo type can't be opened here. Try a JPEG or take a new photo.");
+  });
+});
+
+describe('aiErrorMessage for post imports', () => {
+  it('maps no_dish', () => {
+    expect(aiErrorMessage(err(422, 'no_dish'))).toBe(
+      "Couldn't find a dish in this post. Try a screenshot that shows the food or the recipe.",
+    );
+  });
+  it('maps invalid_post', () => {
+    expect(aiErrorMessage(err(400, 'invalid_post'))).toBe(
+      'Add a caption (up to 2,200 characters) or 1 to 2 screenshots.',
+    );
+  });
+  it('exposes the screenshot-invalid copy', () => {
+    expect(SCREENSHOT_INVALID).toBe('Use 1 or 2 screenshots (JPEG, up to 1 MB each).');
   });
 });

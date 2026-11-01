@@ -30,7 +30,7 @@ function recipeFor(overrides: Partial<GeneratedRecipe> = {}): GeneratedRecipe {
     ingredients: [{ name: 'eggs', amount: '4', extra: false }, { name: 'tomatoes', amount: '3', extra: false }],
     steps: ['Simmer the tomatoes.', 'Crack in the eggs and cover.'],
     diets: { vegetarian: true, vegan: false, glutenFree: true, dairyFree: false },
-    allergens: [], saved: false, createdAt: '2026-10-31T10:00:00Z', provider: 'groq',
+    allergens: [], saved: false, createdAt: '2026-10-31T10:00:00Z', provider: 'groq', origin: null, swaps: [],
     ...overrides,
   };
 }
