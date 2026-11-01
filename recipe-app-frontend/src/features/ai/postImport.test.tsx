@@ -287,6 +287,7 @@ describe('PostImport on /cook?tab=post', () => {
     ['invalid_photo', 400, 'Use 1 or 2 screenshots (JPEG, up to 1 MB each).'],
     ['daily_limit', 429, "You've used today's 10 AI recipes. More tomorrow."],
     ['ai_quota', 503, 'The free AI limit is reached for now. Try again later.'],
+    ['generation_failed', 422, "Couldn't make a safe recipe from this post. Try again, or try a different screenshot."],
   ])('shows the message for %s', async (code, status, message) => {
     signedIn();
     server.use(http.post(IMPORT, () => HttpResponse.json({ detail: 'server detail', code }, { status })));
@@ -302,6 +303,64 @@ describe('PostImport on /cook?tab=post', () => {
       expect(makeButton()).toBeEnabled();
     }
     expectNoEmoji();
+  });
+
+  it('editing the caption clears a stale error', async () => {
+    signedIn();
+    server.use(http.post(IMPORT, () => HttpResponse.json({ detail: 'x', code: 'no_dish' }, { status: 422 })));
+    const { user } = await openPost();
+    await user.type(captionBox(), 'Corn');
+    await user.click(makeButton());
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    await user.type(captionBox(), 's');
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(captionBox()).toHaveValue('Corns');
+  });
+
+  it('picking or removing a screenshot clears a stale error', async () => {
+    signedIn();
+    server.use(http.post(IMPORT, () => HttpResponse.json({ detail: 'x', code: 'no_dish' }, { status: 422 })));
+    const { user, input } = await openPost();
+    await pick(user, input, 'a');
+    await user.click(makeButton());
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    await pick(user, input, 'b');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    await user.click(makeButton());
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove screenshot 2' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps Make recipe disabled, without a request, when no recipes are left today', async () => {
+    signedIn({ ...USAGE, used: 10, remaining: 0 });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { user } = await openPost();
+    await user.type(captionBox(), 'Charred corn salad');
+
+    expect(await within(postPanel()).findByText('0 left today')).toBeInTheDocument();
+    expect(makeButton()).toBeDisabled();
+    await user.click(makeButton());
+    expect(importForms(fetchSpy)).toHaveLength(0);
+  });
+
+  it('does not count trailing spaces or line breaks toward the 2,200 limit', async () => {
+    signedIn();
+    const { user } = await openPost();
+    await user.click(captionBox());
+    await user.paste('a'.repeat(2200) + '   \n ');
+
+    expect(screen.getByText('2,200 / 2,200')).not.toHaveClass('text-danger');
+    expect(screen.queryByText('Shorten the caption to 2,200 characters.')).not.toBeInTheDocument();
+    expect(makeButton()).toBeEnabled();
+
+    await user.type(captionBox(), 'b');
+    expect(screen.getByText('2,206 / 2,200')).toHaveClass('text-danger');
+    expect(makeButton()).toBeDisabled();
   });
 
   it('shrinkFailure_showsPhotoUnreadable', async () => {

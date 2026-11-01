@@ -5229,6 +5229,12 @@ Decisions that changed what the code does, worth knowing:
   - A stale preference key fails inside the safety check after the
     reservation and is given back (fail closed), since this flow has no
     earlier conflict check.
+  - The post tab has its own "Couldn't make a safe recipe from this post"
+    message for generation_failed (the ingredients tab says to change the
+    ingredients, which makes no sense here). Editing the caption or adding
+    or removing a screenshot clears an old error, and both Generate and
+    Make recipe stay disabled once the shared counter reads 0 left. Only
+    the trimmed caption counts toward 2,200, as on the server.
 
 Tests
 -----
@@ -5238,7 +5244,7 @@ Tests
     V11 is live (the other two check that 'cook' still inserts and an
     unknown kind is refused).
   - No test makes a real AI call; the AI is a fake in every test.
-  - Frontend: npx vitest run, 58 files, 702 tests passing. npm run build
+  - Frontend: npx vitest run, 58 files, 708 tests passing. npm run build
     succeeded.
 
 Your manual steps

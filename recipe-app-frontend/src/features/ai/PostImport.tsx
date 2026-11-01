@@ -6,7 +6,7 @@ import { ApiError } from '@/api/client';
 import { Button } from '@/components/ui';
 import { FormError } from '@/features/auth/AuthCard';
 import { PhotoUnreadableError, shrinkPhoto } from '@/lib/shrinkPhoto';
-import { aiErrorMessage, PHOTO_UNREADABLE, SCREENSHOT_INVALID } from './aiMessages';
+import { aiErrorMessage, PHOTO_UNREADABLE, POST_GENERATION_FAILED, SCREENSHOT_INVALID } from './aiMessages';
 import { CookResult } from './CookResult';
 import { PhotoThumbs, usePhotoPicks } from './PhotoPicks';
 
@@ -27,6 +27,7 @@ type ImportRequest = { caption: string | null; files: File[] } | { again: Parts 
 function errorMessage(err: unknown): string {
   if (err instanceof PhotoUnreadableError) return PHOTO_UNREADABLE;
   if (err instanceof ApiError && err.code === 'invalid_photo') return SCREENSHOT_INVALID;
+  if (err instanceof ApiError && err.code === 'generation_failed') return POST_GENERATION_FAILED;
   return aiErrorMessage(err);
 }
 
@@ -78,16 +79,31 @@ export function PostImport({
     if (result) resultRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   }, [result?.id]);
 
+  /** An error is about the last attempt; once the user changes the input it no longer applies. */
+  function clearStaleError() {
+    if (make.isError) make.reset();
+  }
+
   function onPick(e: ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = ''; // so choosing the same file again still fires a change
-    if (picked.length > 0) add(picked);
+    if (picked.length > 0) {
+      clearStaleError();
+      add(picked);
+    }
+  }
+
+  function onRemove(id: number) {
+    clearStaleError();
+    remove(id);
   }
 
   const busy = make.isPending;
-  const overLimit = caption.length > MAX_CAPTION;
+  const length = caption.trimEnd().length; // the server trims, so trailing spaces and line breaks don't count
+  const overLimit = length > MAX_CAPTION;
   const hasInput = caption.trim().length > 0 || photos.length > 0;
-  const canMake = hasInput && !overLimit && !busy && !limitReached;
+  const exhausted = limitReached || left === 0;
+  const canMake = hasInput && !overLimit && !busy && !exhausted;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -103,7 +119,7 @@ export function PostImport({
           <textarea
             id={captionId}
             value={caption}
-            onChange={(e) => setCaption(e.target.value)}
+            onChange={(e) => { clearStaleError(); setCaption(e.target.value); }}
             rows={6}
             aria-describedby={overLimit ? `${counterId} ${overId}` : counterId}
             aria-invalid={overLimit || undefined}
@@ -117,7 +133,7 @@ export function PostImport({
               id={counterId}
               className={`shrink-0 text-xs tabular-nums ${overLimit ? 'font-semibold text-danger' : 'text-olive/70'}`}
             >
-              {count(caption.length)} / {count(MAX_CAPTION)}
+              {count(length)} / {count(MAX_CAPTION)}
             </span>
           </div>
         </div>
@@ -140,7 +156,7 @@ export function PostImport({
           {tooMany && (
             <p className="mt-2 text-xs font-medium text-olive">Choose up to {MAX_SCREENSHOTS} screenshots.</p>
           )}
-          <PhotoThumbs photos={photos} noun="screenshot" busy={busy} onRemove={remove} />
+          <PhotoThumbs photos={photos} noun="screenshot" busy={busy} onRemove={onRemove} />
           <p className="mt-3 text-xs leading-relaxed text-olive/70">
             Tip: a screenshot of the recipe slide works best. Open the full caption (tap 'more') before you copy it.
           </p>
@@ -180,7 +196,7 @@ export function PostImport({
             key={result.id}
             recipe={result}
             busy={busy}
-            onAgain={() => { if (lastParts.current && !limitReached) make.mutate({ again: lastParts.current }); }}
+            onAgain={() => { if (lastParts.current && !exhausted) make.mutate({ again: lastParts.current }); }}
           />
         </div>
       )}

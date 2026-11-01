@@ -97,7 +97,8 @@ function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterP
     run({ ingredients, mealType, onlyWhatIHave });
   }
 
-  const canGenerate = ingredients.length >= MIN_INGREDIENTS && !generate.isPending && !limitReached;
+  const exhausted = limitReached || left === 0;
+  const canGenerate = ingredients.length >= MIN_INGREDIENTS && !generate.isPending && !exhausted;
 
   return (
     <>
@@ -174,7 +175,7 @@ function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterP
             key={result.id}
             recipe={result}
             busy={generate.isPending}
-            onAgain={() => { if (lastBody.current && !limitReached) run(lastBody.current); }}
+            onAgain={() => { if (lastBody.current && !exhausted) run(lastBody.current); }}
           />
         </div>
       )}

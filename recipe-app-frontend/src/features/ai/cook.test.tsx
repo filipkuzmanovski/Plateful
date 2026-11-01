@@ -227,6 +227,24 @@ describe('Cook page', () => {
     expect(openPanel().getByText('0 left today')).toBeInTheDocument();
   });
 
+  it('disables both buttons, without a request, when the usage already shows 0 left', async () => {
+    signedIn({ ...USAGE, used: 10, remaining: 0 });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const user = userEvent.setup();
+    renderApp('/cook');
+
+    await addChips(user, 'eggs', 'tomatoes');
+    expect(await openPanel().findByText('0 left today')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
+
+    await user.click(screen.getByRole('tab', { name: 'From a post' }));
+    await user.type(screen.getByRole('textbox', { name: "Paste the post's caption" }), 'Corn salad');
+    expect(openPanel().getByText('0 left today')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Make recipe' })).toBeDisabled();
+
+    expect(fetchSpy.mock.calls.filter(([url]) => [GENERATE, IMPORT].includes(String(url)))).toHaveLength(0);
+  });
+
   it('flags the chips named in a 400 with their reasons, and clears the flags when the chips change', async () => {
     signedIn();
     server.use(http.post(GENERATE, () =>

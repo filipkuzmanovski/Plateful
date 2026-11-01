@@ -117,7 +117,7 @@ public class PromptBuilder {
     private static final Pattern CONTROL_CHARS = Pattern.compile("[\\p{Cc}&&[^\\n]]");
 
     private static final Pattern POST_TAGS =
-            Pattern.compile("</?post-(?:caption|screenshots)>", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("<\\s*/?\\s*post-(?:caption|screenshots)\\s*>", Pattern.CASE_INSENSITIVE);
 
     private final FoodRules rules;
     private final PantryStaples staples;

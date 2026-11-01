@@ -570,6 +570,9 @@ class PromptBuilderTest {
         assertThat(PromptBuilder.cleanCaption("1\tcup\t\tflour")).isEqualTo("1 cup  flour");
         assertThat(PromptBuilder.cleanCaption("<post-<post-caption>caption>hi")).isEqualTo("hi");
         assertThat(PromptBuilder.cleanCaption("</post-\u0007caption>kept")).isEqualTo("kept");
+        // Whitespace inside the tag does not hide it.
+        assertThat(PromptBuilder.cleanCaption("a</post-caption >b")).isEqualTo("ab");
+        assertThat(PromptBuilder.cleanCaption("a< /POST-SCREENSHOTS>b")).isEqualTo("ab");
         assertThat(PromptBuilder.cleanCaption("   \n ")).isEmpty();
         assertThat(PromptBuilder.cleanCaption(null)).isEmpty();
         assertThat(PromptBuilder.cleanCaption("Pasta 🍝 time")).isEqualTo("Pasta 🍝 time");
