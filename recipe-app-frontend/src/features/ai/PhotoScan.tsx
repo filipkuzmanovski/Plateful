@@ -163,26 +163,25 @@ export function PhotoScan({
 
       {errorMessage && <div className="mt-3"><FormError>{errorMessage}</FormError></div>}
 
-      {(busy || outcome) && (
-        <div role="status" className="mt-3 space-y-1.5 text-sm text-olive">
-          {busy && <p className="font-medium">Looking at your photos. This can take up to 30 seconds.</p>}
-          {outcome && !busy && (
-            <>
-              {outcome.found > 0 && (
-                <p>
-                  Found {plural(outcome.found, 'ingredient', 'ingredients')}. Check them: remove anything wrong and
-                  add anything missed.
-                </p>
-              )}
-              {outcome.didntFit.length > 0 && (
-                <p>{outcome.didntFit.length} more didn't fit ({max} max): {outcome.didntFit.join(', ')}.</p>
-              )}
-              {outcome.leftOut && <p>{outcome.leftOut}</p>}
-              {noFood && <p>No food spotted. Try a closer, brighter photo, or type your ingredients.</p>}
-            </>
-          )}
-        </div>
-      )}
+      {/* Always mounted: a live region that appears already holding text is often not announced. */}
+      <div role="status" aria-live="polite" className={`space-y-1.5 text-sm text-olive ${busy || outcome ? 'mt-3' : ''}`}>
+        {busy && <p className="font-medium">Looking at your photos. This can take up to 30 seconds.</p>}
+        {outcome && !busy && (
+          <>
+            {outcome.found > 0 && (
+              <p>
+                Found {plural(outcome.found, 'ingredient', 'ingredients')}. Check them: remove anything wrong and
+                add anything missed.
+              </p>
+            )}
+            {outcome.didntFit.length > 0 && (
+              <p>{outcome.didntFit.length} more didn't fit ({max} max): {outcome.didntFit.join(', ')}.</p>
+            )}
+            {outcome.leftOut && <p>{outcome.leftOut}</p>}
+            {noFood && <p>No food spotted. Try a closer, brighter photo, or type your ingredients.</p>}
+          </>
+        )}
+      </div>
 
       <p className="mt-3 text-xs leading-relaxed text-olive/70">
         Photos go to Groq only to spot ingredients and are never stored. Keep people and papers out of the shot.

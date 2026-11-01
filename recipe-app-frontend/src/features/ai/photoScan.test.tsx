@@ -218,10 +218,14 @@ describe('PhotoScan on /cook', () => {
       return HttpResponse.json({ ingredients: ['egg'], leftOut: [], remainingScans: 9 });
     }));
     const { user, input } = await openCook();
+    const statusBefore = screen.getByRole('status');
+    expect(statusBefore).toBeEmptyDOMElement();
+    expect(statusBefore).toHaveAttribute('aria-live', 'polite');
     await pick(user, input, 'a');
     await user.click(scanButton());
 
     const status = await screen.findByRole('status');
+    expect(status).toBe(statusBefore); // the same element, not a new one mounted with its text
     expect(status).toHaveTextContent('Looking at your photos. This can take up to 30 seconds.');
     expect(scanButton()).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Take or choose photos' })).toBeDisabled();
