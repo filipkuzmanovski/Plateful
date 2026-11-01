@@ -53,7 +53,6 @@ export default function BrowsePage() {
 
   return (
     <div>
-      <TodaysMeals />
       <section className="mb-8 sm:mb-10">
         <h1 className="max-w-2xl font-serif text-4xl leading-[1.08] font-semibold tracking-tight text-balance text-olive sm:text-5xl">
           Cook something <em className="font-medium text-terracotta italic">wonderful</em> tonight
@@ -112,6 +111,8 @@ export default function BrowsePage() {
           <ActiveFilterChips state={applied} cuisines={cuisines.data} onChange={apply} />
         </div>
       </section>
+
+      <TodaysMeals />
 
       <FilterDrawer open={drawerOpen} onOpenChange={setDrawerOpen} applied={applied} query={q} onApply={apply} />
 

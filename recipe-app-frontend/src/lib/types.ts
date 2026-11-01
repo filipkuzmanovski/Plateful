@@ -85,7 +85,7 @@ export interface GeneratedRecipe {
   servings: number;
   prepMinutes: number;
   cookMinutes: number;
-  cuisine: string;
+  cuisine: string | null;
   ingredients: GeneratedIngredient[];
   steps: string[];
   diets: { vegetarian: boolean; vegan: boolean; glutenFree: boolean; dairyFree: boolean };

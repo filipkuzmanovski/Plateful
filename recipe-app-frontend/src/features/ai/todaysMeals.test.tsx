@@ -78,6 +78,22 @@ describe("Today's meals strip", () => {
     expectNoEmoji();
   });
 
+  it('comes after the page heading, search and filters, and before the results', async () => {
+    signIn();
+    serve(READY);
+    renderApp('/');
+
+    const strip = await screen.findByRole('heading', { level: 2, name: "Today's meals" });
+    const results = await screen.findByText('No recipes match your search or filters.');
+    const h1 = screen.getByRole('heading', { level: 1 });
+    const filters = screen.getByRole('button', { name: 'Filters' });
+    const follows = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getAllByRole('heading')[0]).toBe(h1);
+    expect(follows(h1, strip)).toBe(true);
+    expect(follows(filters, strip)).toBe(true);
+    expect(follows(strip, results)).toBe(true);
+  });
+
   it('asks for the local date', async () => {
     signIn();
     const dates = serve(READY);

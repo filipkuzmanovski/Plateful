@@ -111,6 +111,14 @@ export default function PrivacyPage() {
                   servers are in the EU, in Stockholm, Sweden.
                 </li>
                 <li>
+                  <Strong>Groq</Strong> writes AI recipes. It processes the data sent for AI recipes (see below)
+                  outside the EU.
+                </li>
+                <li>
+                  <Strong>Google (Gemini API)</Strong> writes AI recipes when Groq is not available. It processes the
+                  data sent for AI recipes outside the EU.
+                </li>
+                <li>
                   <Strong>Our web hosting providers</Strong> serve the site to you. They will be named here once the
                   site is deployed.
                 </li>
@@ -131,7 +139,8 @@ export default function PrivacyPage() {
               <p>
                 <Strong>What is sent:</Strong> the ingredients you typed, the meal type, a list of ingredients to
                 avoid (built from your allergies, diet and dislikes), the cuisines and ingredients you like, and a few
-                example recipes from a research dataset.
+                example recipes from a research dataset. For today's meals, the titles of your recent daily meals are
+                sent too, so the AI doesn't repeat them.
               </p>
               <p>
                 <Strong>What is never sent:</Strong> your name, your email address or anything that identifies your
@@ -140,7 +149,8 @@ export default function PrivacyPage() {
               <p>
                 The free tier of Google Gemini may use what is sent to improve Google's products, and human reviewers
                 may read it. Groq's data retention is switched off. Please do not type personal information into the
-                ingredient box.
+                ingredient box, or into your food preferences either: the ingredients and cuisines you like or avoid are
+                sent as plain text.
               </p>
               <p>
                 AI recipes are stored privately on your account and are deleted together with it. A recipe you have not

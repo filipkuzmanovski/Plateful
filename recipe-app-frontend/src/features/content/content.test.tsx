@@ -194,8 +194,29 @@ describe('Privacy Policy', () => {
     expect(section).toHaveTextContent('human reviewers may read it');
     expect(section).toHaveTextContent("Groq's data retention is switched off");
     expect(section).toHaveTextContent('do not type personal information into the ingredient box');
+    expect(section).toHaveTextContent(
+      'or into your food preferences either: the ingredients and cuisines you like or avoid are sent as plain text.',
+    );
+    expect(section).toHaveTextContent(
+      "For today's meals, the titles of your recent daily meals are sent too, so the AI doesn't repeat them.",
+    );
     expect(section).toHaveTextContent('stored privately on your account and are deleted together with it');
     expect(section).toHaveTextContent('not saved is deleted after 30 days');
+    expectNoEmoji(section);
+  });
+
+  test('names Groq and Google as processors of AI recipe data outside the EU', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const section = document.getElementById('who-processes-your-data')!;
+    expect(section).not.toBeNull();
+    const items = within(section).getAllByRole('listitem').map((li) => li.textContent ?? '');
+    const groq = items.find((t) => t.startsWith('Groq'));
+    const google = items.find((t) => t.startsWith('Google (Gemini API)'));
+    expect(groq).toMatch(/processes the data sent for AI recipes .*outside the EU/);
+    expect(google).toMatch(/processes the data sent for AI recipes outside the EU/);
+    expect(section).toHaveTextContent('Supabase');
+    expect(section).toHaveTextContent('Spoonacular supplies recipe data only. No user data is sent to it.');
     expectNoEmoji(section);
   });
 
