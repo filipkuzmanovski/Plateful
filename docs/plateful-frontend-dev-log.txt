@@ -4988,12 +4988,12 @@ Two review fixes worth knowing:
 
 Tests
 -----
-  - Backend, after the scan endpoint was added: 68 test classes, 922 tests
+  - Backend, after the scan endpoint was added: 68 test classes, 923 tests
     without the database, 0 failures. The three new scan database tests
     (reserve stops at the limit, refund floors at 0, scans and generations
     are independent) skip until V10 is live.
   - No test makes a real AI call; providers use a mock server and a fake.
-  - Frontend: npx vitest run, 57 files, 659 tests passing. npm run build
+  - Frontend: npx vitest run, 57 files, 662 tests passing. npm run build
     succeeded.
 
 Your manual steps
