@@ -111,12 +111,12 @@ export default function PrivacyPage() {
                   servers are in the EU, in Stockholm, Sweden.
                 </li>
                 <li>
-                  <Strong>Groq</Strong> writes AI recipes. It processes the data sent for AI recipes (see below)
-                  outside the EU.
+                  <Strong>Groq</Strong> writes AI recipes and reads the photos you scan for ingredients. It processes
+                  the data sent for AI recipes (see below) outside the EU.
                 </li>
                 <li>
                   <Strong>Google (Gemini API)</Strong> writes AI recipes when Groq is not available. It processes the
-                  data sent for AI recipes outside the EU.
+                  data sent for AI recipes outside the EU. Google never receives your photos.
                 </li>
                 <li>
                   <Strong>Our web hosting providers</Strong> serve the site to you. They will be named here once the
@@ -151,6 +151,16 @@ export default function PrivacyPage() {
                 may read it. Groq's data retention is switched off. Please do not type personal information into the
                 ingredient box, or into your food preferences either: the ingredients and cuisines you like or avoid are
                 sent as plain text.
+              </p>
+              <p>
+                <Strong>Photo scans.</Strong> On the Cook page you can scan up to 3 photos of your fridge, pantry or
+                kitchen to find ingredients. Your browser shrinks each photo first. {SITE.name} then shrinks and
+                re-saves it without location or other hidden data, such as the camera or the time. Only these photos and a
+                fixed instruction are sent, never your name, your email address, your account or your food
+                preferences. The photos go only to Groq, never to Google. {SITE.name} does not store your photos: not
+                in the database, in storage, in files or in logs. It keeps only the number of scans you have used
+                today. Groq's data retention is switched off. A photo can show more than food. Keep people,
+                documents and anything personal out of the shot.
               </p>
               <p>
                 AI recipes are stored privately on your account and are deleted together with it. A recipe you have not

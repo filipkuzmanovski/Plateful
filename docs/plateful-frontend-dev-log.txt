@@ -4800,3 +4800,219 @@ Status
 ------
 All code and tests are done on the branch, and the final whole-branch
 review's fixes are in (see "Final review fixes" above).
+
+
+
+
+################################################################################
+################################################################################
+ PART 19 — PHOTO TO RECIPE
+ Branch: feature/photo-to-recipe
+################################################################################
+################################################################################
+
+Why this exists
+---------------
+This is sub-project 3 of the AI features (docs/ai-features-handoff.md). It
+builds on PART 18: typing ten ingredients into "Cook with what I have" is
+slow, so now you can photograph your fridge, pantry or counter and let an AI
+list what it sees. You check and fix the list, then generate a recipe with
+the same button as before. The photos are never stored.
+Spec: docs/superpowers/specs/2026-11-01-photo-to-recipe-design.md
+
+What the user sees
+------------------
+  - On /cook (signed-in users), a "From a photo" panel sits above the
+    Ingredients chips:
+      * "Take or choose photos" opens the camera or the photo library (a
+        phone offers both). Up to 3 photos show as thumbnails, each with a
+        "Remove photo N" button. Picking more than 3 says "Choose up to 3
+        photos." and keeps the first ones.
+      * "Scan photos", with "N scans left today" under it. It is disabled
+        with no photos, while a scan runs, and when no scans are left.
+        While it works the page says "Looking at your photos. This can take
+        up to 30 seconds."
+      * Under the panel: "Photos go to Groq only to spot ingredients and
+        are never stored. Keep people and papers out of the shot."
+  - A scan adds the ingredients it found to the chips you already have,
+    without doubles (capital letters are ignored), up to the usual 15. If
+    some did not fit, a line lists them ("4 more didn't fit (15 max): ...").
+    A note says "Found 9 ingredients. Check them: remove anything wrong and
+    add anything missed." The photos are then cleared.
+  - Anything that clashes with your food preferences is left out by the
+    code and named with the reason: "Left out because of your food
+    preferences: peanut butter (Peanuts)." It never blocks the scan.
+  - A photo with no food says "No food spotted. Try a closer, brighter
+    photo, or type your ingredients." The scan still counts.
+  - Every error has its own message: not a usable photo, no scans left,
+    couldn't read the photo, the AI is busy or not set up. A photo that the
+    browser cannot open (for example HEIC in Chrome on Windows) says "This
+    photo type can't be opened here. Try a JPEG or take a new photo."
+  - After a scan, Generate, the meal type and the "Only use what I have"
+    switch work exactly as in PART 18, on the merged chips.
+  - The Privacy Policy says all of this (see Privacy below).
+
+How a scan works
+----------------
+  1. In the browser: each photo is shrunk to at most 1,536 pixels on its
+     long side and saved again as a JPEG (quality 0.85, then 0.7 and 0.55
+     if it is still over 1,000,000 bytes). The phone's rotation flag is
+     applied first, so a portrait photo reaches the server the right way
+     up. Drawing on a canvas drops all hidden data. The original file never
+     leaves the device.
+  2. The photos are sent as one multipart request to
+     POST /api/users/me/ai-recipes/scan (part name "photos", 1 to 3 files).
+  3. The server checks them again, in memory only: a real JPEG, 1 to
+     1,048,576 bytes, at most 4,096 pixels a side (read from the header
+     before decoding, so a "decompression bomb" is refused cheaply). It
+     scales and re-encodes them without any metadata, so GPS, camera and
+     time are gone even from a photo sent by another client. If the photos
+     together are still too big for Groq (over 2,800,000 bytes), all are
+     re-encoded once at quality 0.7.
+  4. One of today's 10 scans is reserved, then Groq's vision model is asked
+     for the food it sees. The only text sent is a fixed instruction.
+  5. The reply must be a JSON list of 0 to 40 short names. If it is
+     unreadable, the call is repeated once, but only if at least 20 of the
+     45 seconds are left. Unreadable twice gives "scan_failed".
+  6. In code: names are cleaned (same cleaner as the rest of the app), empty
+     ones and doubles dropped, then checked against your allergies, diets
+     and dislikes. Clashing names go to "left out" with the reason. The
+     first 15 of the rest are returned with the scans remaining.
+  7. Any failure after the reservation (quota, AI down, unreadable twice, a
+     bug) gives the scan back. A readable answer with no food still counts.
+  The database is not held open during the AI call, as in PART 18.
+
+Privacy
+-------
+  - Photos go to Groq only (qwen/qwen3.8-27b), where Zero Data Retention is
+    on. Google Gemini never receives a photo: its free tier may use what is
+    sent to improve Google's products, and human reviewers may read it.
+    Gemini stays the fallback for recipe text only.
+  - A property (plateful.ai.vision-order) could add Gemini for photos later
+    with no code change, but that needs your decision and a Privacy update
+    first.
+  - Photos are never stored: not in the database, not on disk, not in
+    storage, not in logs. They exist in memory during the request. Logs
+    hold the provider, model, outcome, timing and a photo count, never the
+    photos, the reply or a user id.
+  - The only thing kept is a number: the scans used today (ai_usage.scans).
+  - The AI is sent no name, email, account or food preferences. The
+    preference check happens afterwards, in code.
+  - The Privacy Policy: the Groq entry says it reads the photos you scan
+    for ingredients, the Google entry says "Google never receives your
+    photos.", and a new "Photo scans" paragraph in the AI section says what
+    is sent, that photos go only to Groq, that nothing is stored, that
+    Groq's retention is off and "Keep people, documents and anything
+    personal out of the shot." The Last updated date reads 1 November 2026.
+
+Limits
+------
+  - 1 to 3 photos a scan; each 1 to 1,048,576 bytes; JPEG only (the browser
+    converts); at most 4,096 pixels a side; shrunk to 1,536 pixels.
+  - 10 scans per user per UTC day, separate from the 10 recipe
+    generations. 45 second budget, one retry only with 20 seconds left.
+  - At most 40 names in a reply, each 1 to 60 characters; 15 are returned.
+  - Groq's own limits for this model: 30 requests a minute, 1,000 a day,
+    3 images a request, about 4 MB per request. They are separate from the
+    text model's limits.
+
+Backend
+-------
+  - Flyway V10 adds one column, ai_usage.scans (default 0). Nothing about
+    photos is stored. It reaches the live database when you restart the
+    backend after the merge.
+  - The AI request can now carry images. Groq and Gemini each know how to
+    send them. A second AI chain, "visionAi", has its own order (Groq only)
+    and its own cooldowns, so a busy vision model never stops text recipes.
+  - New: PhotoPreparer (checks, shrinks, strips), ScanParser,
+    PhotoScanService, the scan endpoint, and scan fields on the usage
+    endpoint (scansUsed, scanLimit, scansRemaining).
+  - Errors carry a "code": invalid_photo (400), no_preferences (409),
+    scan_limit (429), ai_quota, ai_unavailable, ai_not_configured (503) and
+    scan_failed (422). Spring's own "upload too large" errors also become
+    invalid_photo.
+  - Settings: plateful.ai.groq.vision-model, plateful.ai.gemini.vision-model,
+    plateful.ai.vision-order and plateful.ai.daily-scan-limit. The Groq key
+    already in the run configuration is used for the vision model too.
+  - Frontend: lib/shrinkPhoto.ts, scanPhotos in api/ai.ts, the multipart
+    fix in api/client.ts (no JSON Content-Type for form data), and the
+    PhotoScan panel in features/ai.
+  - Commits on the branch, in order: the V10 scan counter, the image input
+    and Groq-only vision chain, PhotoPreparer, the scan service, the
+    endpoint, the frontend plumbing, the PhotoScan panel, and this task.
+
+Rulings made during the build
+-----------------------------
+Decisions that changed what the code does, worth knowing:
+  - Groq's vision request asks for "JSON mode" instead of the strict
+    schema used for text. Groq documents JSON mode working with images,
+    but not the strict mode. The instruction spells out the exact shape and
+    the parser checks it, at the cost of a few more unreadable replies.
+  - Groq's vision request turns the model's hidden reasoning off and keeps
+    any reasoning out of the reply. Otherwise it eats the small reply
+    budget, and JSON mode refuses the visible kind. The text path still
+    uses "low". If Groq rejects this on the first live scan, it is a
+    one-line fix.
+  - The scan has its own "invalid photo" error. The older one belongs to
+    recipe photos and answers in a different shape; mixing them would have
+    changed an existing response.
+  - One ingredient can be left out for two reasons (for example peanut
+    butter is both Peanuts and Vegan). The server sends one row per reason
+    and the page groups them: "peanut butter (Peanuts, Vegan)".
+  - The build ran in a separate worktree, so V10 was not in the live
+    database. The three new database tests skip until the backend has
+    restarted; their SQL copies the reviewed recipe-generation statements.
+    They are run once after the merge.
+  - CMYK and similar JPEGs (some scanners) decode fine in Java 21, so they
+    are accepted instead of refused. The test only demands no crash. The
+    browser always sends plain RGB, so this only matters for other clients.
+  - A JPEG that the decoder warns about counts as damaged and is refused
+    (the truncated-photo case). The browser's output is clean, so false
+    refusals should be rare.
+  - In the panel: "1 scan left today" is singular; a result that only has
+    left-out items shows that line rather than "No food spotted"; "Found N"
+    counts every name the server returned, even those that did not fit; and
+    the photos are kept after a failed scan so you can try again.
+Two review fixes worth knowing:
+  - Java's image library quietly kept a temporary copy of each uploaded
+    photo (with its location data) in a file on disk while processing it.
+    That broke the "never on disk" promise. It now uses memory-only
+    streams, and a test checks the stream type.
+  - The status line ("Looking at your photos...") now stays on the page
+    even when empty and only fills with text during a scan. A line that
+    appears already filled is not announced by screen readers.
+
+Tests
+-----
+  - Backend, after the scan endpoint was added: 68 test classes, 922 tests
+    without the database, 0 failures. The three new scan database tests
+    (reserve stops at the limit, refund floors at 0, scans and generations
+    are independent) skip until V10 is live.
+  - No test makes a real AI call; providers use a mock server and a fake.
+  - Frontend: npx vitest run, 57 files, 659 tests passing. npm run build
+    succeeded.
+
+Your manual steps
+-----------------
+Before the build: nothing, the Groq key is already set.
+After the merge:
+  1. Restart the backend so Flyway applies V10.
+  2. Check it with a real Groq key (spec section 8.4):
+       a. A fridge photo: sensible chips appear; edit them and generate.
+       b. Three photos at once (fridge, pantry, counter): one list.
+       c. Save a peanut allergy, scan a photo with a peanut butter jar: it
+          is left out, with the reason.
+       d. A photo with no food: "No food spotted", and the scan count goes
+          down.
+       e. On an iPhone in Safari: take a photo with the camera and scan it.
+       f. The backend log shows: ai call provider=groq
+          model=qwen/qwen3.8-27b ... images=N
+  3. Run the three new scan database tests once V10 is live.
+  Real-browser behaviour is only checked by you: that the canvas really
+  drops the location data, that photos come out the right way up, and the
+  iPhone camera. The tests stub the browser's image functions.
+
+Status
+------
+All code and tests are done on the branch and reviewed task by task. Merge
+it, restart the backend, then do the manual checks above.

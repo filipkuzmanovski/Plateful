@@ -220,6 +220,28 @@ describe('Privacy Policy', () => {
     expectNoEmoji(section);
   });
 
+  test('says photo scans go only to Groq, are never stored, and Google never receives them', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const processors = document.getElementById('who-processes-your-data')!;
+    const items = within(processors).getAllByRole('listitem').map((li) => li.textContent ?? '');
+    expect(items.find((t) => t.startsWith('Groq'))).toMatch(/photos you scan for ingredients/);
+    expect(items.find((t) => t.startsWith('Google (Gemini API)'))).toContain('Google never receives your photos.');
+
+    const section = document.getElementById('ai-recipes')!;
+    const paragraphs = within(section).getAllByText((_, el) => el?.tagName === 'P' && /^Photo scans/.test(el.textContent ?? ''));
+    expect(paragraphs).toHaveLength(1);
+    const scans = paragraphs[0]!;
+    expect(scans).toHaveTextContent('only to Groq');
+    expect(scans).toHaveTextContent('does not store');
+    expect(scans).toHaveTextContent('without location');
+    expect(scans).toHaveTextContent('Keep people, documents');
+    expect(scans).toHaveTextContent("Groq's data retention is switched off");
+    expect(scans).toHaveTextContent('number of scans you have used today');
+    expectNoEmoji(section);
+    expectNoEmoji(processors);
+  });
+
   test('has section headings as h2', async () => {
     renderApp('/privacy');
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
