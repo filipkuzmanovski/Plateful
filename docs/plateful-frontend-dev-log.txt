@@ -4546,7 +4546,6 @@ Tests after the final review fixes
 
 
 
-
 ################################################################################
 ################################################################################
  PART 18 — AI RECIPES AND DAILY MEALS
@@ -4601,8 +4600,8 @@ The providers, and why this order
 Two free providers sit behind one small Java interface (RecipeAi), so
 adding a third later is one class:
   - Groq (openai/gpt-oss-120b) is tried first. It allows 1,000 requests a
-    day, and Zero Data Retention is switched on in the Groq console, so it
-    keeps nothing we send.
+    day, and Zero Data Retention is set in the Groq console so that Groq does
+    not keep what we send.
   - Google Gemini (gemini-3.8-flash) is the fallback. On this project's AI
     Studio page the free tier shows only 20 requests a day, so it cannot be
     the main provider. It catches Groq's bursts (Groq allows 8,000 tokens a
@@ -4688,12 +4687,15 @@ Limits
     its date) with one AI call for all three; a second call retries only
     the meals that failed. If it cannot be done, the strip shows the most
     recent earlier set labelled with its date ("From 28 October. Today's
-    meals couldn't be made fresh."), or "not available yet".
+    meals couldn't be made fresh."), or "not available yet". A failed set
+    is tried again after 15 minutes; until then the strip keeps showing
+    that earlier set with its date.
   - The database is not held open during an AI call (Supabase allows about
     15 connections). Two tabs cannot both generate the same day's set: the
     first one claims it, the other sees "generating".
-  - A daily job at 03:00 UTC deletes AI recipes older than 30 days that were
-    not saved, and old meal sets (keeping each user's latest).
+  - A daily job at 03:00 UTC deletes old meal sets and AI recipes older
+    than 30 days, keeping each user's latest ready set, every saved recipe,
+    and any recipe a remaining set still uses.
 
 Backend
 -------
@@ -4730,10 +4732,10 @@ Decisions that changed what the code does, worth knowing:
 
 Tests
 -----
-  - Backend quick regression (no database), at Task 11: 783 passing in 61
-    classes.
-  - Backend DbTests against the live Supabase database, at Task 11: 84
-    passing in 17 classes. They write only inside rolled-back transactions.
+  - Backend, after the last backend change: 783 tests in 61 classes
+    without the database, and 84 database tests (DbTests, against the live
+    Supabase database) in 17 classes, all passing. The database tests write
+    only inside rolled-back transactions.
   - No test makes a real AI call; providers are tested with a mock server
     and a fake RecipeAi.
   - Frontend: npx vitest run, 53 files, 607 tests passing. npm run build
@@ -4769,8 +4771,7 @@ fallback (Claude Haiku 5.5) would need your approval first.
 
 Status
 ------
-All code and tests are done on the branch (Tasks 1 to 15). The final
-whole-branch review is still to come; any fixes from it get a short
-addendum below. Known small leftovers are in the build ledger, for example
-the Today's meals heading sits above the page title, to be tidied in that
-final wave.
+All code and tests are done on the branch. The final whole-branch review is
+still to come; any fixes from it get a short addendum below. One known
+small leftover: the Today's meals heading sits above the page title, to be
+tidied in that final review.
