@@ -41,7 +41,7 @@ class GroqRecipeAiTest {
         AiProperties props = new AiProperties(
                 new AiProperties.Provider(KEY, "openai/gpt-oss-120b"),
                 new AiProperties.Provider("", "gemini-3.8-flash"),
-                List.of("groq", "gemini"), 10);
+                List.of("groq", "gemini"), 10, 10);
         ai = new GroqRecipeAi(builder, props, BASE);
     }
 

@@ -20,13 +20,14 @@ import java.util.OptionalInt;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace.NONE;
 
 /**
  * Runs the AI state statements (usage reserve, daily set claim, cleanup) against the real Postgres.
- * Opt-in: skipped unless SUPABASE_DB_PASSWORD is set, and skipped while V9 is not applied (the
- * backend applies it on its next start; Flyway is disabled here so a test can never migrate the
- * real database). Every write, fixture users included, stays in the rolled-back test transaction.
+ * Opt-in: skipped unless SUPABASE_DB_PASSWORD is set, and skipped while V9 is not applied (the scan
+ * tests also while V10 is not). The backend applies a migration on its next start; Flyway is
+ * disabled here so a test can never migrate the real database. Every write, fixture users included, stays in the rolled-back test transaction.
  */
 @Tag("db")
 @EnabledIfEnvironmentVariable(named = "SUPABASE_DB_PASSWORD", matches = ".+")
@@ -116,6 +117,52 @@ class AiStateRepositoryDbTest {
         assertThat(repository.generationsUsed(u, DAY)).isZero();
         repository.refundGeneration(u, DAY);
         assertThat(repository.generationsUsed(u, DAY)).isZero();
+    }
+
+    // V10 reaches Supabase only when the backend restarts, so the scan tests skip until then.
+    private boolean scansColumnExists() {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM information_schema.columns "
+                + "WHERE table_name = 'ai_usage' AND column_name = 'scans'", Integer.class);
+        return n != null && n > 0;
+    }
+
+    @Test
+    void scanReserve_stopsAtTheLimit() {
+        assumeTrue(scansColumnExists(), "V10 is not applied yet (restart the backend)");
+        UUID u = newUser();
+
+        assertThat(repository.reserveScan(u, DAY, 2)).isEqualTo(OptionalInt.of(1));
+        assertThat(repository.reserveScan(u, DAY, 2)).isEqualTo(OptionalInt.of(2));
+        assertThat(repository.reserveScan(u, DAY, 2)).isEmpty();
+        assertThat(repository.scansUsed(u, DAY)).isEqualTo(2);
+    }
+
+    @Test
+    void scanRefund_floorsAtZero() {
+        assumeTrue(scansColumnExists(), "V10 is not applied yet (restart the backend)");
+        UUID u = newUser();
+
+        repository.refundScan(u, DAY);
+        assertThat(repository.scansUsed(u, DAY)).isZero();
+
+        repository.reserveScan(u, DAY, 5);
+        repository.refundScan(u, DAY);
+        assertThat(repository.scansUsed(u, DAY)).isZero();
+        repository.refundScan(u, DAY);
+        assertThat(repository.scansUsed(u, DAY)).isZero();
+    }
+
+    @Test
+    void scansAndGenerations_areIndependent() {
+        assumeTrue(scansColumnExists(), "V10 is not applied yet (restart the backend)");
+        UUID u = newUser();
+
+        repository.reserveScan(u, DAY, 10);
+        repository.reserveScan(u, DAY, 10);
+        repository.reserveGeneration(u, DAY, 10);
+
+        assertThat(repository.generationsUsed(u, DAY)).isEqualTo(1);
+        assertThat(repository.scansUsed(u, DAY)).isEqualTo(2);
     }
 
     @Test

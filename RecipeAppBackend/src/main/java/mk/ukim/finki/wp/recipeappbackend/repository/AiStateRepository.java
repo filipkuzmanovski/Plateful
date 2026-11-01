@@ -14,11 +14,11 @@ import java.util.OptionalInt;
 import java.util.UUID;
 
 /**
- * The AI feature's small shared state: the per-day generation counter ({@code ai_usage}) and the
- * daily meal set claims ({@code daily_meal_sets}). They need {@code ON CONFLICT ... RETURNING} and
- * conditional updates, so they are plain SQL rather than JPA entities. Every statement is one
- * round trip and none holds a connection while an AI call runs. SQL text is fixed; values are
- * bound as parameters.
+ * The AI feature's small shared state: the per-day generation and photo scan counters
+ * ({@code ai_usage}) and the daily meal set claims ({@code daily_meal_sets}). They need
+ * {@code ON CONFLICT ... RETURNING} and conditional updates, so they are plain SQL rather than JPA
+ * entities. Every statement is one round trip and none holds a connection while an AI call runs.
+ * SQL text is fixed; values are bound as parameters.
  */
 @Repository
 public class AiStateRepository {
@@ -65,6 +65,35 @@ public class AiStateRepository {
     public int generationsUsed(UUID userId, LocalDate day) {
         List<Integer> rows = jdbc.queryForList(
                 "SELECT generations FROM ai_usage WHERE user_id = :user AND usage_date = :day",
+                new MapSqlParameterSource().addValue("user", userId).addValue("day", day), Integer.class);
+        return rows.isEmpty() ? 0 : rows.get(0);
+    }
+
+    /**
+     * Takes one photo scan from the user's count for {@code day} (UTC). Returns the new count, or
+     * empty when {@code limit} is already reached. One statement, like {@link #reserveGeneration}.
+     * Scans and generations are independent counts on the same row.
+     */
+    public OptionalInt reserveScan(UUID userId, LocalDate day, int limit) {
+        List<Integer> rows = jdbc.queryForList(
+                "INSERT INTO ai_usage (user_id, usage_date, generations, scans) VALUES (:user, :day, 0, 1) "
+                        + "ON CONFLICT (user_id, usage_date) DO UPDATE SET scans = ai_usage.scans + 1 "
+                        + "WHERE ai_usage.scans < :limit RETURNING scans",
+                new MapSqlParameterSource().addValue("user", userId).addValue("day", day).addValue("limit", limit),
+                Integer.class);
+        return rows.isEmpty() ? OptionalInt.empty() : OptionalInt.of(rows.get(0));
+    }
+
+    /** Gives one scan back (a failed scan is free). Never goes below zero. */
+    public void refundScan(UUID userId, LocalDate day) {
+        jdbc.update("UPDATE ai_usage SET scans = scans - 1 "
+                        + "WHERE user_id = :user AND usage_date = :day AND scans > 0",
+                new MapSqlParameterSource().addValue("user", userId).addValue("day", day));
+    }
+
+    public int scansUsed(UUID userId, LocalDate day) {
+        List<Integer> rows = jdbc.queryForList(
+                "SELECT scans FROM ai_usage WHERE user_id = :user AND usage_date = :day",
                 new MapSqlParameterSource().addValue("user", userId).addValue("day", day), Integer.class);
         return rows.isEmpty() ? 0 : rows.get(0);
     }

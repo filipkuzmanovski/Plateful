@@ -12,8 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
- * The per-user, per-UTC-day count of AI generations (spec section 4.2). Each call is one statement in
- * {@link AiStateRepository}; nothing here holds a transaction or connection.
+ * The per-user, per-UTC-day counts of AI generations (spec section 4.2) and photo scans. Each call is
+ * one statement in {@link AiStateRepository}; nothing here holds a transaction or connection.
  */
 @Service
 public class AiUsageService {
@@ -48,10 +48,24 @@ public class AiUsageService {
         state.refundGeneration(userId, today());
     }
 
+    /** Takes one photo scan for today; the count including it, or empty when the scan limit is reached. */
+    public OptionalInt reserveScan(UUID userId) {
+        return state.reserveScan(userId, today(), properties.dailyScanLimit());
+    }
+
+    /** Gives one photo scan back; a failed scan is free. */
+    public void refundScan(UUID userId) {
+        state.refundScan(userId, today());
+    }
+
     public AiUsageDto usage(UUID userId) {
+        LocalDate day = today();
         int limit = properties.dailyLimit();
-        int used = state.generationsUsed(userId, today());
-        return new AiUsageDto(used, limit, Math.max(0, limit - used));
+        int used = state.generationsUsed(userId, day);
+        int scanLimit = properties.dailyScanLimit();
+        int scansUsed = state.scansUsed(userId, day);
+        return new AiUsageDto(used, limit, Math.max(0, limit - used),
+                scansUsed, scanLimit, Math.max(0, scanLimit - scansUsed));
     }
 
     private LocalDate today() {

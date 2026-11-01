@@ -8,15 +8,18 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * @param order      provider names in the order they are tried
  * @param dailyLimit generations allowed per user per UTC day
+ * @param dailyScanLimit photo scans allowed per user per UTC day
  */
 @ConfigurationProperties("plateful.ai")
-public record AiProperties(Provider groq, Provider gemini, List<String> order, int dailyLimit) {
+public record AiProperties(Provider groq, Provider gemini, List<String> order, int dailyLimit,
+                           int dailyScanLimit) {
 
     public AiProperties {
         groq = groq == null ? new Provider("", "") : groq;
         gemini = gemini == null ? new Provider("", "") : gemini;
         order = order == null || order.isEmpty() ? List.of("groq", "gemini") : List.copyOf(order);
         dailyLimit = dailyLimit <= 0 ? 10 : dailyLimit;
+        dailyScanLimit = dailyScanLimit <= 0 ? 10 : dailyScanLimit;
     }
 
     public record Provider(String apiKey, String model) {

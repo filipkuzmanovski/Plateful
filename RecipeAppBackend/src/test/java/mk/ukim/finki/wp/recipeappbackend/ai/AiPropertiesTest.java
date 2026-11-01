@@ -12,7 +12,7 @@ class AiPropertiesTest {
     private static AiProperties bind(Map<String, String> props) {
         return new Binder(new MapConfigurationPropertySource(props))
                 .bind("plateful.ai", AiProperties.class)
-                .orElseGet(() -> new AiProperties(null, null, null, 0));
+                .orElseGet(() -> new AiProperties(null, null, null, 0, 0));
     }
 
     @Test
@@ -40,6 +40,13 @@ class AiPropertiesTest {
         assertThat(p.gemini().active()).isFalse();
         assertThat(p.order()).containsExactly("groq", "gemini");
         assertThat(p.dailyLimit()).isEqualTo(10);
+    }
+
+    @Test
+    void dailyScanLimit_defaultsToTen() {
+        assertThat(bind(Map.of()).dailyScanLimit()).isEqualTo(10);
+        assertThat(bind(Map.of("plateful.ai.daily-scan-limit", "0")).dailyScanLimit()).isEqualTo(10);
+        assertThat(bind(Map.of("plateful.ai.daily-scan-limit", "5")).dailyScanLimit()).isEqualTo(5);
     }
 
     @Test

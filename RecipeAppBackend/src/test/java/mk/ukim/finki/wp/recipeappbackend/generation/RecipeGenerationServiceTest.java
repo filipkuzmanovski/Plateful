@@ -162,7 +162,7 @@ class RecipeGenerationServiceTest {
         SafetyCheck safety = new SafetyCheck(rules, staples);
         service = new RecipeGenerationService(
                 preferences, users, recipes,
-                new AiUsageService(state, new AiProperties(null, null, null, 10), clock),
+                new AiUsageService(state, new AiProperties(null, null, null, 10, 10), clock),
                 new ReferenceFinder(reference, plateful, safety),
                 new PromptBuilder(rules, staples, new Random(1)),
                 ai, new DraftParser(new CuisineCatalog()), safety, new NoveltyCheck(staples),

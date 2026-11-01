@@ -266,18 +266,21 @@ class AiRecipeControllerTest {
 
     @Test
     void usage_returnsUsedLimitAndRemaining() throws Exception {
-        when(usage.usage(USER_ID)).thenReturn(new AiUsageDto(3, 10, 7));
+        when(usage.usage(USER_ID)).thenReturn(new AiUsageDto(3, 10, 7, 4, 10, 6));
 
         mockMvc.perform(get(BASE + "/usage").with(authed()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.used").value(3))
                 .andExpect(jsonPath("$.limit").value(10))
-                .andExpect(jsonPath("$.remaining").value(7));
+                .andExpect(jsonPath("$.remaining").value(7))
+                .andExpect(jsonPath("$.scansUsed").value(4))
+                .andExpect(jsonPath("$.scanLimit").value(10))
+                .andExpect(jsonPath("$.scansRemaining").value(6));
     }
 
     @Test
     void usage_isNotSwallowedByTheIdRoute() throws Exception {
-        when(usage.usage(USER_ID)).thenReturn(new AiUsageDto(0, 10, 10));
+        when(usage.usage(USER_ID)).thenReturn(new AiUsageDto(0, 10, 10, 0, 10, 10));
 
         mockMvc.perform(get(BASE + "/usage").with(authed()))
                 .andExpect(status().isOk());

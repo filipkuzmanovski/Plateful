@@ -267,7 +267,7 @@ class FallbackRecipeAiTest {
         AiProperties properties = new AiProperties(
                 new AiProperties.Provider("test-groq-key", "openai/gpt-oss-120b"),
                 new AiProperties.Provider("", "gemini-3.8-flash"),
-                List.of("gemini", "groq"), 10);
+                List.of("gemini", "groq"), 10, 10);
 
         List<NamedRecipeAi> providers = AiConfig.activeProviders(properties, RestClient.builder());
 
@@ -281,7 +281,7 @@ class FallbackRecipeAiTest {
         AiProperties properties = new AiProperties(
                 new AiProperties.Provider("test-groq-key", "g-model"),
                 new AiProperties.Provider("test-gemini-key", "m-model"),
-                List.of("gemini", "mystery", "groq"), 10);
+                List.of("gemini", "mystery", "groq"), 10, 10);
 
         List<NamedRecipeAi> providers = AiConfig.activeProviders(properties, RestClient.builder());
 
@@ -290,7 +290,7 @@ class FallbackRecipeAiTest {
 
     @Test
     void config_noKeys_buildsEmptyList() {
-        AiProperties properties = new AiProperties(null, null, null, 0);
+        AiProperties properties = new AiProperties(null, null, null, 0, 0);
 
         assertThat(AiConfig.activeProviders(properties, RestClient.builder())).isEmpty();
         assertThatThrownBy(() -> new AiConfig().recipeAi(properties,

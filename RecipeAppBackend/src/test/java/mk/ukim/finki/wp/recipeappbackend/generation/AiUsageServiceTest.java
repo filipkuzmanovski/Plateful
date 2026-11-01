@@ -25,7 +25,7 @@ class AiUsageServiceTest {
 
     private final AiStateRepository state = mock(AiStateRepository.class);
     private final AiUsageService service =
-            new AiUsageService(state, new AiProperties(null, null, null, 10), CLOCK);
+            new AiUsageService(state, new AiProperties(null, null, null, 10, 10), CLOCK);
 
     @Test
     void tryReserve_trueWhenTheRepositoryGaveACount_usingTheUtcDayAndTheLimit() {
@@ -53,18 +53,49 @@ class AiUsageServiceTest {
     void usage_reportsUsedLimitAndRemaining() {
         when(state.generationsUsed(USER, TODAY)).thenReturn(3);
 
-        assertThat(service.usage(USER)).isEqualTo(new AiUsageDto(3, 10, 7));
+        assertThat(service.usage(USER)).isEqualTo(new AiUsageDto(3, 10, 7, 0, 10, 10));
     }
 
     @Test
     void usage_remainingNeverGoesBelowZero() {
         when(state.generationsUsed(USER, TODAY)).thenReturn(12);
+        when(state.scansUsed(USER, TODAY)).thenReturn(11);
 
-        assertThat(service.usage(USER)).isEqualTo(new AiUsageDto(12, 10, 0));
+        assertThat(service.usage(USER)).isEqualTo(new AiUsageDto(12, 10, 0, 11, 10, 0));
     }
 
     @Test
     void usage_fullyUnusedDay() {
-        assertThat(service.usage(USER)).isEqualTo(new AiUsageDto(0, 10, 10));
+        assertThat(service.usage(USER)).isEqualTo(new AiUsageDto(0, 10, 10, 0, 10, 10));
+    }
+
+    @Test
+    void usage_includesScanFields() {
+        when(state.generationsUsed(USER, TODAY)).thenReturn(3);
+        when(state.scansUsed(USER, TODAY)).thenReturn(4);
+
+        assertThat(service.usage(USER)).isEqualTo(new AiUsageDto(3, 10, 7, 4, 10, 6));
+    }
+
+    @Test
+    void reserveScan_usesTheScanLimitAndUtcDay() {
+        AiUsageService scanFive = new AiUsageService(state, new AiProperties(null, null, null, 10, 5), CLOCK);
+        when(state.reserveScan(USER, TODAY, 5)).thenReturn(OptionalInt.of(2));
+
+        assertThat(scanFive.reserveScan(USER)).hasValue(2);
+    }
+
+    @Test
+    void reserveScan_emptyWhenTheLimitIsReached() {
+        when(state.reserveScan(USER, TODAY, 10)).thenReturn(OptionalInt.empty());
+
+        assertThat(service.reserveScan(USER)).isEmpty();
+    }
+
+    @Test
+    void refundScan_callsTheRepository() {
+        service.refundScan(USER);
+
+        verify(state).refundScan(USER, TODAY);
     }
 }
