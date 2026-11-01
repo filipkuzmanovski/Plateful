@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,6 +48,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * returned with its own date ({@code fresh = false}), or "unavailable". An AI error is never an error
  * response here.
  *
+ * <p>A stored ready set (today's or the fallback) is re-checked against the user's current preferences
+ * before it is served, because the preferences may have changed since it was made: an unsafe set for today
+ * gives the fallback instead (no new generation today), an unsafe fallback gives "unavailable". With no
+ * preferences row at that point the set counts as unsafe.
+ *
  * <p>No database transaction or connection is held while an AI call runs. The three inserts and the
  * {@code ready} update share one short transaction; if the update finds the claim was taken over, that
  * transaction is rolled back and whatever the row now says is returned. Daily meals never touch the
@@ -64,7 +70,7 @@ public class DailyMealsService {
     private static final Logger log = LoggerFactory.getLogger(DailyMealsService.class);
 
     static final List<String> MEALS = RecipeSchema.MEALS;
-    static final int EXAMPLES_PER_MEAL = 3;
+    static final int EXAMPLES_PER_MEAL = 2;
     static final int MAX_CALLS = 2;
     static final int RECENT_DAYS = 7;
 
@@ -134,7 +140,7 @@ public class DailyMealsService {
     public DailyMealsDto today(UUID userId, LocalDate date) {
         Optional<DailySetRow> existing = state.findDailySet(userId, date);
         if (existing.isPresent() && "ready".equals(existing.get().status())) {
-            Optional<DailyMealsDto> served = ready(existing.get(), date);
+            Optional<DailyMealsDto> served = ready(userId, existing.get(), date);
             if (served.isPresent()) {
                 return served.get();
             }
@@ -202,7 +208,18 @@ public class DailyMealsService {
             }
             pending = new LinkedHashSet<>(problems.keySet());
         }
-        return pending.isEmpty() ? passed : null;
+        if (!pending.isEmpty()) {
+            log.info("Daily meals not generated: {}", reasons(problems));
+            return null;
+        }
+        return passed;
+    }
+
+    /** "lunch: reason; dinner: reason" for the log; the reasons may name an ingredient, nothing else. */
+    private static String reasons(Map<String, DraftProblem> problems) {
+        List<String> parts = new ArrayList<>();
+        problems.forEach((meal, problem) -> parts.add(meal + ": " + problem.reason()));
+        return String.join("; ", parts);
     }
 
     private Duration timeLeft(Instant start) {
@@ -282,7 +299,7 @@ public class DailyMealsService {
         if (current.isPresent()) {
             DailySetRow row = current.get();
             if ("ready".equals(row.status())) {
-                Optional<DailyMealsDto> served = ready(row, date);
+                Optional<DailyMealsDto> served = ready(userId, row, date);
                 return served.isPresent() ? served.get() : fallback(userId, date);
             }
             if ("generating".equals(row.status())) {
@@ -296,7 +313,7 @@ public class DailyMealsService {
     private DailyMealsDto fallback(UUID userId, LocalDate date) {
         Optional<DailySetRow> earlier = state.latestReadyBefore(userId, date);
         if (earlier.isPresent()) {
-            Optional<DailyMealsDto> served = ready(earlier.get(), earlier.get().date(), false);
+            Optional<DailyMealsDto> served = ready(userId, earlier.get(), earlier.get().date(), false);
             if (served.isPresent()) {
                 return served.get();
             }
@@ -304,11 +321,15 @@ public class DailyMealsService {
         return DailyMealsDto.unavailable();
     }
 
-    private Optional<DailyMealsDto> ready(DailySetRow row, LocalDate date) {
-        return ready(row, date, true);
+    private Optional<DailyMealsDto> ready(UUID userId, DailySetRow row, LocalDate date) {
+        return ready(userId, row, date, true);
     }
 
-    private Optional<DailyMealsDto> ready(DailySetRow row, LocalDate date, boolean fresh) {
+    /**
+     * The stored set as a ready answer, or empty when a recipe is missing or the set no longer fits the
+     * user's current preferences.
+     */
+    private Optional<DailyMealsDto> ready(UUID userId, DailySetRow row, LocalDate date, boolean fresh) {
         if (row.breakfastId() == null || row.lunchId() == null || row.dinnerId() == null) {
             return Optional.empty();
         }
@@ -321,11 +342,36 @@ public class DailyMealsService {
             log.warn("A ready daily set for {} refers to a recipe that no longer exists", row.date());
             return Optional.empty();
         }
+        List<GeneratedRecipe> rows = ids.stream().map(byId::get).toList();
+        if (!fitsCurrentPreferences(userId, rows)) {
+            log.info("A stored daily set for {} no longer fits the user's food preferences", row.date());
+            return Optional.empty();
+        }
         Map<String, GeneratedRecipeSummaryDto> meals = new LinkedHashMap<>();
         for (int i = 0; i < MEALS.size(); i++) {
-            meals.put(MEALS.get(i), mapper.toSummary(byId.get(ids.get(i))));
+            meals.put(MEALS.get(i), mapper.toSummary(rows.get(i)));
         }
         return Optional.of(DailyMealsDto.ready(date, fresh, meals));
+    }
+
+    /**
+     * Whether every stored recipe still passes the safety check against the preferences as they are now. No
+     * preferences row counts as unsafe. An {@link IllegalArgumentException} (a stale food-rule key in the
+     * profile) goes on, as it does when generating.
+     */
+    private boolean fitsCurrentPreferences(UUID userId, List<GeneratedRecipe> rows) {
+        Optional<UserPreferences> stored = preferences.findById(userId);
+        if (stored.isEmpty()) {
+            return false;
+        }
+        UserFoodProfile profile = UserFoodProfile.of(stored.get());
+        for (GeneratedRecipe recipe : rows) {
+            RecipeDraft draft = mapper.toDraft(mapper.read(recipe));
+            if (safety.check(draft, profile, Set.of(), SafetyCheck.Mode.ANY).problem().isPresent()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

@@ -1,6 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.generation;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +31,9 @@ public class GeneratedRecipeMapper {
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {
     };
 
+    /** The diets a stored recipe is labelled with. */
+    private static final Set<String> DIETS = Set.of("vegetarian", "vegan", "gluten_free", "dairy_free");
+
     private final FoodRules rules;
 
     @Autowired
@@ -38,23 +42,60 @@ public class GeneratedRecipeMapper {
     }
 
     /**
+     * Diets and allergens are computed per ingredient name in both normalised forms, as {@link SafetyCheck}
+     * checks them: the ingredient form ({@code IngredientNames.normalise}, which glues punctuation and
+     * singularises only the last word) and the free-text form ({@code FoodRules.allergensInText}), so
+     * "Eggs, beaten" counts as eggs and "walnuts/pecans" as tree nuts.
+     *
      * @param extras normalised free-text names ({@code IngredientNames.normaliseText}) of the ingredients the
      *               user did not list, as {@link SafetyCheck} reports them
      */
     public StoredRecipe fromDraft(RecipeDraft d, Set<String> extras) {
         List<StoredRecipe.StoredIngredient> ingredients = new ArrayList<>();
-        List<String> names = new ArrayList<>();
+        Set<String> allergens = new LinkedHashSet<>();
+        Set<String> broken = new LinkedHashSet<>();
         for (RecipeDraft.Ingredient ingredient : d.ingredients()) {
-            boolean extra = extras.contains(IngredientNames.normaliseText(ingredient.name()));
-            ingredients.add(new StoredRecipe.StoredIngredient(ingredient.name(), ingredient.amount(), extra));
-            IngredientNames.normalise(ingredient.name()).ifPresent(names::add);
+            String raw = ingredient.name();
+            boolean extra = extras.contains(IngredientNames.normaliseText(raw));
+            ingredients.add(new StoredRecipe.StoredIngredient(raw, ingredient.amount(), extra));
+            List<String> name = IngredientNames.normalise(raw).map(List::of).orElse(List.of());
+            allergens.addAll(rules.allergensIn(name));
+            allergens.addAll(rules.allergensInText(raw));
+            broken.addAll(rules.dietViolations(name, DIETS));
+            broken.addAll(rules.dietViolationsInText(raw, DIETS));
         }
         StoredRecipe.Diets diets = new StoredRecipe.Diets(
-                keeps(names, "vegetarian"), keeps(names, "vegan"),
-                keeps(names, "gluten_free"), keeps(names, "dairy_free"));
-        List<String> allergens = List.copyOf(rules.allergensIn(names));
+                !broken.contains("vegetarian"), !broken.contains("vegan"),
+                !broken.contains("gluten_free"), !broken.contains("dairy_free"));
+        // In the order of the rules file, as before, not in ingredient order.
+        List<String> ordered = rules.allergenKeys().stream().filter(allergens::contains).toList();
         return new StoredRecipe(d.title(), d.description(), d.servings(), d.prepMinutes(), d.cookMinutes(),
-                d.cuisine(), List.copyOf(ingredients), List.copyOf(d.steps()), diets, allergens);
+                d.cuisine(), List.copyOf(ingredients), List.copyOf(d.steps()), diets, ordered);
+    }
+
+    /**
+     * The stored recipe as a draft again, so a stored recipe can be re-checked against the user's current
+     * preferences with {@link SafetyCheck}. Missing lists become empty and missing texts blank, so an odd
+     * stored document is checked rather than failing.
+     */
+    public RecipeDraft toDraft(StoredRecipe s) {
+        List<RecipeDraft.Ingredient> ingredients = new ArrayList<>();
+        for (StoredRecipe.StoredIngredient ingredient : s.ingredients() == null
+                ? List.<StoredRecipe.StoredIngredient>of() : s.ingredients()) {
+            if (ingredient != null) {
+                ingredients.add(new RecipeDraft.Ingredient(text(ingredient.name()), text(ingredient.amount())));
+            }
+        }
+        List<String> steps = new ArrayList<>();
+        for (String step : s.steps() == null ? List.<String>of() : s.steps()) {
+            steps.add(text(step));
+        }
+        return new RecipeDraft(text(s.title()), text(s.description()), s.servings(), s.prepMinutes(),
+                s.cookMinutes(), s.cuisine(), List.copyOf(ingredients), List.copyOf(steps));
+    }
+
+    private static String text(String value) {
+        return value == null ? "" : value;
     }
 
     /** The row's {@code recipe} document as a JSON map, for the JSONB column. */
@@ -82,11 +123,6 @@ public class GeneratedRecipeMapper {
         StoredRecipe s = read(row);
         return new GeneratedRecipeSummaryDto(row.getId(), row.getKind(), row.getMealType(), row.getTitle(),
                 s.description(), s.prepMinutes() + s.cookMinutes(), row.getSavedAt());
-    }
-
-    /** True when no ingredient name breaks the diet. */
-    private boolean keeps(List<String> names, String diet) {
-        return rules.dietViolations(names, Set.of(diet)).isEmpty();
     }
 
     /** An allergen key stored earlier may have left the rules file since; show the key rather than fail. */

@@ -11,6 +11,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -47,11 +51,13 @@ import mk.ukim.finki.wp.recipeappbackend.repository.PlatefulComparisonRepository
 import mk.ukim.finki.wp.recipeappbackend.repository.ReferenceDataRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserPreferencesRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -64,6 +70,9 @@ class DailyMealsServiceTest {
     private static final UUID B = UUID.fromString("b0000000-0000-0000-0000-000000000001");
     private static final UUID L = UUID.fromString("b0000000-0000-0000-0000-000000000002");
     private static final UUID D = UUID.fromString("b0000000-0000-0000-0000-000000000003");
+    private static final UUID EB = UUID.fromString("e0000000-0000-0000-0000-000000000001");
+    private static final UUID EL = UUID.fromString("e0000000-0000-0000-0000-000000000002");
+    private static final UUID ED = UUID.fromString("e0000000-0000-0000-0000-000000000003");
 
     /** A clock the fake AI moves forward on every call. */
     private static final class MovingClock extends Clock {
@@ -129,6 +138,19 @@ class DailyMealsServiceTest {
     private ScriptedAi ai;
     private GeneratedRecipeMapper mapper;
     private DailyMealsService service;
+    private final Logger logger = (Logger) LoggerFactory.getLogger(DailyMealsService.class);
+    private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+
+    @AfterEach
+    void releaseLogs() {
+        logger.detachAppender(appender);
+    }
+
+    private void captureLogs() {
+        logger.setLevel(Level.INFO);
+        appender.start();
+        logger.addAppender(appender);
+    }
 
     @BeforeEach
     void setUp() {
@@ -202,8 +224,12 @@ class DailyMealsServiceTest {
     }
 
     private GeneratedRecipe stored(UUID id, String meal, String title) {
+        return stored(id, meal, title, "rice", "beans", "salt");
+    }
+
+    private GeneratedRecipe stored(UUID id, String meal, String title, String... ingredientNames) {
         RecipeDraft draft = new DraftParser(new CuisineCatalog())
-                .parse(recipeJson(title, "rice", "beans", "salt")).draft();
+                .parse(recipeJson(title, ingredientNames)).draft();
         return GeneratedRecipe.builder().id(id).kind("daily").mealType(meal).title(title)
                 .recipe(mapper.toDocument(mapper.fromDraft(draft, java.util.Set.of()))).build();
     }
@@ -583,5 +609,191 @@ class DailyMealsServiceTest {
         verify(state, never()).reserveGeneration(any(), any(), anyInt());
         verify(state, never()).refundGeneration(any(), any());
         verify(state, never()).generationsUsed(any(), any());
+    }
+
+    // ---- stored sets are re-checked against the current preferences
+
+    private void withAllergens(String... keys) {
+        when(preferences.findById(USER)).thenReturn(Optional.of(
+                UserPreferences.builder().userId(USER).allergens(List.of(keys)).build()));
+    }
+
+    /** Today's ready set (B, L, D), with peanuts in the lunch when {@code peanutLunch}. */
+    private void storeToday(boolean peanutLunch) {
+        when(state.findDailySet(USER, DATE)).thenReturn(Optional.of(
+                new DailySetRow(DATE, "ready", B, L, D, OffsetDateTime.parse("2026-10-31T06:00:00Z"))));
+        when(recipes.findAllById(List.of(B, L, D))).thenReturn(List.of(
+                stored(B, "breakfast", "Stored Breakfast"),
+                peanutLunch
+                        ? stored(L, "lunch", "Satay Noodles", "noodles", "peanut butter", "lime")
+                        : stored(L, "lunch", "Stored Lunch"),
+                stored(D, "dinner", "Stored Dinner")));
+    }
+
+    /** An earlier ready set (EB, EL, ED) on {@link #EARLIER}, with peanuts in the dinner when asked. */
+    private void storeEarlier(boolean peanutDinner) {
+        when(state.latestReadyBefore(USER, DATE)).thenReturn(Optional.of(
+                new DailySetRow(EARLIER, "ready", EB, EL, ED, OffsetDateTime.parse("2026-10-28T06:00:00Z"))));
+        when(recipes.findAllById(List.of(EB, EL, ED))).thenReturn(List.of(
+                stored(EB, "breakfast", "Earlier Breakfast"),
+                stored(EL, "lunch", "Earlier Lunch"),
+                peanutDinner
+                        ? stored(ED, "dinner", "Peanut Stew", "sweet potato", "peanuts", "tomato")
+                        : stored(ED, "dinner", "Earlier Dinner")));
+    }
+
+    @Test
+    void todaysSet_thatBreaksANewAllergy_servesTheFallbackWithoutGenerating() {
+        withAllergens("peanuts");
+        storeToday(true);
+        storeEarlier(false);
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.status()).isEqualTo("ready");
+        assertThat(result.date()).isEqualTo(EARLIER);
+        assertThat(result.fresh()).isFalse();
+        assertThat(result.meals().get("dinner").title()).isEqualTo("Earlier Dinner");
+        assertThat(ai.requests).isEmpty();
+        verify(state, never()).claimDailySet(any(), any());
+        verify(state, never()).failDailySet(any(), any());
+        verify(recipes, never()).save(any());
+    }
+
+    @Test
+    void fallbackSet_thatBreaksANewAllergy_isUnavailable() {
+        withAllergens("peanuts");
+        when(state.claimDailySet(USER, DATE)).thenReturn(false);
+        storeSet(DATE, "failed", false);
+        storeEarlier(true);
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.status()).isEqualTo("unavailable");
+        assertThat(ai.requests).isEmpty();
+    }
+
+    @Test
+    void unsafeTodaysSet_andUnsafeFallback_isUnavailable() {
+        withAllergens("peanuts");
+        storeToday(true);
+        storeEarlier(true);
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.status()).isEqualTo("unavailable");
+        assertThat(ai.requests).isEmpty();
+        verify(state, never()).claimDailySet(any(), any());
+    }
+
+    @Test
+    void safeSets_areServedUnchanged_whenTheUserHasAllergies() {
+        withAllergens("peanuts");
+        storeToday(false);
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.status()).isEqualTo("ready");
+        assertThat(result.date()).isEqualTo(DATE);
+        assertThat(result.fresh()).isTrue();
+        assertThat(result.meals().get("lunch").title()).isEqualTo("Stored Lunch");
+        assertThat(ai.requests).isEmpty();
+    }
+
+    @Test
+    void safeFallback_isServedUnchanged_whenTheUserHasAllergies() {
+        withAllergens("peanuts");
+        when(state.claimDailySet(USER, DATE)).thenReturn(false);
+        storeSet(DATE, "failed", false);
+        storeEarlier(false);
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.status()).isEqualTo("ready");
+        assertThat(result.date()).isEqualTo(EARLIER);
+        assertThat(result.fresh()).isFalse();
+        assertThat(ai.requests).isEmpty();
+    }
+
+    @Test
+    void storedSet_isAlsoRecheckedAgainstANewDiet() {
+        when(preferences.findById(USER)).thenReturn(Optional.of(
+                UserPreferences.builder().userId(USER).diets(List.of("vegan")).build()));
+        when(state.findDailySet(USER, DATE)).thenReturn(Optional.of(
+                new DailySetRow(DATE, "ready", B, L, D, OffsetDateTime.parse("2026-10-31T06:00:00Z"))));
+        when(recipes.findAllById(List.of(B, L, D))).thenReturn(List.of(
+                stored(B, "breakfast", "Scrambled Toast", "Eggs, beaten", "bread", "salt"),
+                stored(L, "lunch", "Stored Lunch"), stored(D, "dinner", "Stored Dinner")));
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.status()).isEqualTo("unavailable");
+        assertThat(ai.requests).isEmpty();
+    }
+
+    @Test
+    void storedSet_withNoPreferencesRow_isUnavailable() {
+        when(preferences.findById(USER)).thenReturn(Optional.empty());
+        storeToday(false);
+        storeEarlier(false);
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.status()).isEqualTo("unavailable");
+        assertThat(ai.requests).isEmpty();
+        verify(state, never()).claimDailySet(any(), any());
+    }
+
+    @Test
+    void storedSet_withAStaleProfileKey_propagates() {
+        withAllergens("no_such_allergen");
+        storeToday(false);
+
+        assertThatThrownBy(() -> service.today(USER, DATE)).isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(ai.requests).isEmpty();
+    }
+
+    @Test
+    void readySetAnotherRequestFinished_isRecheckedToo() {
+        withAllergens("peanuts");
+        DailySetRow ready = new DailySetRow(DATE, "ready", B, L, D, OffsetDateTime.parse("2026-10-31T11:59:00Z"));
+        when(state.findDailySet(USER, DATE)).thenReturn(Optional.empty(), Optional.of(ready));
+        when(state.claimDailySet(USER, DATE)).thenReturn(false);
+        when(recipes.findAllById(List.of(B, L, D))).thenReturn(List.of(
+                stored(B, "breakfast", "Stored Breakfast"),
+                stored(L, "lunch", "Satay Noodles", "noodles", "peanut butter", "lime"),
+                stored(D, "dinner", "Stored Dinner")));
+        storeEarlier(false);
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.date()).isEqualTo(EARLIER);
+        assertThat(result.fresh()).isFalse();
+        assertThat(ai.requests).isEmpty();
+    }
+
+    // ---- diagnosable failures
+
+    @Test
+    void stillFailing_logsTheProblemReasons() {
+        captureLogs();
+        String broken = "{\"title\":\"No ingredients\"}";
+        ai.then(meals(BREAKFAST, broken, DINNER), meals(null, broken, null));
+
+        service.today(USER, DATE);
+
+        assertThat(appender.list)
+                .filteredOn(e -> e.getFormattedMessage().startsWith("Daily meals not generated: "))
+                .singleElement()
+                .satisfies(e -> {
+                    assertThat(e.getLevel()).isEqualTo(Level.INFO);
+                    assertThat(e.getFormattedMessage()).contains("lunch: ").doesNotContain(USER.toString());
+                });
+    }
+
+    @Test
+    void examplesPerMeal_isTwo() {
+        assertThat(DailyMealsService.EXAMPLES_PER_MEAL).isEqualTo(2);
     }
 }

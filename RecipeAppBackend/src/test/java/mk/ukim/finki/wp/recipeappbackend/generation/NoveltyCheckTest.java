@@ -162,4 +162,24 @@ class NoveltyCheckTest {
         assertThat(r.score()).isEqualTo(0.0);
         assertThat(r.problem()).isEmpty();
     }
+
+    @Test
+    void closestTitleNamingAllergiesOrDiets_isNotQuoted() {
+        Set<String> shared = names("shared", 0, 4);
+        for (String title : List.of("Allergy-Friendly Oat Bars", "Low DIET Lentil Soup", "Non-allergenic Muffins")) {
+            NoveltyCheck.NoveltyResult r = novelty.check(draft("Alpha Dish", shared),
+                    List.of(new ComparedRecipe(title, shared)));
+
+            assertThat(r.problem()).isPresent();
+            assertThat(r.problem().get().reason())
+                    .isEqualTo("Too similar to an existing recipe. Make something more different.")
+                    .doesNotContainIgnoringCase("allerg").doesNotContainIgnoringCase("diet");
+        }
+    }
+
+    @Test
+    void similarTo_quotesOrdinaryTitles() {
+        assertThat(NoveltyCheck.similarTo("Lemon Chickpea Salad"))
+                .isEqualTo("Too similar to 'Lemon Chickpea Salad'. Make something more different.");
+    }
 }

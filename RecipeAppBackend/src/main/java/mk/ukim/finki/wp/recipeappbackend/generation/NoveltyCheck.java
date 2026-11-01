@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import mk.ukim.finki.wp.recipeappbackend.food.IngredientNames;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,8 @@ public class NoveltyCheck {
     public static final Set<String> STOP_WORDS = Set.of(
             "a", "an", "and", "the", "with", "of", "in", "on", "for",
             "style", "easy", "quick", "simple", "best", "homemade", "recipe", "my");
+
+    private static final Pattern HEALTH_WORDS = Pattern.compile("allerg|diet", Pattern.CASE_INSENSITIVE);
 
     /** {@code score} is the highest ingredient similarity against any compared recipe (0 if none). */
     public record NoveltyResult(double score, Optional<DraftProblem> problem) {
@@ -65,9 +68,19 @@ public class NoveltyCheck {
 
         Optional<DraftProblem> problem = closestTitle == null
                 ? Optional.empty()
-                : Optional.of(new DraftProblem(
-                        "Too similar to '" + closestTitle + "'. Make something more different."));
+                : Optional.of(new DraftProblem(similarTo(closestTitle)));
         return new NoveltyResult(bestScore, problem);
+    }
+
+    /**
+     * The retry reason. It goes back to the provider, which must never see the words for allergies or diets,
+     * so a dataset title containing them ("Allergy-Friendly Muffins") is not quoted.
+     */
+    static String similarTo(String title) {
+        if (HEALTH_WORDS.matcher(title).find()) {
+            return "Too similar to an existing recipe. Make something more different.";
+        }
+        return "Too similar to '" + title + "'. Make something more different.";
     }
 
     private static Set<String> titleWords(String title) {
