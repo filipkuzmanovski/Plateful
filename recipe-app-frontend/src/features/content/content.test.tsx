@@ -242,6 +242,49 @@ describe('Privacy Policy', () => {
     expectNoEmoji(processors);
   });
 
+  test('privacy_hasRecipesFromAPostParagraph', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const section = document.getElementById('ai-recipes')!;
+    const paragraphs = within(section).getAllByText(
+      (_, el) => el?.tagName === 'P' && /^Recipes from a post/.test(el.textContent ?? ''),
+    );
+    expect(paragraphs).toHaveLength(1);
+    const post = paragraphs[0]!;
+    expect(post).toHaveTextContent('up to 2 screenshots');
+    expect(post).toHaveTextContent('without location');
+    expect(post).toHaveTextContent('never your name, your email address or your account');
+    expect(post).toHaveTextContent('go only to Groq');
+    expect(post).toHaveTextContent('may go to Google Gemini');
+    expect(post).toHaveTextContent("may use it to improve Google's products");
+    expect(post).toHaveTextContent(
+      'Plateful does not store the caption, the screenshots or a link to the post',
+    );
+    expect(post).toHaveTextContent('crop it to the post');
+    expectNoEmoji(section);
+  });
+
+  test('googleEntry_saysNeverAScreenshot', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const processors = document.getElementById('who-processes-your-data')!;
+    const items = within(processors).getAllByRole('listitem').map((li) => li.textContent ?? '');
+    const google = items.find((t) => t.startsWith('Google (Gemini API)'))!;
+    expect(google).toContain('pasted caption');
+    expect(google).toContain('never a screenshot');
+    expectNoEmoji(processors);
+  });
+
+  test('groqEntry_mentionsPostScreenshots', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const processors = document.getElementById('who-processes-your-data')!;
+    const items = within(processors).getAllByRole('listitem').map((li) => li.textContent ?? '');
+    const groq = items.find((t) => t.startsWith('Groq'))!;
+    expect(groq).toContain('screenshots of posts you turn into recipes');
+    expectNoEmoji(processors);
+  });
+
   test('has section headings as h2', async () => {
     renderApp('/privacy');
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });

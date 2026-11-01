@@ -111,12 +111,14 @@ export default function PrivacyPage() {
                   servers are in the EU, in Stockholm, Sweden.
                 </li>
                 <li>
-                  <Strong>Groq</Strong> writes AI recipes and reads the photos you scan for ingredients. It processes
-                  the data sent for AI recipes (see below) outside the EU.
+                  <Strong>Groq</Strong> writes AI recipes, reads the photos you scan for ingredients and reads the
+                  screenshots of posts you turn into recipes. It processes the data sent for AI recipes (see below)
+                  outside the EU.
                 </li>
                 <li>
-                  <Strong>Google (Gemini API)</Strong> writes AI recipes when Groq is not available. It processes the
-                  data sent for AI recipes outside the EU. Google never receives your photos.
+                  <Strong>Google (Gemini API)</Strong> writes AI recipes when Groq is not available. It may also
+                  receive a pasted caption of a post when Groq is busy, never a screenshot. It processes the data sent
+                  for AI recipes outside the EU. Google never receives your photos.
                 </li>
                 <li>
                   <Strong>Our web hosting providers</Strong> serve the site to you. They will be named here once the
@@ -161,6 +163,18 @@ export default function PrivacyPage() {
                 in the database, in storage, in files or in logs. It keeps only the number of scans you have used
                 today. Groq's data retention is switched off. A photo can show more than food. Keep people,
                 documents and anything personal out of the shot.
+              </p>
+              <p>
+                <Strong>Recipes from a post.</Strong> On the Cook page you can turn an Instagram post into a recipe by
+                pasting its caption, adding up to 2 screenshots, or both. Your browser shrinks each screenshot first.{' '}
+                {SITE.name} then shrinks and re-saves it without location or other hidden data. Only the caption, the
+                screenshots and the list of ingredients to avoid are sent, never your name, your email address or your
+                account. The screenshots, and anything read from them, go only to Groq, never to Google. A caption on
+                its own may go to Google Gemini when Groq is busy, and the free tier of Google Gemini may use it to
+                improve Google's products. {SITE.name} does not store the caption, the screenshots or a link to the
+                post. Only the recipe made from them is kept, privately, like other AI recipes. Groq's data retention
+                is switched off. A screenshot can show more than the post, such as notifications or your own account
+                name, so crop it to the post.
               </p>
               <p>
                 AI recipes are stored privately on your account and are deleted together with it. A recipe you have not
