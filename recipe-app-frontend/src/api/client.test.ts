@@ -174,6 +174,33 @@ test('mfaRequired401DoesNotSignOut', async () => {
   }
 });
 
+test('formDataBody_hasNoJsonContentType', async () => {
+  let contentType: string | null = null;
+  server.use(
+    http.post(`${BASE}/api/upload`, ({ request }) => {
+      contentType = request.headers.get('Content-Type');
+      return HttpResponse.json({ ok: true });
+    }),
+  );
+  const form = new FormData();
+  form.append('photos', new Blob(['x'], { type: 'image/jpeg' }), 'photo-1.jpg');
+  await api('/api/upload', { method: 'POST', body: form });
+  expect(contentType).not.toBeNull();
+  expect(contentType!.startsWith('multipart/form-data')).toBe(true);
+});
+
+test('jsonBody_stillSendsJsonContentType', async () => {
+  let contentType: string | null = null;
+  server.use(
+    http.post(`${BASE}/api/upload`, ({ request }) => {
+      contentType = request.headers.get('Content-Type');
+      return HttpResponse.json({ ok: true });
+    }),
+  );
+  await api('/api/upload', { method: 'POST', body: JSON.stringify({ a: 1 }) });
+  expect(contentType).toBe('application/json');
+});
+
 test('plain401StillSignsOut', async () => {
   server.use(
     http.get(`${BASE}/api/ping`, () =>

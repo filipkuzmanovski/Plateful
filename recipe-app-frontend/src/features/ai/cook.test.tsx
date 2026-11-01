@@ -5,7 +5,7 @@ import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { profileFixture } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
-import type { GeneratedRecipe } from '@/lib/types';
+import type { AiUsage, GeneratedRecipe } from '@/lib/types';
 
 const BASE = 'http://localhost:8080';
 const GENERATE = `${BASE}/api/users/me/ai-recipes/generate`;
@@ -35,7 +35,9 @@ function recipeFor(overrides: Partial<GeneratedRecipe> = {}): GeneratedRecipe {
   };
 }
 
-function signedIn(usage: { used: number; limit: number; remaining: number } = { used: 3, limit: 10, remaining: 7 }) {
+const USAGE: AiUsage = { used: 3, limit: 10, remaining: 7, scansUsed: 2, scanLimit: 10, scansRemaining: 8 };
+
+function signedIn(usage: AiUsage = USAGE) {
   mocks.session = { access_token: 't', user: { id: 'u-1', email: 'jane@example.com' } };
   server.use(
     http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profileFixture)),

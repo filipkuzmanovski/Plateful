@@ -12,7 +12,13 @@ const BY_CODE: Record<string, string> = {
   ai_unavailable: "The AI service isn't responding. Try again in a minute.",
   ai_not_configured: "AI features aren't set up on this server.",
   generation_failed: "Couldn't make a safe new recipe from these. Try changing the ingredients.",
+  invalid_photo: 'Use 1 to 3 photos (JPEG, up to 1 MB each).',
+  scan_limit: "You've used today's 10 photo scans. More tomorrow.",
+  scan_failed: "Couldn't read the photo. Try again or type your ingredients.",
 };
+
+/** Shown when the browser can't decode a picked photo (for example HEIC in Chrome on Windows) or can't shrink it enough. */
+export const PHOTO_UNREADABLE = "This photo type can't be opened here. Try a JPEG or take a new photo.";
 
 /** The message to show for a failed AI call: the spec's text for its `code`, else the server's detail. */
 export function aiErrorMessage(err: unknown): string {

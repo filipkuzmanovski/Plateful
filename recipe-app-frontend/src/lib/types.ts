@@ -108,7 +108,17 @@ export interface GeneratedRecipeSummary {
 
 export interface GenerateResult { recipe: GeneratedRecipe; remainingToday: number; }
 
-export interface AiUsage { used: number; limit: number; remaining: number; }
+export interface AiUsage {
+  used: number; limit: number; remaining: number;
+  scansUsed: number; scanLimit: number; scansRemaining: number;
+}
+
+/** What a photo scan found. `leftOut` may name one ingredient more than once, one row per reason. */
+export interface ScanResult {
+  ingredients: string[];
+  leftOut: { ingredient: string; reason: string }[];
+  remainingScans: number;
+}
 
 /** Today's meals. `date`, `fresh` and `meals` are present only when `status` is `ready`. */
 export interface DailyMeals {

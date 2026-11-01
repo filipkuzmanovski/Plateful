@@ -38,7 +38,8 @@ export function setMfaRequiredHandler(fn: (() => void) | null): void {
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  if (init.body) headers.set('Content-Type', 'application/json');
+  // A FormData body needs the browser's own multipart Content-Type (with its boundary).
+  if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (token) headers.set('Authorization', `Bearer ${token}`);

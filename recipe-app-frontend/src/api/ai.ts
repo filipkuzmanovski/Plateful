@@ -1,7 +1,7 @@
 import { api, apiVoid } from './client';
 import { PAGE_SIZE } from './recipes';
 import type {
-  AiUsage, DailyMeals, GenerateResult, GeneratedRecipe, GeneratedRecipeSummary, MealType, Page,
+  AiUsage, DailyMeals, GenerateResult, GeneratedRecipe, GeneratedRecipeSummary, MealType, Page, ScanResult,
 } from '@/lib/types';
 
 const BASE = '/api/users/me';
@@ -17,7 +17,14 @@ export const dailyMealsQueryKey = (userId: string | undefined, date: string) => 
 export const generateRecipe = (body: GenerateBody) =>
   api<GenerateResult>(`${BASE}/ai-recipes/generate`, { method: 'POST', body: JSON.stringify(body) });
 
-export const getAiRecipe = (id: string) => api<GeneratedRecipe>(`${BASE}/ai-recipes/${encodeURIComponent(id)}`);
+/** Sends 1 to 3 shrunken JPEGs as `photos` parts; the browser sets the multipart Content-Type. Can take 30 s or more. */
+export const scanPhotos = (photos: Blob[]) => {
+  const form = new FormData();
+  photos.forEach((blob, i) => form.append('photos', blob, `photo-${i + 1}.jpg`));
+  return api<ScanResult>(`${BASE}/ai-recipes/scan`, { method: 'POST', body: form });
+};
+
+export const getAiRecipe =(id: string) => api<GeneratedRecipe>(`${BASE}/ai-recipes/${encodeURIComponent(id)}`);
 
 export const listSavedAiRecipes = (page: number, size: number = PAGE_SIZE): Promise<Page<GeneratedRecipeSummary>> =>
   api(`${BASE}/ai-recipes?${new URLSearchParams({ page: String(page), size: String(size) })}`);
