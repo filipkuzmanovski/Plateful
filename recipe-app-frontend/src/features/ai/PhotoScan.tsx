@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, LoaderCircle, X } from 'lucide-react';
+import { Camera, LoaderCircle } from 'lucide-react';
 import { aiUsageQueryKey, getAiUsage, scanPhotos } from '@/api/ai';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
@@ -10,11 +10,10 @@ import { PhotoUnreadableError, shrinkPhoto } from '@/lib/shrinkPhoto';
 import type { ScanResult } from '@/lib/types';
 import { aiErrorMessage, PHOTO_UNREADABLE } from './aiMessages';
 import { leftOutLine, mergeIngredients } from './mergeIngredients';
+import { PhotoThumbs, usePhotoPicks } from './PhotoPicks';
 
 const MAX_PHOTOS = 3;
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
-
-interface Photo { id: number; file: File; url: string; }
 
 /** What the last scan did to the chips, shown under the panel until the next scan. */
 interface Outcome { found: number; didntFit: string[]; leftOut: string | null; }
@@ -32,30 +31,18 @@ export function PhotoScan({
   const userId = profile?.id;
   const queryClient = useQueryClient();
 
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [tooMany, setTooMany] = useState(false);
+  const { photos, tooMany, add, remove, clear, dismissTooMany } = usePhotoPicks(MAX_PHOTOS);
   const [remaining, setRemaining] = useState<number | null>(null); // the latest count the server gave us
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const nextId = useRef(0);
 
   // The chips can change while a scan is running; merge into whatever is there when the reply arrives.
   const currentRef = useRef(current);
   currentRef.current = current;
 
-  // Object URLs outlive the component unless revoked.
-  const photosRef = useRef(photos);
-  photosRef.current = photos;
-  useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
-
   const usage = useQuery({ queryKey: aiUsageQueryKey(userId), queryFn: getAiUsage });
   const left = remaining ?? usage.data?.scansRemaining ?? null;
   const limitReached = left === 0;
-
-  function clearPhotos() {
-    photosRef.current.forEach((p) => URL.revokeObjectURL(p.url));
-    setPhotos([]);
-  }
 
   const scan = useMutation({
     mutationFn: async (files: File[]) => {
@@ -66,7 +53,7 @@ export function PhotoScan({
     },
     onMutate: () => {
       setOutcome(null);
-      setTooMany(false);
+      dismissTooMany();
     },
     onSuccess: (res: ScanResult) => {
       setRemaining(res.remainingScans);
@@ -74,7 +61,7 @@ export function PhotoScan({
       const { merged, didntFit } = mergeIngredients(currentRef.current, res.ingredients, max);
       if (merged.length !== currentRef.current.length) onFound(merged);
       setOutcome({ found: res.ingredients.length, didntFit, leftOut: leftOutLine(res.leftOut) });
-      clearPhotos();
+      clear();
     },
     onError: (err) => {
       if (err instanceof ApiError && err.code === 'scan_limit') setRemaining(0);
@@ -86,19 +73,12 @@ export function PhotoScan({
     e.target.value = ''; // so choosing the same file again still fires a change
     if (picked.length === 0) return;
     scan.reset(); // a fresh pick makes the last error stale
-    const room = MAX_PHOTOS - photos.length;
-    setTooMany(picked.length > room);
-    const added = picked.slice(0, Math.max(0, room)).map((file) => ({
-      id: nextId.current++, file, url: URL.createObjectURL(file),
-    }));
-    if (added.length > 0) setPhotos([...photos, ...added]);
+    add(picked);
   }
 
-  function remove(photo: Photo) {
-    URL.revokeObjectURL(photo.url);
+  function onRemove(id: number) {
     scan.reset(); // the error was about the photos as they were
-    setPhotos(photos.filter((p) => p.id !== photo.id));
-    setTooMany(false);
+    remove(id);
   }
 
   const busy = scan.isPending;
@@ -131,28 +111,7 @@ export function PhotoScan({
 
       {tooMany && <p className="mt-2 text-xs font-medium text-olive">Choose up to {MAX_PHOTOS} photos.</p>}
 
-      {photos.length > 0 && (
-        <ul className="mt-3 flex flex-wrap gap-3">
-          {photos.map((p, i) => (
-            <li key={p.id} className="relative">
-              <img
-                src={p.url}
-                alt={`Photo ${i + 1}`}
-                className="size-20 rounded-xl border border-sand object-cover sm:size-24"
-              />
-              <button
-                type="button"
-                aria-label={`Remove photo ${i + 1}`}
-                disabled={busy}
-                onClick={() => remove(p)}
-                className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full bg-olive text-cream shadow-button transition hover:bg-olive/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron disabled:pointer-events-none disabled:opacity-45"
-              >
-                <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <PhotoThumbs photos={photos} noun="photo" busy={busy} onRemove={onRemove} />
 
       <div className="mt-3">
         <Button

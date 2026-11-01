@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
@@ -9,6 +9,7 @@ import type { AiUsage, GeneratedRecipe } from '@/lib/types';
 
 const BASE = 'http://localhost:8080';
 const GENERATE = `${BASE}/api/users/me/ai-recipes/generate`;
+const IMPORT = `${BASE}/api/users/me/ai-recipes/import`;
 
 const mocks = vi.hoisted(() => ({ session: null as unknown }));
 
@@ -51,6 +52,15 @@ async function addChips(user: ReturnType<typeof userEvent.setup>, ...names: stri
   const input = await screen.findByLabelText('Ingredients');
   for (const n of names) await user.type(input, `${n}{Enter}`);
 }
+
+/** The visible tab panel: both panels stay mounted, so text queries are scoped to the open one. */
+const openPanel = () => within(screen.getByRole('tabpanel'));
+const findInOpenPanel = async (text: string) => within(await screen.findByRole('tabpanel')).findByText(text);
+
+const INGREDIENTS_INTRO =
+  'Add 2 to 15 ingredients and get a recipe made for you, in line with your food preferences.';
+const POST_INTRO =
+  'Saw something good on Instagram? Paste the caption or add screenshots, and get a recipe made for you.';
 
 describe('Cook page', () => {
   it('keeps Generate disabled until there are two ingredients, then sends the payload', async () => {
@@ -106,10 +116,10 @@ describe('Cook page', () => {
     const user = userEvent.setup();
     renderApp('/cook');
 
-    expect(await screen.findByText('7 left today')).toBeInTheDocument();
+    expect(await findInOpenPanel('7 left today')).toBeInTheDocument();
     await addChips(user, 'eggs', 'tomatoes');
     await user.click(screen.getByRole('button', { name: 'Generate' }));
-    expect(await screen.findByText('6 left today')).toBeInTheDocument();
+    expect(await openPanel().findByText('6 left today')).toBeInTheDocument();
   });
 
   it('disables Generate and shows the waiting text while the recipe is being made', async () => {
@@ -214,7 +224,7 @@ describe('Cook page', () => {
     expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
     await addChips(user, 'rice');
     expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
-    expect(screen.getByText('0 left today')).toBeInTheDocument();
+    expect(openPanel().getByText('0 left today')).toBeInTheDocument();
   });
 
   it('flags the chips named in a 400 with their reasons, and clears the flags when the chips change', async () => {
@@ -236,6 +246,110 @@ describe('Cook page', () => {
     await user.click(screen.getByRole('button', { name: 'Remove peanut butter' }));
     await waitFor(() => expect(screen.queryByText(/allergy: Peanuts/)).not.toBeInTheDocument());
     expectNoEmoji();
+  });
+});
+
+describe('Cook page tabs', () => {
+  it('bothTabsRender_ingredientsSelectedByDefault', async () => {
+    signedIn();
+    renderApp('/cook');
+
+    expect(await screen.findByRole('heading', { name: 'Cook with what I have' })).toBeInTheDocument();
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual(['From my ingredients', 'From a post']);
+    expect(screen.getByRole('tab', { name: 'From my ingredients' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'From a post' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('From my ingredients');
+    expect(screen.getByText(INGREDIENTS_INTRO)).toBeInTheDocument();
+    expect(screen.queryByText(POST_INTRO)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Ingredients')).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: "Paste the post's caption" })).not.toBeInTheDocument();
+    expectNoEmoji();
+  });
+
+  it('tabParam_opensPostTab', async () => {
+    signedIn();
+    renderApp('/cook?tab=post');
+
+    expect(await screen.findByRole('textbox', { name: "Paste the post's caption" })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'From a post' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('From a post');
+    expect(screen.getByText(POST_INTRO)).toBeInTheDocument();
+    expect(screen.queryByText(INGREDIENTS_INTRO)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate' })).not.toBeInTheDocument();
+  });
+
+  it('arrowKeys_moveBetweenTabs', async () => {
+    signedIn();
+    const user = userEvent.setup();
+    renderApp('/cook');
+
+    const ingredientsTab = await screen.findByRole('tab', { name: 'From my ingredients' });
+    const postTab = screen.getByRole('tab', { name: 'From a post' });
+    expect(ingredientsTab).toHaveAttribute('tabindex', '0');
+    expect(postTab).toHaveAttribute('tabindex', '-1');
+    ingredientsTab.focus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(postTab).toHaveFocus();
+    expect(postTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('textbox', { name: "Paste the post's caption" })).toBeInTheDocument();
+
+    await user.keyboard('{ArrowRight}'); // wraps around
+    expect(ingredientsTab).toHaveFocus();
+    expect(ingredientsTab).toHaveAttribute('aria-selected', 'true');
+
+    await user.keyboard('{End}');
+    expect(postTab).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(ingredientsTab).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(postTab).toHaveFocus();
+    expect(postTab).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('ingredientsTab_stillGenerates', async () => {
+    signedIn();
+    server.use(http.post(GENERATE, () => HttpResponse.json({ recipe: recipeFor(), remainingToday: 6 })));
+    const user = userEvent.setup();
+    renderApp('/cook?tab=post');
+
+    await user.click(await screen.findByRole('tab', { name: 'From my ingredients' }));
+    await addChips(user, 'eggs', 'tomatoes');
+    await user.click(screen.getByRole('button', { name: 'Generate' }));
+    expect(await screen.findByRole('heading', { name: 'Tomato Egg Skillet' })).toBeInTheDocument();
+    expect(openPanel().getByText('6 left today')).toBeInTheDocument();
+  });
+
+  it('importUpdatesTheSharedCounter', async () => {
+    signedIn();
+    server.use(http.post(IMPORT, () => HttpResponse.json({
+      recipe: recipeFor({ id: 'p-1', kind: 'post', mealType: null, title: 'Corn Salad', origin: 'recipe' }),
+      remainingToday: 4,
+    })));
+    const user = userEvent.setup();
+    renderApp('/cook?tab=post');
+
+    expect(await findInOpenPanel('7 left today')).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: "Paste the post's caption" }), 'Charred corn salad');
+    await user.click(screen.getByRole('button', { name: 'Make recipe' }));
+    await screen.findByRole('heading', { name: 'Corn Salad' });
+    expect(openPanel().getByText('4 left today')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'From my ingredients' }));
+    expect(openPanel().getByText('4 left today')).toBeInTheDocument();
+
+    // A daily_limit on the post tab disables Generate on the ingredients tab too.
+    server.use(http.post(IMPORT, () => HttpResponse.json({ detail: 'x', code: 'daily_limit' }, { status: 429 })));
+    await user.click(screen.getByRole('tab', { name: 'From a post' }));
+    await user.click(screen.getByRole('button', { name: 'Make recipe' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("You've used today's 10 AI recipes. More tomorrow.");
+    expect(screen.getByRole('button', { name: 'Make recipe' })).toBeDisabled();
+
+    await user.click(screen.getByRole('tab', { name: 'From my ingredients' }));
+    await addChips(user, 'eggs', 'tomatoes');
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
+    expect(openPanel().getByText('0 left today')).toBeInTheDocument();
   });
 });
 
