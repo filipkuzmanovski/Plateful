@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -24,11 +26,15 @@ import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
 import mk.ukim.finki.wp.recipeappbackend.exception.DailyLimitException;
 import mk.ukim.finki.wp.recipeappbackend.exception.GenerationFailedException;
 import mk.ukim.finki.wp.recipeappbackend.exception.GenerationRequestException;
+import mk.ukim.finki.wp.recipeappbackend.exception.InvalidScanPhotoException;
+import mk.ukim.finki.wp.recipeappbackend.exception.ScanFailedException;
+import mk.ukim.finki.wp.recipeappbackend.exception.ScanLimitException;
 import mk.ukim.finki.wp.recipeappbackend.exception.NoPreferencesException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.food.Allergen;
 import mk.ukim.finki.wp.recipeappbackend.generation.AiRecipeService;
 import mk.ukim.finki.wp.recipeappbackend.generation.AiUsageService;
+import mk.ukim.finki.wp.recipeappbackend.generation.PhotoScanService;
 import mk.ukim.finki.wp.recipeappbackend.generation.RecipeGenerationService;
 import mk.ukim.finki.wp.recipeappbackend.generation.SafetyCheck;
 import mk.ukim.finki.wp.recipeappbackend.generation.StoredRecipe;
@@ -37,8 +43,10 @@ import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.AiUsageDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GenerateResultDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GeneratedRecipeDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GeneratedRecipeSummaryDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.ScanResultDto;
 import mk.ukim.finki.wp.recipeappbackend.security.MfaFactorLookup;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -48,7 +56,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 @WebMvcTest(AiRecipeController.class)
 @Import(SecurityConfig.class)
@@ -63,6 +75,8 @@ class AiRecipeControllerTest {
     AiRecipeService recipes;
     @MockitoBean
     AiUsageService usage;
+    @MockitoBean
+    PhotoScanService scans;
     @MockitoBean
     JwtDecoder jwtDecoder; // satisfies SecurityConfig's resource-server wiring
     @MockitoBean
@@ -233,6 +247,159 @@ class AiRecipeControllerTest {
         verifyNoInteractions(generation);
     }
 
+    // ---- scan
+
+    private static MockMultipartFile jpeg(String name, byte... bytes) {
+        return new MockMultipartFile("photos", name, "image/jpeg", bytes);
+    }
+
+    private static MockMultipartHttpServletRequestBuilder scanOne() {
+        return multipart(BASE + "/scan").file(jpeg("a.jpg", (byte) 1));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void scan_passesTheBytesInOrderAndReturnsTheResult() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenReturn(new ScanResultDto(
+                List.of("egg", "spinach"),
+                List.of(new ScanResultDto.LeftOutDto("peanut butter", "allergy: Peanuts")),
+                7));
+
+        mockMvc.perform(multipart(BASE + "/scan")
+                        .file(jpeg("a.jpg", (byte) 1, (byte) 2))
+                        .file(jpeg("b.jpg", (byte) 3))
+                        .with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ingredients[0]").value("egg"))
+                .andExpect(jsonPath("$.ingredients[1]").value("spinach"))
+                .andExpect(jsonPath("$.leftOut[0].ingredient").value("peanut butter"))
+                .andExpect(jsonPath("$.leftOut[0].reason").value("allergy: Peanuts"))
+                .andExpect(jsonPath("$.remainingScans").value(7));
+
+        ArgumentCaptor<List<byte[]>> captor = ArgumentCaptor.forClass(List.class);
+        verify(scans).scan(eq(USER_ID), captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+        assertThat(captor.getValue().get(0)).containsExactly(1, 2);
+        assertThat(captor.getValue().get(1)).containsExactly(3);
+    }
+
+    @Test
+    void scan_missingPart_is400InvalidPhoto() throws Exception {
+        mockMvc.perform(multipart(BASE + "/scan").with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_photo"))
+                .andExpect(jsonPath("$.detail").value("Use 1 to 3 photos (JPEG, up to 1 MB each)."));
+
+        verifyNoInteractions(scans);
+    }
+
+    @Test
+    void scan_nonFileField_is400InvalidPhoto() throws Exception {
+        mockMvc.perform(multipart(BASE + "/scan").param("photos", "not a file").with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_photo"));
+
+        verifyNoInteractions(scans);
+    }
+
+    @Test
+    void scan_invalidPhoto_is400() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new InvalidScanPhotoException("not a JPEG"));
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_photo"))
+                .andExpect(jsonPath("$.detail").value("Use 1 to 3 photos (JPEG, up to 1 MB each)."));
+    }
+
+    @Test
+    void scan_noPreferences_is409() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new NoPreferencesException());
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("no_preferences"));
+    }
+
+    @Test
+    void scan_limit_is429() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new ScanLimitException());
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("scan_limit"))
+                .andExpect(jsonPath("$.detail").value("You've used today's 10 photo scans. More tomorrow."));
+    }
+
+    @Test
+    void scan_failed_is422() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new ScanFailedException());
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("scan_failed"))
+                .andExpect(jsonPath("$.detail")
+                        .value("Couldn't read the photo. Try again or type your ingredients."));
+    }
+
+    @Test
+    void scan_quota_is503() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new AiQuotaExceededException("groq 429"));
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("ai_quota"));
+    }
+
+    @Test
+    void scan_unavailable_is503() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new AiUnavailableException("groq down"));
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("ai_unavailable"));
+    }
+
+    @Test
+    void scan_notConfigured_is503() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new AiNotConfiguredException("no keys"));
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("ai_not_configured"));
+    }
+
+    @Test
+    void scan_uploadTooLarge_is400InvalidPhoto() throws Exception {
+        // MockMvc does not enforce the multipart limits, so the exception Spring would raise is thrown here
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new MaxUploadSizeExceededException(1));
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_photo"))
+                .andExpect(jsonPath("$.detail").value("Use 1 to 3 photos (JPEG, up to 1 MB each)."));
+    }
+
+    @Test
+    void scan_malformedMultipart_is400InvalidPhoto() throws Exception {
+        when(scans.scan(eq(USER_ID), any())).thenThrow(new MultipartException("broken"));
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_photo"));
+    }
+
+    @Test
+    void scan_withVerifiedFactorAtAal1_is401MfaRequired() throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+
+        mockMvc.perform(scanOne().with(authed()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("mfa_required"));
+
+        verifyNoInteractions(scans);
+    }
+
     // ---- list
 
     @Test
@@ -362,7 +529,8 @@ class AiRecipeControllerTest {
         mockMvc.perform(get(BASE + "/" + RECIPE_ID)).andExpect(status().isUnauthorized());
         mockMvc.perform(put(BASE + "/" + RECIPE_ID + "/saved")).andExpect(status().isUnauthorized());
         mockMvc.perform(delete(BASE + "/" + RECIPE_ID + "/saved")).andExpect(status().isUnauthorized());
+        mockMvc.perform(scanOne()).andExpect(status().isUnauthorized());
 
-        verifyNoInteractions(generation, recipes, usage);
+        verifyNoInteractions(generation, recipes, usage, scans);
     }
 }

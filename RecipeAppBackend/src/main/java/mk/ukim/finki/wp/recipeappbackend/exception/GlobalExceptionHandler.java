@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.LinkedHashMap;
@@ -204,12 +206,60 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** A scan photo is unusable (count, size, type, unreadable): 400. The exception message is not sent. */
+    @ExceptionHandler(InvalidScanPhotoException.class)
+    ProblemDetail handleInvalidScanPhoto(InvalidScanPhotoException ex) {
+        return invalidScanPhoto();
+    }
+
+    /**
+     * A malformed multipart request: 400 with the same problem as a bad photo (no other endpoint takes
+     * multipart). {@code MaxUploadSizeExceededException}, a subclass, is handled by the override below,
+     * because {@link ResponseEntityExceptionHandler} already maps it.
+     */
+    @ExceptionHandler(MultipartException.class)
+    ProblemDetail handleMultipart(MultipartException ex) {
+        return invalidScanPhoto();
+    }
+
+    /** All of today's photo scans used: 429. */
+    @ExceptionHandler(ScanLimitException.class)
+    ProblemDetail handleScanLimit(ScanLimitException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problem.setProperty("code", "scan_limit");
+        return problem;
+    }
+
+    /** The AI's reply to a scan was unreadable twice: 422. */
+    @ExceptionHandler(ScanFailedException.class)
+    ProblemDetail handleScanFailed(ScanFailedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatusCode.valueOf(422), ex.getMessage());
+        problem.setProperty("code", "scan_failed");
+        return problem;
+    }
+
+    private static ProblemDetail invalidScanPhoto() {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                "Use 1 to 3 photos (JPEG, up to 1 MB each).");
+        problem.setProperty("code", "invalid_photo");
+        return problem;
+    }
+
     /** Catch-all: log the real cause server-side, leak nothing to the client. */
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception ex) {
         log.error("Unhandled exception", ex);
         return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected error occurred");
+    }
+
+    /** Spring's own upload-size error (the multipart limits in application.properties): the invalid_photo problem. */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex,
+                                                                          HttpHeaders headers,
+                                                                          HttpStatusCode status,
+                                                                          WebRequest request) {
+        return ResponseEntity.badRequest().body(invalidScanPhoto());
     }
 
     @Override
