@@ -71,9 +71,16 @@ class GeneratedRecipeKindDbTest {
     }
 
     @Test
+    void cookKind_inserts() {
+        assertThat(insert(newUser(), "cook")).isEqualTo(1);
+    }
+
+    @Test
     void unknownKind_isRefused() {
         UUID userId = newUser();
 
-        assertThatThrownBy(() -> insert(userId, "other")).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insert(userId, "other"))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("generated_recipes_kind_check");
     }
 }
