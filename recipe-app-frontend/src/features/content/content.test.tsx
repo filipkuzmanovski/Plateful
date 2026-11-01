@@ -174,6 +174,31 @@ describe('Privacy Policy', () => {
     expectNoEmoji(main);
   });
 
+  test('explains the AI recipes: who makes them, what is sent and never sent, and the 30-day deletion', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    expect(screen.getByRole('heading', { level: 2, name: 'AI recipes' })).toBeInTheDocument();
+    const section = document.getElementById('ai-recipes')!;
+    expect(section).not.toBeNull();
+    expect(section).toHaveTextContent('made by Groq');
+    expect(section).toHaveTextContent('made by Google Gemini');
+    expect(section).toHaveTextContent(
+      'What is sent: the ingredients you typed, the meal type, a list of ingredients to avoid',
+    );
+    expect(section).toHaveTextContent('the cuisines and ingredients you like');
+    expect(section).toHaveTextContent('example recipes from a research dataset');
+    expect(section).toHaveTextContent(
+      'What is never sent: your name, your email address or anything that identifies your account.',
+    );
+    expect(section).toHaveTextContent("may use what is sent to improve Google's products");
+    expect(section).toHaveTextContent('human reviewers may read it');
+    expect(section).toHaveTextContent("Groq's data retention is switched off");
+    expect(section).toHaveTextContent('do not type personal information into the ingredient box');
+    expect(section).toHaveTextContent('stored privately on your account and are deleted together with it');
+    expect(section).toHaveTextContent('not saved is deleted after 30 days');
+    expectNoEmoji(section);
+  });
+
   test('has section headings as h2', async () => {
     renderApp('/privacy');
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });

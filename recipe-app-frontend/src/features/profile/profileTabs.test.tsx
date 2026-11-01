@@ -183,13 +183,28 @@ describe('profile tabs', () => {
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/));
   });
 
-  test('hasThreeTabsInOrder', async () => {
+  test('hasFourTabsInOrder', async () => {
     signedIn();
     fakeSavedServer([soup]);
     renderAt('/me');
 
     await screen.findByRole('tab', { name: 'My recipes' });
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['My recipes', 'Saved', 'Preferences']);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['My recipes', 'Saved', 'AI recipes', 'Preferences']);
+  });
+
+  test('aiTabFollowsUrl', async () => {
+    signedIn();
+    fakeSavedServer([soup]);
+    server.use(http.get(`${BASE}/api/users/me/ai-recipes`, () => HttpResponse.json(pageOf([]))));
+    renderAt('/me?tab=ai');
+
+    const tab = await screen.findByRole('tab', { name: 'AI recipes' });
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'My recipes' })).toHaveAttribute('aria-selected', 'false');
+    expect(await screen.findByText('No saved AI recipes yet.')).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('AI recipes');
+    expect(screen.queryByText('My Own Pie')).not.toBeInTheDocument();
+    expectNoEmoji();
   });
 
   test('preferencesTabFollowsUrl', async () => {
@@ -211,15 +226,19 @@ describe('profile tabs', () => {
     signedIn();
     fakeSavedServer([soup]);
     stubPreferencesApi();
+    server.use(http.get(`${BASE}/api/users/me/ai-recipes`, () => HttpResponse.json(pageOf([]))));
     renderAt('/me');
 
     const mineTab = await screen.findByRole('tab', { name: 'My recipes' });
     const savedTab = screen.getByRole('tab', { name: 'Saved' });
+    const aiTab = screen.getByRole('tab', { name: 'AI recipes' });
     const prefsTab = screen.getByRole('tab', { name: 'Preferences' });
     // Roving tabindex: only the selected tab is in the page's tab order.
     expect(mineTab).toHaveAttribute('tabindex', '0');
     expect(savedTab).toHaveAttribute('tabindex', '-1');
+    expect(aiTab).toHaveAttribute('tabindex', '-1');
     expect(prefsTab).toHaveAttribute('tabindex', '-1');
+    const tabParam = () => new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('tab');
 
     mineTab.focus();
     await userEvent.keyboard('{ArrowRight}');
@@ -228,14 +247,21 @@ describe('profile tabs', () => {
     expect(savedTab).toHaveAttribute('tabindex', '0');
     expect(mineTab).toHaveAttribute('tabindex', '-1');
     expect(await screen.findByText('Saved Soup')).toBeInTheDocument();
-    expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('tab')).toBe('saved');
+    expect(tabParam()).toBe('saved');
+
+    await userEvent.keyboard('{ArrowRight}');
+    expect(aiTab).toHaveFocus();
+    expect(aiTab).toHaveAttribute('aria-selected', 'true');
+    expect(aiTab).toHaveAttribute('tabindex', '0');
+    expect(savedTab).toHaveAttribute('tabindex', '-1');
+    expect(tabParam()).toBe('ai');
 
     await userEvent.keyboard('{ArrowRight}');
     expect(prefsTab).toHaveFocus();
     expect(prefsTab).toHaveAttribute('aria-selected', 'true');
     expect(prefsTab).toHaveAttribute('tabindex', '0');
-    expect(savedTab).toHaveAttribute('tabindex', '-1');
-    expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('tab')).toBe('preferences');
+    expect(aiTab).toHaveAttribute('tabindex', '-1');
+    expect(tabParam()).toBe('preferences');
 
     await userEvent.keyboard('{ArrowRight}'); // wraps to the first tab
     expect(mineTab).toHaveFocus();
@@ -245,6 +271,10 @@ describe('profile tabs', () => {
     await userEvent.keyboard('{ArrowLeft}'); // wraps to the last tab
     expect(prefsTab).toHaveFocus();
     expect(prefsTab).toHaveAttribute('aria-selected', 'true');
+
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(aiTab).toHaveFocus();
+    expect(aiTab).toHaveAttribute('aria-selected', 'true');
 
     await userEvent.keyboard('{ArrowLeft}');
     expect(savedTab).toHaveFocus();

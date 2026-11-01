@@ -120,6 +120,36 @@ export default function PrivacyPage() {
           ),
         },
         {
+          id: 'ai-recipes',
+          title: 'AI recipes',
+          body: (
+            <>
+              <p>
+                When you ask {SITE.name} to make a recipe, or open today's meals, an AI service writes it. The recipe
+                is made by Groq. If Groq is not available, it is made by Google Gemini.
+              </p>
+              <p>
+                <Strong>What is sent:</Strong> the ingredients you typed, the meal type, a list of ingredients to
+                avoid (built from your allergies, diet and dislikes), the cuisines and ingredients you like, and a few
+                example recipes from a research dataset.
+              </p>
+              <p>
+                <Strong>What is never sent:</Strong> your name, your email address or anything that identifies your
+                account.
+              </p>
+              <p>
+                The free tier of Google Gemini may use what is sent to improve Google's products, and human reviewers
+                may read it. Groq's data retention is switched off. Please do not type personal information into the
+                ingredient box.
+              </p>
+              <p>
+                AI recipes are stored privately on your account and are deleted together with it. A recipe you have not
+                saved is deleted after 30 days.
+              </p>
+            </>
+          ),
+        },
+        {
           id: 'public-content',
           title: 'Public content',
           body: (

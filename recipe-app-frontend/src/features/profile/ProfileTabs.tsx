@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 const TABS = [
   { key: 'mine', label: 'My recipes' },
   { key: 'saved', label: 'Saved' },
+  { key: 'ai', label: 'AI recipes' },
   { key: 'preferences', label: 'Preferences' },
 ] as const;
 
@@ -13,18 +14,20 @@ const tabId = (key: TabKey) => `profile-tab-${key}`;
 const panelId = (key: TabKey) => `profile-panel-${key}`;
 
 /**
- * The "My recipes" / "Saved" / "Preferences" tabs on the user's own profile. The selected tab lives in the URL
- * (`?tab=saved` or `?tab=preferences`; anything else is "My recipes"). Arrow keys move focus and select (automatic activation).
- * Only the selected panel's content is rendered, so the Saved list and preferences are not fetched until opened.
+ * The "My recipes" / "Saved" / "AI recipes" / "Preferences" tabs on the user's own profile. The selected tab lives in the URL
+ * (`?tab=saved`, `?tab=ai` or `?tab=preferences`; anything else is "My recipes"). Arrow keys move focus and select (automatic activation).
+ * Only the selected panel's content is rendered, so the Saved and AI recipes lists and preferences are not fetched until opened.
  */
 export function ProfileTabs({
   mine,
   saved,
+  ai,
   preferences,
   needsAttention = 0,
 }: {
   mine: ReactNode;
   saved: ReactNode;
+  ai: ReactNode;
   preferences: ReactNode;
   /** Rejected recipes the author should look at; shown in the "My recipes" label when above 0. */
   needsAttention?: number;
@@ -32,7 +35,7 @@ export function ProfileTabs({
   const [params, setParams] = useSearchParams();
   const tabParam = params.get('tab');
   const selected: TabKey = TABS.find((t) => t.key === tabParam)?.key ?? 'mine';
-  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ mine: null, saved: null, preferences: null });
+  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ mine: null, saved: null, ai: null, preferences: null });
 
   function select(key: TabKey) {
     const next = new URLSearchParams(params);
@@ -58,7 +61,7 @@ export function ProfileTabs({
     tabRefs.current[key]?.focus();
   }
 
-  const content: Record<TabKey, ReactNode> = { mine, saved, preferences };
+  const content: Record<TabKey, ReactNode> = { mine, saved, ai, preferences };
 
   return (
     <div className="mt-10">
@@ -67,7 +70,7 @@ export function ProfileTabs({
           role="tablist"
           aria-label="Your recipes and preferences"
           onKeyDown={onKeyDown}
-          className="inline-flex items-center gap-1 rounded-full bg-paper p-1 shadow-card ring-1 ring-sand/70"
+          className="inline-flex max-w-full items-center gap-1 rounded-full max-sm:overflow-x-auto bg-paper p-1 shadow-card ring-1 ring-sand/70"
         >
           {TABS.map(({ key, label }) => {
             const active = key === selected;
@@ -82,7 +85,7 @@ export function ProfileTabs({
                 aria-controls={panelId(key)}
                 tabIndex={active ? 0 : -1}
                 onClick={() => select(key)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition duration-200 sm:px-5 ${
+                className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition duration-200 sm:px-5 ${
                   active ? 'bg-olive text-cream shadow-button' : 'text-olive hover:bg-sand/60'
                 }`}
               >

@@ -9,6 +9,6 @@ export const SITE = {
   country: 'North Macedonia',
   city: 'Skopje',
   dataProtectionAuthority: 'the Personal Data Protection Agency of North Macedonia (azlp.mk)',
-  legalLastUpdated: '30 October 2026',
+  legalLastUpdated: '1 November 2026',
   copyrightYear: 2026,
 } as const;
