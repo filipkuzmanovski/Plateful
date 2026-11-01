@@ -13,6 +13,7 @@ import { IngredientChipInput } from '@/features/preferences/IngredientChipInput'
 import type { GeneratedRecipe, MealType } from '@/lib/types';
 import { aiErrorMessage } from './aiMessages';
 import { AiRecipeView } from './AiRecipeView';
+import { PhotoScan } from './PhotoScan';
 import { SaveAiRecipeButton } from './SaveAiRecipeButton';
 
 const MAX_INGREDIENTS = 15;
@@ -135,6 +136,8 @@ export default function CookPage() {
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-7">
+        <PhotoScan current={ingredients} max={MAX_INGREDIENTS} onFound={changeIngredients} />
+
         <IngredientChipInput
           label="Ingredients"
           values={ingredients}
