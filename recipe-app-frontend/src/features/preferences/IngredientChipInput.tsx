@@ -13,18 +13,21 @@ const clean = (raw: string) => raw.trim().replace(/\s+/g, ' ').slice(0, MAX_NAME
  * A free-text list of ingredient names. Enter or a comma adds the typed name as a removable chip;
  * suggestions from the ingredient catalogue appear (after a 300 ms pause) as buttons below the input.
  * Names are trimmed, capped at 60 characters and compared case-insensitively. At `max` the input is
- * disabled with a hint.
+ * disabled with a hint. `flagged` maps a chip's exact text to a reason: those chips get a danger style
+ * and the reason as visible text under them.
  */
 export function IngredientChipInput({
   label,
   values,
   onChange,
   max,
+  flagged,
 }: {
   label: string;
   values: string[];
   onChange: (v: string[]) => void;
   max: number;
+  flagged?: Record<string, string>;
 }) {
   const inputId = useId();
   const [text, setText] = useState('');
@@ -113,22 +116,33 @@ export function IngredientChipInput({
 
       {values.length > 0 && (
         <ul className="mb-2.5 flex flex-wrap gap-2">
-          {values.map((name) => (
-            <li
-              key={name}
-              className="inline-flex items-center gap-1 rounded-full bg-olive py-1 pr-1 pl-3.5 text-sm font-medium text-cream shadow-button"
-            >
-              {name}
-              <button
-                type="button"
-                aria-label={`Remove ${name}`}
-                onClick={() => remove(name)}
-                className="flex size-6 items-center justify-center rounded-full transition hover:bg-cream/20 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-saffron"
-              >
-                <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
-              </button>
-            </li>
-          ))}
+          {values.map((name) => {
+            const reason = flagged && Object.hasOwn(flagged, name) ? flagged[name] : undefined;
+            return (
+              <li key={name} className="flex flex-col items-start gap-1">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full py-1 pr-1 pl-3.5 text-sm font-medium ${
+                    reason !== undefined
+                      ? 'border border-danger bg-danger/10 text-danger'
+                      : 'bg-olive text-cream shadow-button'
+                  }`}
+                >
+                  {name}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${name}`}
+                    onClick={() => remove(name)}
+                    className="flex size-6 items-center justify-center rounded-full transition hover:bg-cream/20 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-saffron"
+                  >
+                    <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
+                  </button>
+                </span>
+                {reason !== undefined && (
+                  <span className="pl-3.5 text-xs font-medium text-danger">{name}: {reason}</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

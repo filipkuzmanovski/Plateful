@@ -76,6 +76,7 @@ export default function AppShell() {
           </Link>
           <nav className="flex items-center gap-1 text-sm sm:gap-2">
             <NavLink to="/" end className={navLink}>Browse</NavLink>
+            {status === 'ready' && <NavLink to="/cook" className={navLink}>Cook</NavLink>}
             {status === 'ready' && (
               <NavLink to="/recipes/new" className={(s) => `${navLink(s)} inline-flex items-center gap-1`}>
                 <Plus aria-hidden="true" className="hidden size-4 sm:block" />
