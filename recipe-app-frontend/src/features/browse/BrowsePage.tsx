@@ -13,6 +13,7 @@ import { countActive, emptyFilters, readFilters, readQuery, readSort, SORT_KEYS,
 import { FilterDrawer } from './FilterDrawer';
 import { ActiveFilterChips } from './ActiveFilterChips';
 import { SearchBar } from './SearchBar';
+import { TodaysMeals } from '@/features/ai/TodaysMeals';
 
 const SORT_ICONS: Record<SortKey, LucideIcon> = {
   newest: Clock,
@@ -52,6 +53,7 @@ export default function BrowsePage() {
 
   return (
     <div>
+      <TodaysMeals />
       <section className="mb-8 sm:mb-10">
         <h1 className="max-w-2xl font-serif text-4xl leading-[1.08] font-semibold tracking-tight text-balance text-olive sm:text-5xl">
           Cook something <em className="font-medium text-terracotta italic">wonderful</em> tonight
