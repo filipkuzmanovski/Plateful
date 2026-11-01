@@ -12,6 +12,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.ZoneId;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -63,10 +65,40 @@ class DailyMealsServiceTest {
     private static final UUID L = UUID.fromString("b0000000-0000-0000-0000-000000000002");
     private static final UUID D = UUID.fromString("b0000000-0000-0000-0000-000000000003");
 
+    /** A clock the fake AI moves forward on every call. */
+    private static final class MovingClock extends Clock {
+        private Instant now = NOW;
+
+        void advance(Duration d) {
+            now = now.plus(d);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+    }
+
     /** Replies (a String is the JSON, a RuntimeException is thrown) in order; remembers the requests. */
     private static final class ScriptedAi implements RecipeAi {
         final Deque<Object> script = new ArrayDeque<>();
         final List<AiRequest> requests = new ArrayList<>();
+        final MovingClock clock;
+        Duration perCall = Duration.ZERO;
+
+        ScriptedAi(MovingClock clock) {
+            this.clock = clock;
+        }
 
         ScriptedAi then(Object... replies) {
             script.addAll(List.of(replies));
@@ -76,6 +108,7 @@ class DailyMealsServiceTest {
         @Override
         public AiReply complete(AiRequest request) {
             requests.add(request);
+            clock.advance(perCall);
             Object next = script.poll();
             if (next instanceof RuntimeException e) {
                 throw e;
@@ -92,6 +125,7 @@ class DailyMealsServiceTest {
     private GeneratedRecipeRepository recipes;
     private AiStateRepository state;
     private PlatformTransactionManager transactionManager;
+    private MovingClock clock;
     private ScriptedAi ai;
     private GeneratedRecipeMapper mapper;
     private DailyMealsService service;
@@ -105,7 +139,8 @@ class DailyMealsServiceTest {
         ReferenceDataRepository reference = mock(ReferenceDataRepository.class);
         PlatefulComparisonRepository plateful = mock(PlatefulComparisonRepository.class);
         transactionManager = mock(PlatformTransactionManager.class);
-        ai = new ScriptedAi();
+        clock = new MovingClock();
+        ai = new ScriptedAi(clock);
 
         when(preferences.findById(USER)).thenReturn(Optional.of(UserPreferences.builder().userId(USER).build()));
         when(users.getReferenceById(any())).thenReturn(mock(User.class));
@@ -130,7 +165,7 @@ class DailyMealsServiceTest {
                 new ReferenceFinder(reference, plateful, safety),
                 new PromptBuilder(rules, staples, new Random(1)),
                 ai, new DraftParser(new CuisineCatalog()), safety, new NoveltyCheck(staples),
-                mapper, new TransactionTemplate(transactionManager), Clock.fixed(NOW, ZoneOffset.UTC));
+                mapper, new TransactionTemplate(transactionManager), clock);
     }
 
     // ---- helpers
@@ -298,7 +333,7 @@ class DailyMealsServiceTest {
                 .containsExactly("Berry Oat Bowl", "Lemon Chickpea Salad", "Garlic Mushroom Risotto");
         assertThat(rows).extracting(GeneratedRecipe::getProvider).containsOnly("groq");
         assertThat(rows).extracting(GeneratedRecipe::getModel).containsOnly("test-model");
-        assertThat(rows.get(0).getRequest()).containsEntry("date", "2026-10-31").containsEntry("mealType", "breakfast");
+        assertThat(rows.get(0).getRequest()).containsOnlyKeys("mealDate").containsEntry("mealDate", "2026-10-31");
         assertThat(rows.get(0).getSavedAt()).isNull();
 
         // The rows are flushed before the set is updated, and both happen in one transaction.
@@ -423,7 +458,7 @@ class DailyMealsServiceTest {
     }
 
     @Test
-    void failDailySetReturningFalse_stillReturnsTheFallback() {
+    void failDailySetReturningFalse_withNoReadySetYet_returnsTheFallback() {
         when(state.failDailySet(USER, DATE)).thenReturn(false);
         ai.then(new AiQuotaExceededException("quota"));
         storeSet(EARLIER, "ready", true);
@@ -435,6 +470,65 @@ class DailyMealsServiceTest {
     }
 
     @Test
+    void failDailySetReturningFalse_servesTheSetTheNewOwnerFinished() {
+        when(state.failDailySet(USER, DATE)).thenReturn(false);
+        DailySetRow ready = new DailySetRow(DATE, "ready", B, L, D, OffsetDateTime.parse("2026-10-31T12:01:00Z"));
+        when(state.findDailySet(USER, DATE)).thenReturn(Optional.empty(), Optional.of(ready));
+        when(recipes.findAllById(List.of(B, L, D))).thenReturn(List.of(
+                stored(B, "breakfast", "Their Breakfast"), stored(L, "lunch", "Their Lunch"),
+                stored(D, "dinner", "Their Dinner")));
+        ai.then(new AiQuotaExceededException("quota"));
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(result.date()).isEqualTo(DATE);
+        assertThat(result.fresh()).isTrue();
+        assertThat(result.meals().get("lunch").title()).isEqualTo("Their Lunch");
+    }
+
+    @Test
+    void slowFirstCall_withAFailedMeal_makesNoSecondCall() {
+        String broken = "{\"title\":\"No ingredients\"}";
+        ai.perCall = Duration.ofSeconds(50); // 25 s left of the 75 s budget: under the 30 s minimum
+        ai.then(meals(BREAKFAST, broken, DINNER), meals(null, LUNCH, null));
+        storeSet(EARLIER, "ready", true);
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(ai.requests).hasSize(1);
+        verify(recipes, never()).save(any());
+        verify(state).failDailySet(USER, DATE);
+        assertThat(result.date()).isEqualTo(EARLIER);
+        assertThat(result.fresh()).isFalse();
+    }
+
+    @Test
+    void firstCallWithExactlyTheMinimumLeft_stillRetries() {
+        String broken = "{\"title\":\"No ingredients\"}";
+        ai.perCall = Duration.ofSeconds(45); // exactly 30 s left: allowed
+        ai.then(meals(BREAKFAST, broken, DINNER), meals(null, LUNCH, null));
+
+        DailyMealsDto result = service.today(USER, DATE);
+
+        assertThat(ai.requests).hasSize(2);
+        assertThat(result.status()).isEqualTo("ready");
+    }
+
+    @Test
+    void databaseErrorWhileSaving_marksFailedAndRethrows() {
+        when(recipes.save(any(GeneratedRecipe.class)))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("db down"));
+        ai.then(meals(BREAKFAST, LUNCH, DINNER));
+
+        assertThatThrownBy(() -> service.today(USER, DATE))
+                .isInstanceOf(org.springframework.dao.DataAccessResourceFailureException.class);
+
+        verify(transactionManager).rollback(any());
+        verify(state, never()).finishDailySet(any(), any(), any(), any(), any());
+        verify(state).failDailySet(USER, DATE);
+    }
+
+    @Test
     void staleProfileKey_marksFailedAndPropagates() {
         when(preferences.findById(USER)).thenReturn(Optional.of(
                 UserPreferences.builder().userId(USER).allergens(List.of("no_such_allergen")).build()));
@@ -443,7 +537,7 @@ class DailyMealsServiceTest {
         assertThatThrownBy(() -> service.today(USER, DATE)).isInstanceOf(IllegalArgumentException.class);
 
         verify(state).failDailySet(USER, DATE);
-        assertThat(ai.requests.size()).isLessThanOrEqualTo(1); // never retried
+        assertThat(ai.requests).isEmpty(); // the stale key stops it before any AI call
         verify(recipes, never()).save(any());
     }
 

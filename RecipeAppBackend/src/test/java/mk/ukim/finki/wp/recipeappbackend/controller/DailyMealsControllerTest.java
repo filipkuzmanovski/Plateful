@@ -1,5 +1,8 @@
 package mk.ukim.finki.wp.recipeappbackend.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -8,12 +11,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
+import mk.ukim.finki.wp.recipeappbackend.exception.GenerationRequestException;
 import mk.ukim.finki.wp.recipeappbackend.exception.NoPreferencesException;
 import mk.ukim.finki.wp.recipeappbackend.generation.DailyMealsService;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.DailyMealsDto;
@@ -162,6 +168,23 @@ class DailyMealsControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid_request"));
         verifyNoInteractions(service);
+    }
+
+    // ---- the exact window edge, with a fixed clock (the controller is built by hand, no MockMvc)
+
+    @Test
+    void window_isExactlyOneDayEachWayOfTheServersUtcDate() {
+        DailyMealsController controller = new DailyMealsController(service,
+                Clock.fixed(Instant.parse("2026-11-01T23:59:59Z"), ZoneOffset.UTC));
+        DailyMealsDto answer = DailyMealsDto.generating();
+        for (String ok : new String[]{"2026-10-31", "2026-11-01", "2026-11-02"}) {
+            when(service.today(USER_ID, LocalDate.parse(ok))).thenReturn(answer);
+            assertThat(controller.today(USER_ID, ok)).isSameAs(answer);
+        }
+        for (String bad : new String[]{"2026-10-30", "2026-11-03"}) {
+            assertThatThrownBy(() -> controller.today(USER_ID, bad)).isInstanceOf(GenerationRequestException.class);
+            verify(service, never()).today(USER_ID, LocalDate.parse(bad));
+        }
     }
 
     // ---- errors and auth

@@ -3,6 +3,8 @@ package mk.ukim.finki.wp.recipeappbackend.generation;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
@@ -50,6 +52,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * transaction is rolled back and whatever the row now says is returned. Daily meals never touch the
  * 10-a-day counter. An {@link IllegalArgumentException} from the safety check (a stale food-rule key) is not
  * retryable: the set is marked failed and the exception goes on.
+ *
+ * <p>Time: a claim goes stale after 2 minutes, so generation keeps feature 1's budget rule: the retry call
+ * starts only if at least {@link RecipeGenerationService#MIN_TIME_FOR_ATTEMPT} of the
+ * {@link RecipeGenerationService#BUDGET} (counted from the claim) is left. The worst case is then about
+ * 115 seconds, inside the stale window, so a late owner cannot fail a take-over owner's live claim.
  */
 @Service
 public class DailyMealsService {
@@ -141,17 +148,16 @@ public class DailyMealsService {
             return whatTheRowSays(userId, date);
         }
 
+        Instant start = clock.instant();
         try {
-            Map<String, PassedMeal> passed = generate(userId, profile);
+            Map<String, PassedMeal> passed = generate(userId, profile, start);
             if (passed == null) {
-                markFailed(userId, date);
-                return fallback(userId, date);
+                return failed(userId, date);
             }
             return save(userId, date, passed);
         } catch (AiQuotaExceededException | AiUnavailableException | AiNotConfiguredException e) {
             log.info("Daily meals not generated for {}: {}", date, e.getClass().getSimpleName());
-            markFailed(userId, date);
-            return fallback(userId, date);
+            return failed(userId, date);
         } catch (RuntimeException e) {
             markFailed(userId, date);
             throw e;
@@ -162,7 +168,7 @@ public class DailyMealsService {
      * Steps 3 to 6: inspiration, one call for all three meals, per-meal checks, and one more call for only
      * the meals that failed. Returns the passed meals, or null when a meal still fails.
      */
-    private Map<String, PassedMeal> generate(UUID userId, UserFoodProfile profile) {
+    private Map<String, PassedMeal> generate(UUID userId, UserFoodProfile profile, Instant start) {
         Map<String, List<ReferenceRecipe>> examples = new LinkedHashMap<>();
         for (String meal : MEALS) {
             examples.put(meal, references.dailyInspiration(meal, profile, EXAMPLES_PER_MEAL));
@@ -174,6 +180,11 @@ public class DailyMealsService {
         Set<String> pending = new LinkedHashSet<>(MEALS);
 
         for (int call = 1; call <= MAX_CALLS && !pending.isEmpty(); call++) {
+            if (call > 1 && timeLeft(start).compareTo(RecipeGenerationService.MIN_TIME_FOR_ATTEMPT) < 0) {
+                log.info("Daily meals retry skipped: under {} s of the budget left",
+                        RecipeGenerationService.MIN_TIME_FOR_ATTEMPT.toSeconds());
+                break;
+            }
             AiReply reply = ai.complete(prompts.daily(profile, examples, recentTitles, pending, problems));
             Map<String, DraftParser.Result> parsed = parser.parseMeals(reply.json(), pending);
 
@@ -192,6 +203,10 @@ public class DailyMealsService {
             pending = new LinkedHashSet<>(problems.keySet());
         }
         return pending.isEmpty() ? passed : null;
+    }
+
+    private Duration timeLeft(Instant start) {
+        return RecipeGenerationService.BUDGET.minus(Duration.between(start, clock.instant()));
     }
 
     private Checked check(DraftParser.Result parsed, UserFoodProfile profile, List<ReferenceRecipe> examples,
@@ -245,8 +260,7 @@ public class DailyMealsService {
     private GeneratedRecipe row(UUID userId, LocalDate date, String meal, PassedMeal p) {
         StoredRecipe recipe = mapper.fromDraft(p.draft(), p.extras());
         Map<String, Object> request = new LinkedHashMap<>();
-        request.put("date", date.toString());
-        request.put("mealType", meal);
+        request.put("mealDate", date.toString());
         Long[] referenceIds = p.examples().stream().map(ReferenceRecipe::id).toArray(Long[]::new);
         return GeneratedRecipe.builder()
                 .user(users.getReferenceById(userId))
@@ -314,14 +328,27 @@ public class DailyMealsService {
         return Optional.of(DailyMealsDto.ready(date, fresh, meals));
     }
 
-    /** Marking the set failed must not hide the error that ended the generation, nor turn a fallback into one. */
-    private void markFailed(UUID userId, LocalDate date) {
+    /**
+     * Generation ended without a set: mark ours failed and return the fallback. When the set was no longer
+     * ours to mark (taken over), return what the row says now, which may be the new owner's ready set.
+     */
+    private DailyMealsDto failed(UUID userId, LocalDate date) {
+        return markFailed(userId, date) ? fallback(userId, date) : whatTheRowSays(userId, date);
+    }
+
+    /**
+     * Marking the set failed must not hide the error that ended the generation, nor turn a fallback into
+     * one. True when the set was ours and is now failed (or could not be told); false when it was not ours.
+     */
+    private boolean markFailed(UUID userId, LocalDate date) {
         try {
             if (!state.failDailySet(userId, date)) {
                 log.info("Daily set for {} was no longer ours to mark failed", date);
+                return false;
             }
         } catch (RuntimeException e) {
             log.error("Could not mark the daily set failed", e);
         }
+        return true;
     }
 }
