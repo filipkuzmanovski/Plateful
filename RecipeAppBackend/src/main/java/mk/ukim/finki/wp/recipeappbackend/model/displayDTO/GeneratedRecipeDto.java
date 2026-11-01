@@ -8,7 +8,8 @@ import mk.ukim.finki.wp.recipeappbackend.generation.StoredRecipe;
 
 /**
  * One AI-generated recipe in full (spec section 7.1). {@code allergens} are the allergens found in the
- * ingredient names, computed by the code from the food rules and never taken from the AI.
+ * ingredient names, computed by the code from the food rules and never taken from the AI. {@code origin} and
+ * {@code swaps} come from the post note of a {@code post} recipe; they are null and empty for other kinds.
  */
 public record GeneratedRecipeDto(
         UUID id,
@@ -26,6 +27,8 @@ public record GeneratedRecipeDto(
         List<Allergen> allergens,
         boolean saved,
         OffsetDateTime createdAt,
-        String provider
+        String provider,
+        String origin,
+        List<StoredRecipe.Swap> swaps
 ) {
 }

@@ -97,7 +97,7 @@ class AiRecipeControllerTest {
             List.of("Cook the rice.", "Fry the egg with the rice."),
             new StoredRecipe.Diets(true, false, false, true),
             List.of(new Allergen("egg", "Egg")),
-            false, OffsetDateTime.parse("2026-10-31T10:00:00Z"), "groq");
+            false, OffsetDateTime.parse("2026-10-31T10:00:00Z"), "groq", null, List.of());
 
     private static RequestPostProcessor authed() {
         return jwt().jwt(j -> j.subject(USER_ID.toString()).claim("aal", "aal1"));

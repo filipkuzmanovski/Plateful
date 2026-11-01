@@ -46,7 +46,7 @@ public class GeneratedRecipe {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** {@code cook} or {@code daily}. */
+    /** {@code cook}, {@code daily} or {@code post}. */
     @Column(name = "kind", nullable = false)
     private String kind;
 

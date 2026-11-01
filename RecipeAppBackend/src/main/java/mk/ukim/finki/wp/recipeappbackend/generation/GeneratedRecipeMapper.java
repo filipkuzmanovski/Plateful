@@ -116,7 +116,16 @@ public class GeneratedRecipeMapper {
         return new GeneratedRecipeDto(row.getId(), row.getKind(), row.getMealType(), row.getTitle(),
                 s.description(), s.servings(), s.prepMinutes(), s.cookMinutes(), s.cuisine(),
                 s.ingredients(), s.steps(), s.diets(), List.copyOf(allergens),
-                row.getSavedAt() != null, row.getCreatedAt(), row.getProvider());
+                row.getSavedAt() != null, row.getCreatedAt(), row.getProvider(),
+                s.post() == null ? null : s.post().origin(),
+                s.post() == null || s.post().swaps() == null ? List.of() : List.copyOf(s.post().swaps()));
+    }
+
+    /** A copy of the recipe with its post note set, for a recipe made from an Instagram post. */
+    public StoredRecipe withPost(StoredRecipe recipe, StoredRecipe.PostNote post) {
+        return new StoredRecipe(recipe.title(), recipe.description(), recipe.servings(), recipe.prepMinutes(),
+                recipe.cookMinutes(), recipe.cuisine(), recipe.ingredients(), recipe.steps(), recipe.diets(),
+                recipe.allergens(), post);
     }
 
     public GeneratedRecipeSummaryDto toSummary(GeneratedRecipe row) {
