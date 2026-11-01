@@ -238,6 +238,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** The post import request is wrong (nothing to import, caption too long, too many screenshots): 400. */
+    @ExceptionHandler(PostImportRequestException.class)
+    ProblemDetail handlePostImportRequest(PostImportRequestException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setProperty("code", "invalid_post");
+        return problem;
+    }
+
+    /** The post's screenshots were unreadable twice, or it shows no dish: 422. */
+    @ExceptionHandler(NoDishException.class)
+    ProblemDetail handleNoDish(NoDishException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatusCode.valueOf(422), ex.getMessage());
+        problem.setProperty("code", "no_dish");
+        return problem;
+    }
+
     private static ProblemDetail invalidScanPhoto() {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "Use 1 to 3 photos (JPEG, up to 1 MB each).");

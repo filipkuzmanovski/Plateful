@@ -27,6 +27,8 @@ import mk.ukim.finki.wp.recipeappbackend.exception.DailyLimitException;
 import mk.ukim.finki.wp.recipeappbackend.exception.GenerationFailedException;
 import mk.ukim.finki.wp.recipeappbackend.exception.GenerationRequestException;
 import mk.ukim.finki.wp.recipeappbackend.exception.InvalidScanPhotoException;
+import mk.ukim.finki.wp.recipeappbackend.exception.NoDishException;
+import mk.ukim.finki.wp.recipeappbackend.exception.PostImportRequestException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ScanFailedException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ScanLimitException;
 import mk.ukim.finki.wp.recipeappbackend.exception.NoPreferencesException;
@@ -35,6 +37,7 @@ import mk.ukim.finki.wp.recipeappbackend.food.Allergen;
 import mk.ukim.finki.wp.recipeappbackend.generation.AiRecipeService;
 import mk.ukim.finki.wp.recipeappbackend.generation.AiUsageService;
 import mk.ukim.finki.wp.recipeappbackend.generation.PhotoScanService;
+import mk.ukim.finki.wp.recipeappbackend.generation.PostImportService;
 import mk.ukim.finki.wp.recipeappbackend.generation.RecipeGenerationService;
 import mk.ukim.finki.wp.recipeappbackend.generation.SafetyCheck;
 import mk.ukim.finki.wp.recipeappbackend.generation.StoredRecipe;
@@ -77,6 +80,8 @@ class AiRecipeControllerTest {
     AiUsageService usage;
     @MockitoBean
     PhotoScanService scans;
+    @MockitoBean
+    PostImportService postImports;
     @MockitoBean
     JwtDecoder jwtDecoder; // satisfies SecurityConfig's resource-server wiring
     @MockitoBean
@@ -400,6 +405,195 @@ class AiRecipeControllerTest {
         verifyNoInteractions(scans);
     }
 
+    // ---- import from a post
+
+    private static final String INVALID_POST_DETAIL = "Add a caption (up to 2,200 characters) or 1 to 2 screenshots.";
+
+    private static MockMultipartFile screenshot(String name, byte... bytes) {
+        return new MockMultipartFile("screenshots", name, "image/jpeg", bytes);
+    }
+
+    private static MockMultipartHttpServletRequestBuilder importCaption() {
+        return multipart(BASE + "/import").param("caption", "Garlic pasta: boil, toss, eat.");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void import_captionOnly_reachesService() throws Exception {
+        when(postImports.importPost(eq(USER_ID), eq("Garlic pasta: boil, toss, eat."), any()))
+                .thenReturn(new GenerateResultDto(RECIPE, 6));
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.remainingToday").value(6))
+                .andExpect(jsonPath("$.recipe.id").value(RECIPE_ID.toString()))
+                .andExpect(jsonPath("$.recipe.title").value("Egg fried rice"));
+
+        ArgumentCaptor<List<byte[]>> captor = ArgumentCaptor.forClass(List.class);
+        verify(postImports).importPost(eq(USER_ID), eq("Garlic pasta: boil, toss, eat."), captor.capture());
+        assertThat(captor.getValue()).isEmpty();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void import_screenshotsOnly_reachesService() throws Exception {
+        when(postImports.importPost(eq(USER_ID), any(), any())).thenReturn(new GenerateResultDto(RECIPE, 6));
+
+        mockMvc.perform(multipart(BASE + "/import")
+                        .file(screenshot("a.jpg", (byte) 1, (byte) 2))
+                        .file(screenshot("b.jpg", (byte) 3))
+                        .with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.remainingToday").value(6));
+
+        ArgumentCaptor<List<byte[]>> captor = ArgumentCaptor.forClass(List.class);
+        verify(postImports).importPost(eq(USER_ID), eq(null), captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+        assertThat(captor.getValue().get(0)).containsExactly(1, 2);
+        assertThat(captor.getValue().get(1)).containsExactly(3);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void import_both_reachesService() throws Exception {
+        when(postImports.importPost(eq(USER_ID), any(), any())).thenReturn(new GenerateResultDto(RECIPE, 5));
+
+        mockMvc.perform(multipart(BASE + "/import")
+                        .param("caption", "Slide 2 has the amounts")
+                        .file(screenshot("a.jpg", (byte) 7))
+                        .file(screenshot("b.jpg", (byte) 8, (byte) 9))
+                        .with(authed()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.remainingToday").value(5));
+
+        ArgumentCaptor<List<byte[]>> captor = ArgumentCaptor.forClass(List.class);
+        verify(postImports).importPost(eq(USER_ID), eq("Slide 2 has the amounts"), captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+        assertThat(captor.getValue().get(0)).containsExactly(7);
+        assertThat(captor.getValue().get(1)).containsExactly(8, 9);
+    }
+
+    @Test
+    void import_nothingSent_leavesTheCheckToTheService() throws Exception {
+        when(postImports.importPost(eq(USER_ID), eq(null), eq(List.of())))
+                .thenThrow(new PostImportRequestException(INVALID_POST_DETAIL));
+
+        mockMvc.perform(multipart(BASE + "/import").with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_post"));
+    }
+
+    @Test
+    void import_invalidRequest_is400InvalidPost() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new PostImportRequestException(INVALID_POST_DETAIL));
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_post"))
+                .andExpect(jsonPath("$.detail").value(INVALID_POST_DETAIL));
+    }
+
+    @Test
+    void import_invalidPhoto_is400() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new InvalidScanPhotoException("not a JPEG"));
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_photo"));
+    }
+
+    @Test
+    void import_noDish_is422() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new NoDishException());
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("no_dish"))
+                .andExpect(jsonPath("$.detail").value("Couldn't find a dish in this post."));
+    }
+
+    @Test
+    void import_dailyLimit_is429() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new DailyLimitException());
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("daily_limit"));
+    }
+
+    @Test
+    void import_generationFailed_is422() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new GenerationFailedException());
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("generation_failed"));
+    }
+
+    @Test
+    void import_noPreferences_is409() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new NoPreferencesException());
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("no_preferences"));
+    }
+
+    @Test
+    void import_quota_is503() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new AiQuotaExceededException("groq 429"));
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("ai_quota"));
+    }
+
+    @Test
+    void import_unavailable_is503() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new AiUnavailableException("groq down"));
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("ai_unavailable"));
+    }
+
+    @Test
+    void import_notConfigured_is503() throws Exception {
+        when(postImports.importPost(any(), any(), any())).thenThrow(new AiNotConfiguredException("no keys"));
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("ai_not_configured"));
+    }
+
+    @Test
+    void import_uploadTooLarge_is400InvalidPhoto() throws Exception {
+        // MockMvc does not enforce the multipart limits, so the exception Spring would raise is thrown here
+        when(postImports.importPost(any(), any(), any())).thenThrow(new MaxUploadSizeExceededException(1));
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_photo"));
+    }
+
+    @Test
+    void import_signedOut_is401() throws Exception {
+        mockMvc.perform(importCaption()).andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(postImports);
+    }
+
+    @Test
+    void import_needsAal2WhenFactorExists() throws Exception {
+        when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
+
+        mockMvc.perform(importCaption().with(authed()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("mfa_required"));
+
+        verifyNoInteractions(postImports);
+    }
+
     // ---- list
 
     @Test
@@ -530,7 +724,8 @@ class AiRecipeControllerTest {
         mockMvc.perform(put(BASE + "/" + RECIPE_ID + "/saved")).andExpect(status().isUnauthorized());
         mockMvc.perform(delete(BASE + "/" + RECIPE_ID + "/saved")).andExpect(status().isUnauthorized());
         mockMvc.perform(scanOne()).andExpect(status().isUnauthorized());
+        mockMvc.perform(importCaption()).andExpect(status().isUnauthorized());
 
-        verifyNoInteractions(generation, recipes, usage, scans);
+        verifyNoInteractions(generation, recipes, usage, scans, postImports);
     }
 }

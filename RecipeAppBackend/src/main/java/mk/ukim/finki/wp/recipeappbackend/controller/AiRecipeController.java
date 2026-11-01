@@ -9,6 +9,7 @@ import mk.ukim.finki.wp.recipeappbackend.exception.InvalidScanPhotoException;
 import mk.ukim.finki.wp.recipeappbackend.generation.AiRecipeService;
 import mk.ukim.finki.wp.recipeappbackend.generation.AiUsageService;
 import mk.ukim.finki.wp.recipeappbackend.generation.PhotoScanService;
+import mk.ukim.finki.wp.recipeappbackend.generation.PostImportService;
 import mk.ukim.finki.wp.recipeappbackend.generation.RecipeGenerationService;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.GenerateRequestDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.AiUsageDto;
@@ -45,13 +46,15 @@ public class AiRecipeController {
     private final AiRecipeService recipes;
     private final AiUsageService usage;
     private final PhotoScanService scans;
+    private final PostImportService postImports;
 
     public AiRecipeController(RecipeGenerationService generation, AiRecipeService recipes, AiUsageService usage,
-                              PhotoScanService scans) {
+                              PhotoScanService scans, PostImportService postImports) {
         this.generation = generation;
         this.recipes = recipes;
         this.usage = usage;
         this.scans = scans;
+        this.postImports = postImports;
     }
 
     /** Can take up to a minute: the AI call happens inside. */
@@ -77,6 +80,26 @@ public class AiRecipeController {
             bytes.add(photo.getBytes());
         }
         return scans.scan(userId, bytes);
+    }
+
+    /**
+     * Makes a private AI recipe from an Instagram post: the caption (part {@code caption}) and/or 1 to 2
+     * screenshots (part {@code screenshots}, repeated). Either part may be missing, and a missing
+     * {@code screenshots} part is an empty list; the service decides whether the request is enough. The
+     * screenshots are only held in memory for this call. Can take up to a minute.
+     */
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public GenerateResultDto importPost(@CurrentUserId UUID userId,
+                                        @RequestParam(name = "caption", required = false) String caption,
+                                        @RequestParam(name = "screenshots", required = false)
+                                        List<MultipartFile> screenshots) throws IOException {
+        List<byte[]> bytes = new ArrayList<>();
+        if (screenshots != null) {
+            for (MultipartFile screenshot : screenshots) {
+                bytes.add(screenshot.getBytes());
+            }
+        }
+        return postImports.importPost(userId, caption, bytes);
     }
 
     /** The saved ones, newest saved first. Size is capped by spring.data.web.pageable.max-page-size. */
