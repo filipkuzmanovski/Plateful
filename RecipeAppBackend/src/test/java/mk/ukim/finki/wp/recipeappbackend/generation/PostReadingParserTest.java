@@ -101,11 +101,37 @@ class PostReadingParserTest {
     }
 
     @Test
-    void missingRequiredParts_areUnreadable() {
-        assertThat(parser.parse("{}")).isEmpty();
-        assertThat(parser.parse("{\"dish\":\"x\",\"ingredients\":[],\"steps\":[]}")).isEmpty();
-        assertThat(parser.parse("{\"dish\":\"x\",\"description\":\"d\",\"steps\":[]}")).isEmpty();
-        assertThat(parser.parse("{\"dish\":\"x\",\"description\":\"d\",\"ingredients\":[]}")).isEmpty();
-        assertThat(parser.parse(json("\"x\"", "null", "[]", "[]"))).isEmpty();
+    void missingParts_areEmpty() {
+        PostReading none = new PostReading(null, "", List.of(), List.of());
+        assertThat(parser.parse("{}")).contains(none);
+        assertThat(parser.parse(json("null", "null", "null", "null"))).contains(none);
+        // Each of the three parts missing, one at a time.
+        assertThat(parser.parse("{\"dish\":\"x\",\"ingredients\":[\"egg\"],\"steps\":[\"Fry.\"]}"))
+                .contains(new PostReading("x", "", List.of("egg"), List.of("Fry.")));
+        assertThat(parser.parse("{\"dish\":\"x\",\"description\":\"d\",\"steps\":[\"Fry.\"]}"))
+                .contains(new PostReading("x", "d", List.of(), List.of("Fry.")));
+        assertThat(parser.parse("{\"dish\":\"x\",\"description\":\"d\",\"ingredients\":[\"egg\"]}"))
+                .contains(new PostReading("x", "d", List.of("egg"), List.of()));
+        // Each of the three parts explicitly null, one at a time.
+        assertThat(parser.parse(json("\"x\"", "null", "[\"egg\"]", "[\"Fry.\"]")))
+                .contains(new PostReading("x", "", List.of("egg"), List.of("Fry.")));
+        assertThat(parser.parse(json("\"x\"", "\"d\"", "null", "[\"Fry.\"]")))
+                .contains(new PostReading("x", "d", List.of(), List.of("Fry.")));
+        assertThat(parser.parse(json("\"x\"", "\"d\"", "[\"egg\"]", "null")))
+                .contains(new PostReading("x", "d", List.of("egg"), List.of()));
+    }
+
+    @Test
+    void descriptionCutInsideAnEmoji_isCutBeforeIt() {
+        String emoji = new String(Character.toChars(0x1F355));
+        // 299 letters then a 2-char emoji straddling positions 299-300: the pair is dropped whole.
+        assertThat(parser.parse(json("\"x\"", "\"" + "c".repeat(299) + emoji + "tail\"", "[]", "[]")))
+                .hasValueSatisfying(r -> assertThat(r.description()).isEqualTo("c".repeat(299)));
+        // An emoji ending exactly at 300 stays.
+        assertThat(parser.parse(json("\"x\"", "\"" + "c".repeat(298) + emoji + "tail\"", "[]", "[]")))
+                .hasValueSatisfying(r -> assertThat(r.description()).isEqualTo("c".repeat(298) + emoji));
+        // Stripped again after the cut.
+        assertThat(parser.parse(json("\"x\"", "\"" + "c".repeat(297) + "   tail\"", "[]", "[]")))
+                .hasValueSatisfying(r -> assertThat(r.description()).isEqualTo("c".repeat(297)));
     }
 }
