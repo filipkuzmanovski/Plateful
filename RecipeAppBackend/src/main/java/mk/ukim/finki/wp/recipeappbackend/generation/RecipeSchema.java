@@ -26,6 +26,27 @@ public final class RecipeSchema {
 
     /** The schema of one recipe. */
     public static Map<String, Object> single() {
+        return object(recipeProperties());
+    }
+
+    /**
+     * The schema of a recipe written from a social media post (spec section 4.2): {@link #single()}'s properties
+     * plus {@code origin} (what the post gave) and {@code swaps} (ingredients replaced, at most 10).
+     */
+    public static Map<String, Object> post() {
+        Map<String, Object> props = recipeProperties();
+        Map<String, Object> origin = new LinkedHashMap<>();
+        origin.put("type", "string");
+        origin.put("enum", List.of("recipe", "dish", "none"));
+        props.put("origin", origin);
+        Map<String, Object> swap = new LinkedHashMap<>();
+        swap.put("from", string(1, 60));
+        swap.put("to", string(1, 60));
+        props.put("swaps", array(object(swap), 0, 10));
+        return object(props);
+    }
+
+    private static Map<String, Object> recipeProperties() {
         Map<String, Object> props = new LinkedHashMap<>();
         props.put("title", string(1, 120));
         props.put("description", string(0, 300));
@@ -37,7 +58,7 @@ public final class RecipeSchema {
         props.put("cuisine", cuisine);
         props.put("ingredients", array(ingredient(), 3, 20));
         props.put("steps", array(string(1, 600), 2, 15));
-        return object(props);
+        return props;
     }
 
     /** The schema of an object with one recipe per requested meal (only breakfast, lunch, dinner), in that order. */
