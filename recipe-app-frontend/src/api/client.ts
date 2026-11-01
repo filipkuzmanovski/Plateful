@@ -8,6 +8,8 @@ export class ApiError extends Error {
   errors?: Record<string, string>;
   code?: string;
   approvedTitle?: string;
+  /** The ingredients a 400 `invalid_request` names, each with why it clashes with the user's food preferences. */
+  conflicts?: { ingredient: string; reason: string }[];
 
   constructor(
     status: number,
@@ -15,6 +17,7 @@ export class ApiError extends Error {
     errors?: Record<string, string>,
     code?: string,
     approvedTitle?: string,
+    conflicts?: { ingredient: string; reason: string }[],
   ) {
     super(detail);
     this.status = status;
@@ -22,6 +25,7 @@ export class ApiError extends Error {
     this.errors = errors;
     this.code = code;
     this.approvedTitle = approvedTitle;
+    this.conflicts = conflicts;
   }
 }
 
@@ -51,7 +55,7 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
       await supabase.auth.signOut(); // expired/invalid token — routing reacts to session loss
     }
   }
-  throw new ApiError(res.status, problem?.detail ?? `Request failed (${res.status})`, problem?.errors, problem?.code, problem?.approvedTitle);
+  throw new ApiError(res.status, problem?.detail ?? `Request failed (${res.status})`, problem?.errors, problem?.code, problem?.approvedTitle, problem?.conflicts);
 }
 
 /** JSON-returning call. */

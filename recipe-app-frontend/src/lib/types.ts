@@ -71,3 +71,49 @@ export interface RecipeCreate {
   photos: string[];
   video?: RecipeVideoInput | null;
 }
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner';
+
+export interface GeneratedIngredient { name: string; amount: string; extra: boolean; }
+
+export interface GeneratedRecipe {
+  id: string;
+  kind: 'cook' | 'daily';
+  mealType: MealType | null;
+  title: string;
+  description: string;
+  servings: number;
+  prepMinutes: number;
+  cookMinutes: number;
+  cuisine: string;
+  ingredients: GeneratedIngredient[];
+  steps: string[];
+  diets: { vegetarian: boolean; vegan: boolean; glutenFree: boolean; dairyFree: boolean };
+  allergens: { key: string; label: string }[];
+  saved: boolean;
+  createdAt: string;
+  provider: string | null;
+}
+
+/** A generated recipe in a list: no ingredients or steps. `savedAt` is null when not saved. */
+export interface GeneratedRecipeSummary {
+  id: string;
+  kind: 'cook' | 'daily';
+  mealType: MealType | null;
+  title: string;
+  description: string;
+  totalMinutes: number;
+  savedAt: string | null;
+}
+
+export interface GenerateResult { recipe: GeneratedRecipe; remainingToday: number; }
+
+export interface AiUsage { used: number; limit: number; remaining: number; }
+
+/** Today's meals. `date`, `fresh` and `meals` are present only when `status` is `ready`. */
+export interface DailyMeals {
+  status: 'ready' | 'generating' | 'unavailable';
+  date?: string;
+  fresh?: boolean;
+  meals?: Partial<Record<MealType, GeneratedRecipeSummary>>;
+}

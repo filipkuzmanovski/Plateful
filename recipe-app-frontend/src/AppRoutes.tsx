@@ -10,6 +10,7 @@ import CompleteProfilePage from '@/features/profile/CompleteProfilePage';
 import PreferencesSetupPage from '@/features/preferences/PreferencesSetupPage';
 import BrowsePage from '@/features/browse/BrowsePage';
 import RecipeDetailPage from '@/features/recipe/RecipeDetailPage';
+import AiRecipePage from '@/features/ai/AiRecipePage';
 import RecipeFormPage from '@/features/authoring/RecipeFormPage';
 import MyProfilePage from '@/features/profile/MyProfilePage';
 import PublicProfilePage from '@/features/profile/PublicProfilePage';
@@ -29,6 +30,7 @@ export default function AppRoutes() {
         <Route path="/recipes/new" element={<ProtectedRoute key="recipe-new"><RecipeFormPage /></ProtectedRoute>} />
         <Route path="/recipes/:id" element={<RecipeDetailPage />} />
         <Route path="/recipes/:id/edit" element={<ProtectedRoute key="recipe-edit"><RecipeFormPage /></ProtectedRoute>} />
+        <Route path="/ai-recipes/:id" element={<ProtectedRoute key="ai-recipe"><AiRecipePage /></ProtectedRoute>} />
         <Route path="/users/:id" element={<PublicProfilePage />} />
         <Route path="/me" element={<ProtectedRoute><MyProfilePage /></ProtectedRoute>} />
         <Route path="/login" element={<LoginPage />} />
