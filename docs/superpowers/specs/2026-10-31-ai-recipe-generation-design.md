@@ -56,7 +56,9 @@ Providers know nothing about recipes, so adding one is one class.
 - **`FallbackRecipeAi`** (the `@Primary` `RecipeAi` bean): tries the active providers in
   `plateful.ai.order`.
   - A provider is active when its key property is non-blank.
-  - After a quota answer the provider is skipped for **60 seconds** (in memory, using an injected `Clock`).
+  - After a quota answer the provider is skipped for the provider's `Retry-After` (seconds, clamped to 1 to
+    300), or **60 seconds** when the header is missing or unparsable (in memory, using an injected `Clock`).
+    HTTP 413 is "unavailable": the next provider is tried and there is no cooldown.
   - Every provider quota-limited or cooling down → `AiQuotaExceededException`. Any other mix of failures
     → `AiUnavailableException`. No active provider → `AiNotConfiguredException`.
 - **Logging:** one INFO line per call: provider, model, outcome, milliseconds, token counts. Never the
@@ -67,7 +69,7 @@ Providers know nothing about recipes, so adding one is one class.
 - **`ReferenceFinder`**:
   - `inspiration(...)`: `ReferenceDataRepository.findClosest` with the user's filters, limit 20; every
     candidate re-checked in Java with `FoodRules.allergensIn`, `FoodRules.dietViolations` and the dislike
-    rule on its `ingredient_names` (sub-project 1 spec §11); the first 6 (feature 1) or 3 per meal
+    rule on its `ingredient_names` (sub-project 1 spec §11); the first 6 (feature 1) or 2 per meal
     (daily) kept.
   - `pairings(names)`: for up to 5 of the given names, the top 8 partners from `ingredient_pairings`
     with `together_count / recipe_count` as a percentage, skipping partners the user may not eat.
@@ -285,11 +287,12 @@ The date must be a valid ISO date within one day of the server's UTC date, else 
 
 ### 6.2 Steps
 
-1. A `ready` row for the date → return it.
+1. A `ready` row for the date → return it, after the re-check below.
 2. Try to claim the row (§4.2). Not claimed and the row is `generating` → `{status: "generating"}`. Not
    claimed and `failed` (still cooling down) → the fallback.
-3. Inspiration per meal: `findClosest(liked ingredients, meal, filters)` with the Java re-check, 3 kept;
-   when liked ingredients are empty or fewer than 3 come back, `randomForMeal` tops up to 3.
+3. Inspiration per meal: `findClosest(liked ingredients, meal, filters)` with the Java re-check, 2 kept;
+   when liked ingredients are empty or fewer than 2 come back, `randomForMeal` tops up to 2 (6 examples in
+   total, to stay inside Groq's tokens per minute).
 4. One AI call (§6.3).
 5. Each meal is parsed and checked on its own: structure, safety (no coverage rule, no extras limit) and
    novelty.
@@ -300,14 +303,20 @@ The date must be a valid ISO date within one day of the server's UTC date, else 
 
 The fallback is the user's most recent `ready` set with an earlier date, or `unavailable`.
 
-Daily meals never use the 10-a-day counter. A preference change made during the day applies from the
-next day's set.
+Stored sets are re-checked against the current preferences before they are served: every stored recipe of
+the set (today's or the fallback) is rebuilt as a draft and run through the safety check (`Mode.ANY`) with
+the preferences as they are now. An unsafe set for today → the fallback instead (no new generation today);
+an unsafe fallback → `unavailable`. No preferences row at that point counts as unsafe. An unknown profile
+key still fails closed (the exception goes on).
+
+Daily meals never use the 10-a-day counter. A preference change made during the day does not start a new
+generation; a fresh set that fits it is made the next day.
 
 ### 6.3 Prompt
 
 The same system text as §5.2, asking for a JSON object `{breakfast, lunch, dinner}`, each a recipe
 matching the feature-1 schema. The user text has: liked cuisines and liked ingredients as "lean
-towards"; the same "Never use" list; the 9 examples, labelled by meal; the titles of the user's daily
+towards"; the same "Never use" list; the 6 examples (2 per meal), labelled by meal; the titles of the user's daily
 meals from the last 7 days as "do not repeat these"; a random technique per meal. Temperature 1.0, max
 output tokens 4,096. About 4,500 tokens in total, inside Groq's 8K tokens per minute.
 

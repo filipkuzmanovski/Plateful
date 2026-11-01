@@ -4577,8 +4577,9 @@ What the user sees
       * The result shows below the form, with Generate another, Save and
         Open. If an ingredient clashes with your preferences, those chips
         are highlighted with the reason and nothing is spent.
-  - A "Today's meals" strip at the top of the home page (signed-in users who
-    have saved their preferences). Three cards: Breakfast, Lunch, Dinner.
+  - A "Today's meals" strip on the home page, under the title, search and
+    filters (signed-in users who have saved their preferences). Three
+    cards: Breakfast, Lunch, Dinner.
     The first visit of the day shows placeholders while they are made;
     after that they load instantly.
   - AI recipes are private. They are never published, never shown to other
@@ -4593,7 +4594,8 @@ What the user sees
   - Save keeps a recipe. Saved ones appear in a fourth profile tab, "AI
     recipes" (?tab=ai), with Remove. Unsaved ones are deleted after 30 days.
   - The Privacy Policy has a new paragraph saying what is sent to the AI
-    provider and what never is. Its "Last updated" date was bumped.
+    provider and what never is, and lists Groq and Google as processors.
+    Its "Last updated" date was bumped.
 
 The providers, and why this order
 ---------------------------------
@@ -4609,12 +4611,14 @@ adding a third later is one class:
   - The order is the property plateful.ai.order (default groq,gemini). A
     provider only counts if its key is set, so either key alone also works.
     The keys live only in backend environment variables.
-  - A quota answer (HTTP 429) puts that provider on a 60 second cooldown.
+  - A quota answer (HTTP 429) puts that provider on a cooldown: as long as
+    its Retry-After header asks (1 to 300 seconds), else 60 seconds.
     All providers limited gives "ai_quota"; other failures give
     "ai_unavailable"; no key at all gives "ai_not_configured".
   - Plain RestClient calls, run inside the request. No Spring AI, no job
-    queue. Logs hold only provider, model, outcome, time and token counts,
-    never the prompt, the reply or a key.
+    queue. Logs hold only provider, model, outcome, time, token counts and,
+    for a failed call, the reason ("groq HTTP 413"), never the prompt, the
+    reply or a key.
 
 How the AI is grounded (RAG), and why no model is trained
 ---------------------------------------------------------
@@ -4730,15 +4734,38 @@ Decisions that changed what the code does, worth knowing:
   - Title, description and amounts are scanned, and unknown profile keys
     fail closed. Blocking too much is safe; blocking too little is not.
 
+Final review fixes
+------------------
+The final whole-branch review found five issues. All are fixed:
+  - Allergen line and diet badges: now computed per ingredient in both
+    forms, like the safety check. Before, "Eggs, beaten" showed no eggs
+    and a Vegan badge.
+  - Stored meal sets are re-checked against your current preferences
+    before they are shown. Add a peanut allergy at noon and today's set
+    with peanuts gives way to the earlier set (no new generation today);
+    an unsafe earlier set gives "not available yet".
+  - Groq token fit: today's meals send 2 examples per meal (6, not 9).
+    The quota cooldown follows Retry-After (above). HTTP 413 (request too
+    large) counts as "unavailable": the next provider is tried at once.
+  - Failures can be diagnosed: each failed AI call logs its reason, and a
+    generation that ends without a recipe logs why its attempts were
+    rejected. Still no prompt, reply, key or user id.
+  - Privacy Policy: Groq and Google (Gemini API) are named as processors
+    outside the EU. It says the titles of recent daily meals are sent, and
+    asks you not to put personal information into food preferences.
+Smaller ones: a retry reason never quotes a dataset title that contains
+"allergy" or "diet"; the Today's meals strip moved under the page title,
+so the h1 comes first; GeneratedRecipe.cuisine is typed string | null.
+
 Tests
 -----
-  - Backend, after the last backend change: 783 tests in 61 classes
+  - Backend, after the last backend change: 832 tests in 63 classes
     without the database, and 84 database tests (DbTests, against the live
     Supabase database) in 17 classes, all passing. The database tests write
     only inside rolled-back transactions.
   - No test makes a real AI call; providers are tested with a mock server
     and a fake RecipeAi.
-  - Frontend: npx vitest run, 53 files, 607 tests passing. npm run build
+  - Frontend: npx vitest run, 53 files, 609 tests passing. npm run build
     succeeded.
 
 Your manual steps
@@ -4771,7 +4798,5 @@ fallback (Claude Haiku 5.5) would need your approval first.
 
 Status
 ------
-All code and tests are done on the branch. The final whole-branch review is
-still to come; any fixes from it get a short addendum below. One known
-small leftover: the Today's meals heading sits above the page title, to be
-tidied in that final review.
+All code and tests are done on the branch, and the final whole-branch
+review's fixes are in (see "Final review fixes" above).
