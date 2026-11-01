@@ -11,6 +11,8 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
+import javax.imageio.stream.MemoryCacheImageInputStream;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -80,6 +82,18 @@ public class PhotoPreparer {
         return result;
     }
 
+    /**
+     * Memory-backed streams on purpose: {@code ImageIO.createImageInputStream/OutputStream} use a temp
+     * file cache by default, which would put the raw upload (with its EXIF/GPS) on disk.
+     */
+    static ImageInputStream inputStream(byte[] photo) {
+        return new MemoryCacheImageInputStream(new ByteArrayInputStream(photo));
+    }
+
+    static ImageOutputStream outputStream(ByteArrayOutputStream bytes) {
+        return new MemoryCacheImageOutputStream(bytes);
+    }
+
     private static void checkEnvelope(byte[] photo) {
         if (photo == null || photo.length == 0) {
             throw new InvalidScanPhotoException("Photo is empty");
@@ -111,10 +125,7 @@ public class PhotoPreparer {
     /** Reads the size from the header first, then decodes. Any failure is "invalid". */
     private static BufferedImage decode(byte[] photo) {
         ImageReader reader = null;
-        try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(photo))) {
-            if (in == null) {
-                throw new InvalidScanPhotoException("Photo cannot be read");
-            }
+        try (ImageInputStream in = inputStream(photo)) {
             Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("jpeg");
             if (!readers.hasNext()) {
                 throw new InvalidScanPhotoException("No JPEG reader available");
@@ -194,7 +205,7 @@ public class PhotoPreparer {
             param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
             param.setCompressionQuality(quality);
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            try (ImageOutputStream out = ImageIO.createImageOutputStream(bytes)) {
+            try (ImageOutputStream out = outputStream(bytes)) {
                 writer.setOutput(out);
                 writer.write(null, new IIOImage(image, null, null), param);
             }

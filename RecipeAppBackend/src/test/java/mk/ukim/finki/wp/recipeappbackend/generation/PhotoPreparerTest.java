@@ -290,6 +290,18 @@ class PhotoPreparerTest {
         assertThat(decode(output).getWidth()).isEqualTo(200);
     }
 
+    // ---- nothing on disk -----------------------------------------------------------------------
+
+    @Test
+    void streams_areMemoryBackedNeverFileCached() throws Exception {
+        // ImageIO.createImage*Stream would return FileCache* streams (temp files holding the raw upload).
+        try (var in = PhotoPreparer.inputStream(new byte[] {1, 2, 3});
+             var out = PhotoPreparer.outputStream(new ByteArrayOutputStream())) {
+            assertThat(in).isInstanceOf(javax.imageio.stream.MemoryCacheImageInputStream.class);
+            assertThat(out).isInstanceOf(javax.imageio.stream.MemoryCacheImageOutputStream.class);
+        }
+    }
+
     // ---- size guard ----------------------------------------------------------------------------
 
     @Test
