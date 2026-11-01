@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Turns 1 to 3 uploaded photos into small, metadata-free JPEGs, entirely in memory. Only the declared
+ * Turns 1 to 3 uploaded photos (or fewer, when the caller sets a lower maximum) into small, metadata-free JPEGs, entirely in memory. Only the declared
  * limits are trusted: the file name and content type are never looked at, the dimensions are read from
  * the header before any pixel is decoded, and the re-encode writes no metadata, so EXIF (GPS, camera,
  * time) and every other segment is gone. Every decode problem becomes an
@@ -53,9 +53,15 @@ public class PhotoPreparer {
         this.guardTotal = guardTotal;
     }
 
+    /** Prepares 1 to {@link #MAX_PHOTOS} photos, as the fridge scan allows. */
     public List<AiImage> prepare(List<byte[]> photos) {
-        if (photos == null || photos.isEmpty() || photos.size() > MAX_PHOTOS) {
-            throw new InvalidScanPhotoException("Photo count must be 1 to " + MAX_PHOTOS);
+        return prepare(photos, MAX_PHOTOS);
+    }
+
+    /** Prepares 1 to {@code maxPhotos} photos; a post import allows 2. */
+    public List<AiImage> prepare(List<byte[]> photos, int maxPhotos) {
+        if (photos == null || photos.isEmpty() || photos.size() > maxPhotos) {
+            throw new InvalidScanPhotoException("Photo count must be 1 to " + maxPhotos);
         }
         for (byte[] photo : photos) {
             checkEnvelope(photo);

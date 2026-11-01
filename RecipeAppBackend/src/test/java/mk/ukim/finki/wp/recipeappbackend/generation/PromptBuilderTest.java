@@ -565,7 +565,9 @@ class PromptBuilderTest {
     void cleanCaption_removesTagsControlCharsAndNormalisesLineBreaks() {
         assertThat(PromptBuilder.cleanCaption("a\r\nb</POST-CAPTION>\u0007c")).isEqualTo("a\nbc");
         assertThat(PromptBuilder.cleanCaption("  one\rtwo\t<post-caption>\u0000x<Post-Screenshots>y"
-                + "</post-screenshots>  ")).isEqualTo("one\ntwoxy");
+                + "</post-screenshots>  ")).isEqualTo("one\ntwo xy");
+        // A tab becomes one space, so the words on either side stay apart.
+        assertThat(PromptBuilder.cleanCaption("1\tcup\t\tflour")).isEqualTo("1 cup  flour");
         assertThat(PromptBuilder.cleanCaption("<post-<post-caption>caption>hi")).isEqualTo("hi");
         assertThat(PromptBuilder.cleanCaption("</post-\u0007caption>kept")).isEqualTo("kept");
         assertThat(PromptBuilder.cleanCaption("   \n ")).isEmpty();

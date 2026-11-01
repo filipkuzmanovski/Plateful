@@ -193,15 +193,16 @@ public class PromptBuilder {
     }
 
     /**
-     * A caption made safe to put between the {@code <post-caption>} tags: line breaks become {@code \n}, control
-     * characters other than {@code \n} are removed, the four tag strings (any case) are removed, and the ends
-     * are stripped.
+     * A caption made safe to put between the {@code <post-caption>} tags: line breaks become {@code \n}, each tab
+     * becomes a space (so the words around it stay apart), the other control characters are removed, the four tag
+     * strings (any case) are removed, and the ends are stripped.
      */
     static String cleanCaption(String raw) {
         if (raw == null) {
             return "";
         }
-        String text = CONTROL_CHARS.matcher(raw.replace("\r\n", "\n").replace('\r', '\n')).replaceAll("");
+        String spaced = raw.replace("\r\n", "\n").replace('\r', '\n').replace('\t', ' ');
+        String text = CONTROL_CHARS.matcher(spaced).replaceAll("");
         return removeTags(text).strip();
     }
 
