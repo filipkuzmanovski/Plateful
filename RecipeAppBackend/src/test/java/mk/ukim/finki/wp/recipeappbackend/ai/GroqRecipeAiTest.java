@@ -281,6 +281,68 @@ class GroqRecipeAiTest {
         assertThat(quotaWithRetryAfter("9999").retryAfter()).isEqualTo(Duration.ofSeconds(300));
     }
 
+    private static final byte[] IMAGE_A = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3};
+    private static final byte[] IMAGE_B = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 9, 8};
+
+    private static AiRequest visionRequest(int count) {
+        List<AiImage> images = new java.util.ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            images.add(new AiImage("image/jpeg", i % 2 == 0 ? IMAGE_A : IMAGE_B));
+        }
+        Map<String, Object> schema = Map.of("type", "object",
+                "properties", Map.of("ingredients", Map.of("type", "array")));
+        return new AiRequest("SYS", "Here are 2 photos.", schema, 0.2, 1024, images);
+    }
+
+    @Test
+    void vision_usesVisionModelAndImageParts() {
+        server.expect(requestTo(URL))
+                .andExpect(jsonPath("$.model").value("qwen/qwen3.8-27b"))
+                .andExpect(jsonPath("$.messages[0].role").value("system"))
+                .andExpect(jsonPath("$.messages[0].content").value("SYS"))
+                .andExpect(jsonPath("$.messages[1].role").value("user"))
+                .andExpect(jsonPath("$.messages[1].content[0].type").value("text"))
+                .andExpect(jsonPath("$.messages[1].content[0].text").value("Here are 2 photos."))
+                .andExpect(jsonPath("$.messages[1].content[1].type").value("image_url"))
+                .andExpect(jsonPath("$.messages[1].content[1].image_url.url").value(
+                        "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(IMAGE_A)))
+                .andExpect(jsonPath("$.messages[1].content[2].image_url.url").value(
+                        "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(IMAGE_B)))
+                .andExpect(jsonPath("$.response_format.type").value("json_object"))
+                .andExpect(jsonPath("$.response_format.json_schema").doesNotExist())
+                .andExpect(jsonPath("$.reasoning_effort").value("none"))
+                .andExpect(jsonPath("$.reasoning_format").value("hidden"))
+                .andExpect(jsonPath("$.temperature").value(0.2))
+                .andExpect(jsonPath("$.max_completion_tokens").value(1024))
+                .andRespond(withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+
+        AiReply reply = ai.complete(visionRequest(2));
+
+        server.verify();
+        assertThat(reply.model()).isEqualTo("qwen/qwen3.8-27b");
+    }
+
+    @Test
+    void vision_fourImages_throwsBeforeAnyCall() {
+        assertThatThrownBy(() -> ai.complete(visionRequest(4)))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        server.verify();
+    }
+
+    @Test
+    void text_requestHasNoVisionFields() {
+        server.expect(requestTo(URL))
+                .andExpect(jsonPath("$.model").value("openai/gpt-oss-120b"))
+                .andExpect(jsonPath("$.reasoning_format").doesNotExist())
+                .andExpect(jsonPath("$.messages[1].content").value("USER"))
+                .andRespond(withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+
+        ai.complete(request());
+
+        server.verify();
+    }
+
     @Test
     void status413_isUnavailable_notQuota() {
         server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.PAYLOAD_TOO_LARGE)

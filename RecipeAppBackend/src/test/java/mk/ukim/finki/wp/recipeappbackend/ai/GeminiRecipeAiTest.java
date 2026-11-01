@@ -56,6 +56,43 @@ class GeminiRecipeAiTest {
                "thoughtsTokenCount":20,"totalTokenCount":200}}""";
 
     @Test
+    void vision_addsInlineDataPartsAfterText() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer visionServer = MockRestServiceServer.bindTo(builder).build();
+        AiProperties props = new AiProperties(
+                new AiProperties.Provider("", "openai/gpt-oss-120b"),
+                new AiProperties.Provider(KEY, "gemini-3.8-flash", "gemini-vision-test"),
+                List.of("groq", "gemini"), 10, 10);
+        GeminiRecipeAi visionAi = new GeminiRecipeAi(builder, props, BASE);
+        byte[] bytes = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 4, 5};
+        AiRequest request = new AiRequest("SYS", "USER", Map.of("type", "object"), 0.2, 1024,
+                List.of(new AiImage("image/jpeg", bytes)));
+
+        visionServer.expect(requestTo(BASE + "/v1beta/models/gemini-vision-test:generateContent"))
+                .andExpect(jsonPath("$.contents[0].parts[0].text").value("USER"))
+                .andExpect(jsonPath("$.contents[0].parts[1].inlineData.mimeType").value("image/jpeg"))
+                .andExpect(jsonPath("$.contents[0].parts[1].inlineData.data")
+                        .value(java.util.Base64.getEncoder().encodeToString(bytes)))
+                .andRespond(withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+
+        AiReply reply = visionAi.complete(request);
+
+        visionServer.verify();
+        assertThat(reply.model()).isEqualTo("gemini-vision-test");
+    }
+
+    @Test
+    void text_requestHasOnlyTheTextPart() {
+        server.expect(requestTo(URL))
+                .andExpect(jsonPath("$.contents[0].parts.length()").value(1))
+                .andRespond(withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+
+        ai.complete(request());
+
+        server.verify();
+    }
+
+    @Test
     void sendsKeyInHeaderNotUrl() {
         server.expect(requestTo(URL))
                 .andExpect(method(HttpMethod.POST))

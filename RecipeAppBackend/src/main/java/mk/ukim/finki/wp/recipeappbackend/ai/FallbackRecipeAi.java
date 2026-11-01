@@ -50,14 +50,15 @@ public class FallbackRecipeAi implements RecipeAi {
             long started = System.nanoTime();
             try {
                 AiReply reply = provider.ai().complete(request);
-                logCall(provider, reply.model(), "ok", started, reply.inputTokens(), reply.outputTokens());
+                logCall(provider, reply.model(), "ok", started, reply.inputTokens(), reply.outputTokens(),
+                        request.images().size());
                 return reply;
             } catch (AiQuotaExceededException e) {
                 cooldownUntil.put(provider.name(), clock.instant().plus(e.retryAfter()));
-                logFailure(provider, "quota", started, e);
+                logFailure(provider, "quota", started, e, request.images().size());
             } catch (RuntimeException e) {
                 unavailable = true;
-                logFailure(provider, "unavailable", started, e);
+                logFailure(provider, "unavailable", started, e, request.images().size());
             }
         }
         if (unavailable) {
@@ -66,19 +67,25 @@ public class FallbackRecipeAi implements RecipeAi {
         throw new AiQuotaExceededException("every AI provider is over its quota");
     }
 
-    private static void logFailure(NamedRecipeAi provider, String outcome, long startedNanos, RuntimeException e) {
+    /** The image count is appended for vision calls only. */
+    private static String imagesSuffix(int images) {
+        return images > 0 ? " images=" + images : "";
+    }
+
+    private static void logFailure(NamedRecipeAi provider, String outcome, long startedNanos, RuntimeException e,
+                                   int images) {
         String reason = e instanceof AiQuotaExceededException || e instanceof AiUnavailableException
                 ? e.getMessage()
                 : e.getClass().getSimpleName();
-        log.info("ai call provider={} model={} outcome={} ms={} in=- out=- reason=\"{}\"",
+        log.info("ai call provider={} model={} outcome={} ms={} in=- out=- reason=\"{}\"{}",
                 provider.name(), provider.model(), outcome, (System.nanoTime() - startedNanos) / 1_000_000,
-                reason);
+                reason, imagesSuffix(images));
     }
 
     private static void logCall(NamedRecipeAi provider, String model, String outcome, long startedNanos,
-                                Integer in, Integer out) {
-        log.info("ai call provider={} model={} outcome={} ms={} in={} out={}",
+                                Integer in, Integer out, int images) {
+        log.info("ai call provider={} model={} outcome={} ms={} in={} out={}{}",
                 provider.name(), model, outcome, (System.nanoTime() - startedNanos) / 1_000_000,
-                in == null ? "-" : in, out == null ? "-" : out);
+                in == null ? "-" : in, out == null ? "-" : out, imagesSuffix(images));
     }
 }

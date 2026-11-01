@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.ai;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import mk.ukim.finki.wp.recipeappbackend.ai.FallbackRecipeAi.NamedRecipeAi;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,10 +34,34 @@ public class AiConfig {
         return new FallbackRecipeAi(active, Clock.systemUTC());
     }
 
+    /**
+     * The photo chain: its own {@link FallbackRecipeAi}, so its cooldowns never touch the text chain.
+     * Injected with {@code @Qualifier("visionAi")}.
+     */
+    @Bean("visionAi")
+    public RecipeAi visionAi(AiProperties properties, ObjectProvider<RestClient.Builder> builders) {
+        List<NamedRecipeAi> active =
+                activeVisionProviders(properties, builders.getIfAvailable(RestClient::builder));
+        log.info("ai vision providers active={}", active.stream().map(NamedRecipeAi::name).toList());
+        return new FallbackRecipeAi(active, Clock.systemUTC());
+    }
+
     /** Active providers in configured order. Unknown names are ignored with a warning. */
     static List<NamedRecipeAi> activeProviders(AiProperties properties, RestClient.Builder builder) {
+        return build(properties.order(), "plateful.ai.order", properties, builder, AiProperties.Provider::model);
+    }
+
+    /** Active providers in {@code plateful.ai.vision-order}, each named with its vision model. */
+    static List<NamedRecipeAi> activeVisionProviders(AiProperties properties, RestClient.Builder builder) {
+        return build(properties.visionOrder(), "plateful.ai.vision-order", properties, builder,
+                AiProperties.Provider::visionModel);
+    }
+
+    private static List<NamedRecipeAi> build(List<String> order, String setting, AiProperties properties,
+                                             RestClient.Builder builder,
+                                             Function<AiProperties.Provider, String> modelOf) {
         List<NamedRecipeAi> result = new ArrayList<>();
-        for (String raw : properties.order()) {
+        for (String raw : order) {
             String name = raw == null ? "" : raw.trim().toLowerCase();
             if (result.stream().anyMatch(p -> p.name().equals(name))) {
                 continue;
@@ -45,16 +70,16 @@ public class AiConfig {
                 case GroqRecipeAi.NAME -> {
                     if (properties.groq().active()) {
                         result.add(new NamedRecipeAi(name, new GroqRecipeAi(builder, properties),
-                                properties.groq().model()));
+                                modelOf.apply(properties.groq())));
                     }
                 }
                 case GeminiRecipeAi.NAME -> {
                     if (properties.gemini().active()) {
                         result.add(new NamedRecipeAi(name, new GeminiRecipeAi(builder, properties),
-                                properties.gemini().model()));
+                                modelOf.apply(properties.gemini())));
                     }
                 }
-                default -> log.warn("plateful.ai.order has unknown provider '{}', ignored", name);
+                default -> log.warn("{} has unknown provider '{}', ignored", setting, name);
             }
         }
         return result;

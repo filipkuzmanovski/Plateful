@@ -263,6 +263,39 @@ class FallbackRecipeAiTest {
     }
 
     @Test
+    void logLine_hasImageCount() {
+        AiRequest withImages = new AiRequest("secret-system-text", "secret-user-text", Map.of(), 0.2, 1024,
+                List.of(new AiImage("image/jpeg", new byte[] {1, 2}), new AiImage("image/jpeg", new byte[] {3})));
+        FallbackRecipeAi ai = new FallbackRecipeAi(List.of(
+                named("groq", new Fake().failing(new AiQuotaExceededException("q"))),
+                named("gemini", new Fake())), clock);
+
+        ai.complete(withImages);
+
+        assertThat(appender.list).hasSize(2);
+        assertThat(appender.list.get(0).getFormattedMessage())
+                .matches("ai call provider=groq model=groq-model outcome=quota ms=\\d+ in=- out=- reason=\"q\" images=2");
+        assertThat(appender.list.get(1).getFormattedMessage())
+                .matches("ai call provider=gemini model=fake-model outcome=ok ms=\\d+ in=12 out=34 images=2");
+    }
+
+    @Test
+    void visionCooldown_doesNotAffectTextChain() {
+        Fake provider = new Fake().failing(new AiQuotaExceededException("groq quota"));
+        FallbackRecipeAi vision = new FallbackRecipeAi(List.of(named("groq", provider)), clock);
+        FallbackRecipeAi text = new FallbackRecipeAi(List.of(named("groq", provider)), clock);
+
+        assertThatThrownBy(() -> vision.complete(REQUEST)).isInstanceOf(AiQuotaExceededException.class);
+        assertThat(provider.calls.get()).isEqualTo(1);
+        assertThatThrownBy(() -> vision.complete(REQUEST)).isInstanceOf(AiQuotaExceededException.class);
+        assertThat(provider.calls.get()).as("vision instance is cooling down").isEqualTo(1);
+
+        provider.recover();
+        assertThat(text.complete(REQUEST).json()).isEqualTo("{}");
+        assertThat(provider.calls.get()).as("text instance still calls the provider").isEqualTo(2);
+    }
+
+    @Test
     void config_orderGeminiGroq_withOnlyGroqKey_buildsGroqOnly() {
         AiProperties properties = new AiProperties(
                 new AiProperties.Provider("test-groq-key", "openai/gpt-oss-120b"),

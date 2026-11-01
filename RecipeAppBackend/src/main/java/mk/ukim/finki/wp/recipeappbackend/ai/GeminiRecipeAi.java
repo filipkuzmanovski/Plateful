@@ -1,5 +1,7 @@
 package mk.ukim.finki.wp.recipeappbackend.ai;
 
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +23,7 @@ public class GeminiRecipeAi implements RecipeAi {
     private final RestClient client;
     private final String apiKey;
     private final String model;
+    private final String visionModel;
     private final String url;
 
     public GeminiRecipeAi(RestClient.Builder builder, AiProperties properties) {
@@ -32,6 +35,7 @@ public class GeminiRecipeAi implements RecipeAi {
         this.client = builder.build();
         this.apiKey = properties.gemini().apiKey();
         this.model = properties.gemini().model();
+        this.visionModel = properties.gemini().visionModel();
         this.url = baseUrl + PATH;
     }
 
@@ -41,6 +45,7 @@ public class GeminiRecipeAi implements RecipeAi {
 
     @Override
     public AiReply complete(AiRequest request) {
+        String usedModel = request.images().isEmpty() ? model : visionModel;
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", request.temperature());
         generationConfig.put("maxOutputTokens", request.maxOutputTokens());
@@ -50,12 +55,18 @@ public class GeminiRecipeAi implements RecipeAi {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", request.systemText()))));
-        body.put("contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", request.userText())))));
+        List<Object> parts = new ArrayList<>();
+        parts.add(Map.of("text", request.userText()));
+        for (AiImage image : request.images()) {
+            parts.add(Map.of("inlineData", Map.of("mimeType", image.mimeType(),
+                    "data", Base64.getEncoder().encodeToString(image.data()))));
+        }
+        body.put("contents", List.of(Map.of("role", "user", "parts", parts)));
         body.put("generationConfig", generationConfig);
         String payload = AiHttp.toJson(NAME, body);
 
         AiHttp.Response response = AiHttp.execute(NAME, () -> client.post()
-                .uri(url, model)
+                .uri(url, usedModel)
                 .header("x-goog-api-key", apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
@@ -80,7 +91,7 @@ public class GeminiRecipeAi implements RecipeAi {
         Integer output = candidates == null && thoughts == null
                 ? null
                 : (candidates == null ? 0 : candidates) + (thoughts == null ? 0 : thoughts);
-        return new AiReply(text.toString(), NAME, model,
+        return new AiReply(text.toString(), NAME, usedModel,
                 AiHttp.intOrNull(usage.get("promptTokenCount")), output);
     }
 }

@@ -50,6 +50,35 @@ class AiPropertiesTest {
     }
 
     @Test
+    void visionDefaults() {
+        AiProperties p = bind(Map.of());
+
+        assertThat(p.visionOrder()).containsExactly("groq");
+        assertThat(p.groq().visionModel()).isEqualTo("qwen/qwen3.8-27b");
+        assertThat(p.gemini().visionModel()).isEqualTo("gemini-3.8-flash");
+    }
+
+    @Test
+    void visionSettings_bindFromProperties() {
+        AiProperties p = bind(Map.of(
+                "plateful.ai.groq.api-key", "k",
+                "plateful.ai.groq.model", "text-model",
+                "plateful.ai.groq.vision-model", "my-vision",
+                "plateful.ai.vision-order", "gemini,groq"));
+
+        assertThat(p.groq().model()).isEqualTo("text-model");
+        assertThat(p.groq().visionModel()).isEqualTo("my-vision");
+        assertThat(p.visionOrder()).containsExactly("gemini", "groq");
+    }
+
+    @Test
+    void providerToString_neverPrintsTheKey() {
+        AiProperties.Provider provider = new AiProperties.Provider("test-key-123", "m", "v");
+
+        assertThat(provider.toString()).doesNotContain("test-key-123");
+    }
+
+    @Test
     void toStringNeverShowsTheKey() {
         AiProperties p = bind(Map.of("plateful.ai.groq.api-key", "test-key-123"));
 
