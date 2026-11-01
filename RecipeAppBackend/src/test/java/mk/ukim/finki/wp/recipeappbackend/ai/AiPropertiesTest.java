@@ -2,6 +2,7 @@ package mk.ukim.finki.wp.recipeappbackend.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -69,6 +70,15 @@ class AiPropertiesTest {
         assertThat(p.groq().model()).isEqualTo("text-model");
         assertThat(p.groq().visionModel()).isEqualTo("my-vision");
         assertThat(p.visionOrder()).containsExactly("gemini", "groq");
+    }
+
+    @Test
+    void postOrder_defaultsToGroq() {
+        assertThat(bind(Map.of()).postOrder()).containsExactly("groq");
+        assertThat(new AiProperties(null, null, null, 0, 0, null, List.of()).postOrder())
+                .containsExactly("groq");
+        assertThat(bind(Map.of("plateful.ai.post-order", "groq,gemini")).postOrder())
+                .containsExactly("groq", "gemini");
     }
 
     @Test

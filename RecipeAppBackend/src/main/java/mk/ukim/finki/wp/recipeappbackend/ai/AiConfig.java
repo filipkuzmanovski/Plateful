@@ -46,6 +46,19 @@ public class AiConfig {
         return new FallbackRecipeAi(active, Clock.systemUTC());
     }
 
+    /**
+     * The post chain: recipes written from an Instagram post that came with screenshots go through Groq
+     * only, with the text model. Its own {@link FallbackRecipeAi}, so its cooldowns never touch the other
+     * chains. Injected with {@code @Qualifier("postAi")}.
+     */
+    @Bean("postAi")
+    public RecipeAi postAi(AiProperties properties, ObjectProvider<RestClient.Builder> builders) {
+        List<NamedRecipeAi> active =
+                activePostProviders(properties, builders.getIfAvailable(RestClient::builder));
+        log.info("ai post providers active={}", active.stream().map(NamedRecipeAi::name).toList());
+        return new FallbackRecipeAi(active, Clock.systemUTC());
+    }
+
     /** Active providers in configured order. Unknown names are ignored with a warning. */
     static List<NamedRecipeAi> activeProviders(AiProperties properties, RestClient.Builder builder) {
         return build(properties.order(), "plateful.ai.order", properties, builder, AiProperties.Provider::model);
@@ -55,6 +68,12 @@ public class AiConfig {
     static List<NamedRecipeAi> activeVisionProviders(AiProperties properties, RestClient.Builder builder) {
         return build(properties.visionOrder(), "plateful.ai.vision-order", properties, builder,
                 AiProperties.Provider::visionModel);
+    }
+
+    /** Active providers in {@code plateful.ai.post-order}, each named with its text model. */
+    static List<NamedRecipeAi> activePostProviders(AiProperties properties, RestClient.Builder builder) {
+        return build(properties.postOrder(), "plateful.ai.post-order", properties, builder,
+                AiProperties.Provider::model);
     }
 
     private static List<NamedRecipeAi> build(List<String> order, String setting, AiProperties properties,
