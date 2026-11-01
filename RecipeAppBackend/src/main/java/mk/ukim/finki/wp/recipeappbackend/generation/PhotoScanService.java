@@ -28,9 +28,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /**
- * "Scan my fridge" (spec sections 4.2 and 5.3): preferences, photo preparation, a reserved daily scan, the
- * vision call (one retry if the reply is unreadable and enough time is left), then names normalised,
- * filtered against the user's preferences and capped.
+ * "Scan my fridge" (spec sections 4.2 and 5.3): preferences, a quick check that scans are left, photo
+ * preparation, a reserved daily scan, the vision call (one retry if the reply is unreadable and enough time
+ * is left), then names normalised, filtered against the user's preferences and capped.
  *
  * <p>No database transaction or connection is held while the AI call runs: preferences are read and the scan
  * is reserved as their own statements. Whatever ends the scan without a readable reply (quota, an outage,
@@ -85,6 +85,12 @@ public class PhotoScanService {
     public ScanResultDto scan(UUID userId, List<byte[]> photos) {
         UserPreferences stored = preferences.findById(userId).orElseThrow(NoPreferencesException::new);
         UserFoodProfile profile = UserFoodProfile.of(stored);
+
+        // A cheap read so a user with no scans left is turned away before the server decodes any photo.
+        // The atomic reserve below stays the source of truth.
+        if (usage.usage(userId).scansRemaining() == 0) {
+            throw new ScanLimitException();
+        }
 
         List<AiImage> images = preparer.prepare(photos);
 

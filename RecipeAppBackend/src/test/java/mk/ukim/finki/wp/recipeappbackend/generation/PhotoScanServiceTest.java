@@ -42,6 +42,7 @@ import mk.ukim.finki.wp.recipeappbackend.exception.NoPreferencesException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ScanFailedException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ScanLimitException;
 import mk.ukim.finki.wp.recipeappbackend.food.FoodRules;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.AiUsageDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.ScanResultDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.UserPreferences;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserPreferencesRepository;
@@ -127,6 +128,7 @@ class PhotoScanServiceTest {
 
         when(preferences.findById(USER)).thenReturn(Optional.of(UserPreferences.builder().userId(USER).build()));
         when(preparer.prepare(any())).thenReturn(List.of(IMAGE));
+        when(usage.usage(USER)).thenReturn(new AiUsageDto(0, 10, 10, 0, 10, 10));
         when(usage.reserveScan(USER)).thenReturn(OptionalInt.of(1));
 
         FoodRules rules = new FoodRules();
@@ -313,7 +315,8 @@ class PhotoScanServiceTest {
 
         assertThatThrownBy(() -> service.scan(USER, PHOTOS)).isInstanceOf(InvalidScanPhotoException.class);
 
-        verifyNoInteractions(usage);
+        verify(usage, never()).reserveScan(any());
+        verify(usage, never()).refundScan(any());
         assertThat(ai.requests).isEmpty();
     }
 
@@ -336,6 +339,19 @@ class PhotoScanServiceTest {
 
         assertThat(ai.requests).isEmpty();
         verify(usage, never()).refundScan(any());
+    }
+
+    @Test
+    void limitAlreadyReached_isScanLimitBeforePreparingAnyPhoto() {
+        when(usage.usage(USER)).thenReturn(new AiUsageDto(0, 10, 10, 10, 10, 0));
+
+        assertThatThrownBy(() -> service.scan(USER, PHOTOS)).isInstanceOf(ScanLimitException.class)
+                .hasMessage("You've used today's 10 photo scans. More tomorrow.");
+
+        verifyNoInteractions(preparer);
+        verify(usage, never()).reserveScan(any());
+        verify(usage, never()).refundScan(any());
+        assertThat(ai.requests).isEmpty();
     }
 
     @Test
@@ -365,7 +381,7 @@ class PhotoScanServiceTest {
         assertThat(ai.requests).hasSize(1);
         AiRequest request = ai.requests.get(0);
         assertThat(request.images()).containsExactly(IMAGE);
-        assertThat(request.userText()).isEqualTo("Here are 1 photo. List the ingredients.");
+        assertThat(request.userText()).isEqualTo("Here is 1 photo. List the ingredients.");
     }
 
     @Test

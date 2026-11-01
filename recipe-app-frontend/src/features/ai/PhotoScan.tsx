@@ -58,7 +58,12 @@ export function PhotoScan({
   }
 
   const scan = useMutation({
-    mutationFn: async (files: File[]) => scanPhotos(await Promise.all(files.map((f) => shrinkPhoto(f)))),
+    mutationFn: async (files: File[]) => {
+      // One at a time: each decoded bitmap can be ~100 MB, and a phone may kill the tab if three are alive at once.
+      const blobs: Blob[] = [];
+      for (const file of files) blobs.push(await shrinkPhoto(file));
+      return scanPhotos(blobs);
+    },
     onMutate: () => {
       setOutcome(null);
       setTooMany(false);
@@ -80,6 +85,7 @@ export function PhotoScan({
     const picked = Array.from(e.target.files ?? []);
     e.target.value = ''; // so choosing the same file again still fires a change
     if (picked.length === 0) return;
+    scan.reset(); // a fresh pick makes the last error stale
     const room = MAX_PHOTOS - photos.length;
     setTooMany(picked.length > room);
     const added = picked.slice(0, Math.max(0, room)).map((file) => ({
@@ -90,6 +96,7 @@ export function PhotoScan({
 
   function remove(photo: Photo) {
     URL.revokeObjectURL(photo.url);
+    scan.reset(); // the error was about the photos as they were
     setPhotos(photos.filter((p) => p.id !== photo.id));
     setTooMany(false);
   }

@@ -140,7 +140,7 @@ public class PromptBuilder {
      * @param images     the prepared photos
      */
     public AiRequest scan(int photoCount, List<AiImage> images) {
-        String userText = "Here are " + photoCount + (photoCount == 1 ? " photo" : " photos")
+        String userText = (photoCount == 1 ? "Here is 1 photo" : "Here are " + photoCount + " photos")
                 + ". List the ingredients.";
         return new AiRequest(SCAN_SYSTEM_TEXT, userText, SCAN_SCHEMA, SCAN_TEMPERATURE, SCAN_MAX_TOKENS, images);
     }

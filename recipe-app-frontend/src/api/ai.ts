@@ -24,7 +24,7 @@ export const scanPhotos = (photos: Blob[]) => {
   return api<ScanResult>(`${BASE}/ai-recipes/scan`, { method: 'POST', body: form });
 };
 
-export const getAiRecipe =(id: string) => api<GeneratedRecipe>(`${BASE}/ai-recipes/${encodeURIComponent(id)}`);
+export const getAiRecipe = (id: string) => api<GeneratedRecipe>(`${BASE}/ai-recipes/${encodeURIComponent(id)}`);
 
 export const listSavedAiRecipes = (page: number, size: number = PAGE_SIZE): Promise<Page<GeneratedRecipeSummary>> =>
   api(`${BASE}/ai-recipes?${new URLSearchParams({ page: String(page), size: String(size) })}`);

@@ -4915,6 +4915,10 @@ Limits
   - Groq's own limits for this model: 30 requests a minute, 1,000 a day,
     3 images a request, about 4 MB per request. They are separate from the
     text model's limits.
+  - The vision model also has 8,000 tokens a minute and 200,000 a day. A
+    3-photo scan uses about 6,000 to 7,000 tokens, so roughly one 3-photo
+    scan a minute fits. Scanning several times in quick succession can show
+    "The free AI limit is reached for now" for a minute or so.
 
 Backend
 -------
@@ -5008,6 +5012,7 @@ After the merge:
        f. The backend log shows: ai call provider=groq
           model=qwen/qwen3.8-27b ... images=N
   3. Run the three new scan database tests once V10 is live.
+  4. Space out the multi-photo scans by about a minute.
   Real-browser behaviour is only checked by you: that the canvas really
   drops the location data, that photos come out the right way up, and the
   iPhone camera. The tests stub the browser's image functions.

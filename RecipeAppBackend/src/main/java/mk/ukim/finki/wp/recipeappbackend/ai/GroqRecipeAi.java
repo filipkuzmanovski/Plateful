@@ -12,8 +12,9 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Groq chat completions with a strict {@code json_schema} response format. The key travels only in
- * the {@code Authorization} header.
+ * Groq chat completions. Text requests use a strict {@code json_schema} response format; image (vision)
+ * requests use the vision model with {@code json_object} and reasoning off. The key travels only in the
+ * {@code Authorization} header.
  */
 public class GroqRecipeAi implements RecipeAi {
 

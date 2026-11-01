@@ -61,6 +61,7 @@ beforeEach(() => {
   revokeUrl = vi.fn();
   URL.createObjectURL = createUrl as unknown as typeof URL.createObjectURL;
   URL.revokeObjectURL = revokeUrl as unknown as typeof URL.revokeObjectURL;
+  vi.mocked(shrinkPhoto).mockClear();
   vi.mocked(shrinkPhoto).mockImplementation(async (file: Blob) => file);
 });
 
@@ -416,6 +417,59 @@ describe('PhotoScan on /cook', () => {
       "This photo type can't be opened here. Try a JPEG or take a new photo.",
     );
     expect(screen.getByRole('button', { name: 'Remove photo 1' })).toBeInTheDocument();
+  });
+
+  it('shrinksOnePhotoAtATime_secondStartsOnlyAfterTheFirstResolves', async () => {
+    signedIn();
+    scanReturns({ ingredients: ['egg'] });
+    const releases: Array<() => void> = [];
+    vi.mocked(shrinkPhoto).mockImplementation((file: Blob) => new Promise<Blob>((resolve) => {
+      releases.push(() => resolve(file));
+    }));
+    const { user, input } = await openCook();
+    await pick(user, input, 'a', 'b', 'c');
+    await user.click(scanButton());
+
+    await waitFor(() => expect(shrinkPhoto).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(shrinkPhoto).toHaveBeenCalledTimes(1); // the others wait for the first to finish
+
+    releases[0]();
+    await waitFor(() => expect(shrinkPhoto).toHaveBeenCalledTimes(2));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(shrinkPhoto).toHaveBeenCalledTimes(2);
+
+    releases[1]();
+    await waitFor(() => expect(shrinkPhoto).toHaveBeenCalledTimes(3));
+    releases[2]();
+    await screen.findByText(/^Found 1 ingredient\./);
+  });
+
+  it('removingAPhoto_clearsTheStaleError', async () => {
+    signedIn();
+    vi.mocked(shrinkPhoto).mockRejectedValueOnce(new PhotoUnreadableError());
+    const { user, input } = await openCook();
+    await pick(user, input, 'a');
+    await user.click(scanButton());
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Remove photo 1' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('pickingNewPhotos_clearsTheStaleError', async () => {
+    signedIn();
+    vi.mocked(shrinkPhoto).mockRejectedValueOnce(new PhotoUnreadableError());
+    const { user, input } = await openCook();
+    await pick(user, input, 'a');
+    await user.click(scanButton());
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    await pick(user, input, 'b');
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('img', { name: /^Photo \d$/ })).toHaveLength(2);
   });
 
   it('has no emoji', async () => {
