@@ -104,8 +104,8 @@ public class GroqRecipeAi implements RecipeAi {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
-                .exchange((req, res) -> new AiHttp.Response(
-                        res.getStatusCode().value(), AiHttp.bodyOf(res.getBody()))));
+                .exchange((req, res) -> new AiHttp.Response(res.getStatusCode().value(),
+                        AiHttp.bodyOf(res.getBody()), res.getHeaders().getFirst(HttpHeaders.RETRY_AFTER))));
         AiHttp.requireSuccess(NAME, response, false);
 
         JsonNode root = AiHttp.parse(NAME, response.body());

@@ -1,10 +1,13 @@
 package mk.ukim.finki.wp.recipeappbackend.ai;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.StreamUtils;
@@ -23,8 +26,20 @@ final class AiHttp {
     static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
     static final JsonMapper MAPPER = JsonMapper.builder().build();
 
-    /** Status and raw body of a provider answer; the body is only parsed, never reported. */
-    record Response(int status, String body) {
+    /** The shortest and longest cooldown a {@code Retry-After} header can ask for. */
+    static final Duration MIN_RETRY_AFTER = Duration.ofSeconds(1);
+    static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(300);
+    private static final Pattern RETRY_AFTER_SECONDS = Pattern.compile("\\d+(\\.\\d+)?");
+
+    /**
+     * Status, raw body and {@code Retry-After} header (or null) of a provider answer; the body is only
+     * parsed, never reported.
+     */
+    record Response(int status, String body, String retryAfter) {
+
+        Response(int status, String body) {
+            this(status, body, null);
+        }
     }
 
     private AiHttp() {
@@ -75,6 +90,24 @@ final class AiHttp {
     }
 
     /**
+     * The cooldown a {@code Retry-After} header asks for: a number of seconds (a fraction is rounded up),
+     * clamped to {@link #MIN_RETRY_AFTER}..{@link #MAX_RETRY_AFTER}. Missing or unparsable (a negative number,
+     * an exponent or the HTTP-date form) gives {@link AiQuotaExceededException#DEFAULT_RETRY_AFTER}.
+     */
+    static Duration retryAfter(String header) {
+        if (header == null || !RETRY_AFTER_SECONDS.matcher(header.strip()).matches()) {
+            return AiQuotaExceededException.DEFAULT_RETRY_AFTER;
+        }
+        String value = header.strip();
+        String whole = value.contains(".") ? value.substring(0, value.indexOf('.')) : value;
+        if (whole.replaceFirst("^0+", "").length() > 6) {
+            return MAX_RETRY_AFTER;
+        }
+        long seconds = new BigDecimal(value).setScale(0, RoundingMode.CEILING).longValueExact();
+        return Duration.ofSeconds(Math.clamp(seconds, MIN_RETRY_AFTER.toSeconds(), MAX_RETRY_AFTER.toSeconds()));
+    }
+
+    /**
      * Returns normally for 2xx. HTTP 429 is always quota; so is a {@code RESOURCE_EXHAUSTED} error
      * status when {@code bodyCanSignalQuota}. Every other failure is "unavailable".
      */
@@ -85,7 +118,7 @@ final class AiHttp {
         }
         String message = provider + " HTTP " + status;
         if (status == 429 || (bodyCanSignalQuota && isResourceExhausted(response.body()))) {
-            throw new AiQuotaExceededException(message);
+            throw new AiQuotaExceededException(message, retryAfter(response.retryAfter()));
         }
         throw new AiUnavailableException(message);
     }

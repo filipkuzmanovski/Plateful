@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.ai;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
@@ -58,8 +59,8 @@ public class GeminiRecipeAi implements RecipeAi {
                 .header("x-goog-api-key", apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
-                .exchange((req, res) -> new AiHttp.Response(
-                        res.getStatusCode().value(), AiHttp.bodyOf(res.getBody()))));
+                .exchange((req, res) -> new AiHttp.Response(res.getStatusCode().value(),
+                        AiHttp.bodyOf(res.getBody()), res.getHeaders().getFirst(HttpHeaders.RETRY_AFTER))));
         AiHttp.requireSuccess(NAME, response, true);
 
         JsonNode root = AiHttp.parse(NAME, response.body());

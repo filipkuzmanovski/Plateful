@@ -138,6 +138,58 @@ class FallbackRecipeAiTest {
     }
 
     @Test
+    void afterQuotaWithRetryAfter12s_firstSkippedFor11s_thenTriedAt12s() {
+        Fake first = new Fake().failing(new AiQuotaExceededException("groq HTTP 429", Duration.ofSeconds(12)));
+        Fake second = new Fake();
+        FallbackRecipeAi ai = new FallbackRecipeAi(
+                List.of(named("groq", first), named("gemini", second)), clock);
+
+        ai.complete(REQUEST);
+        assertThat(first.calls.get()).isEqualTo(1);
+
+        clock.advance(Duration.ofSeconds(11));
+        ai.complete(REQUEST);
+        assertThat(first.calls.get()).as("still cooling down at 11 s").isEqualTo(1);
+
+        clock.advance(Duration.ofSeconds(1));
+        first.recover();
+        ai.complete(REQUEST);
+        assertThat(first.calls.get()).as("tried again at 12 s").isEqualTo(2);
+        assertThat(second.calls.get()).isEqualTo(2);
+    }
+
+    @Test
+    void afterQuotaWithTheLongestRetryAfter_firstSkippedFor300s() {
+        Fake first = new Fake().failing(new AiQuotaExceededException("groq HTTP 429", AiHttp.retryAfter("9999")));
+        Fake second = new Fake();
+        FallbackRecipeAi ai = new FallbackRecipeAi(
+                List.of(named("groq", first), named("gemini", second)), clock);
+
+        ai.complete(REQUEST);
+        clock.advance(Duration.ofSeconds(299));
+        ai.complete(REQUEST);
+        assertThat(first.calls.get()).as("still cooling down at 299 s").isEqualTo(1);
+
+        clock.advance(Duration.ofSeconds(1));
+        ai.complete(REQUEST);
+        assertThat(first.calls.get()).as("tried again at 300 s").isEqualTo(2);
+    }
+
+    @Test
+    void unavailableWith413_fallsThroughWithoutCooldown() {
+        Fake first = new Fake().failing(new AiUnavailableException("groq HTTP 413"));
+        Fake second = new Fake();
+        FallbackRecipeAi ai = new FallbackRecipeAi(
+                List.of(named("groq", first), named("gemini", second)), clock);
+
+        ai.complete(REQUEST);
+        ai.complete(REQUEST);
+
+        assertThat(first.calls.get()).as("no cooldown after a 413").isEqualTo(2);
+        assertThat(second.calls.get()).isEqualTo(2);
+    }
+
+    @Test
     void allQuota_throwsQuota() {
         FallbackRecipeAi ai = new FallbackRecipeAi(List.of(
                 named("groq", new Fake().failing(new AiQuotaExceededException("q1"))),
@@ -203,7 +255,7 @@ class FallbackRecipeAiTest {
         assertThat(events).hasSize(2);
         assertThat(events).allSatisfy(e -> assertThat(e.getLevel()).isEqualTo(Level.INFO));
         assertThat(events.get(0).getFormattedMessage())
-                .matches("ai call provider=groq model=groq-model outcome=quota ms=\\d+ in=- out=-");
+                .matches("ai call provider=groq model=groq-model outcome=quota ms=\\d+ in=- out=- reason=\"q\"");
         assertThat(events.get(1).getFormattedMessage())
                 .matches("ai call provider=gemini model=fake-model outcome=ok ms=\\d+ in=12 out=34");
         assertThat(events).allSatisfy(e -> assertThat(e.getFormattedMessage())
@@ -271,5 +323,29 @@ class FallbackRecipeAiTest {
         public Instant instant() {
             return now;
         }
+    }
+
+    @Test
+    void failedCallLogLine_namesTheReason_withoutKeyPromptOrReply() {
+        String key = "test-secret-key-987";
+        FallbackRecipeAi ai = new FallbackRecipeAi(List.of(
+                named("groq", new Fake().failing(new AiUnavailableException("groq HTTP 413"))),
+                named("gemini", new Fake().failing(new AiQuotaExceededException("gemini HTTP 429"))),
+                named("other", new Fake().failing(new IllegalStateException("odd " + key)))), clock);
+
+        assertThatThrownBy(() -> ai.complete(REQUEST)).isInstanceOf(AiUnavailableException.class);
+
+        List<ILoggingEvent> events = appender.list;
+        assertThat(events).hasSize(3);
+        assertThat(events.get(0).getFormattedMessage())
+                .matches("ai call provider=groq model=groq-model outcome=unavailable ms=\\d+ in=- out=- "
+                        + "reason=\"groq HTTP 413\"");
+        assertThat(events.get(1).getFormattedMessage())
+                .matches("ai call provider=gemini model=gemini-model outcome=quota ms=\\d+ in=- out=- "
+                        + "reason=\"gemini HTTP 429\"");
+        // Any other exception is named by its class only, so its message can never leak into the log.
+        assertThat(events.get(2).getFormattedMessage()).endsWith("reason=\"IllegalStateException\"");
+        assertThat(events).allSatisfy(e -> assertThat(e.getFormattedMessage())
+                .doesNotContain(key).doesNotContain("secret-system-text").doesNotContain("secret-user-text"));
     }
 }

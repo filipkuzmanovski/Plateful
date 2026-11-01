@@ -11,6 +11,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
@@ -56,6 +60,7 @@ import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -497,5 +502,34 @@ class RecipeGenerationServiceTest {
         assertThat(sent.temperature()).isEqualTo(1.0);
         assertThat(sent.maxOutputTokens()).isEqualTo(2048);
         assertThat((Map<?, ?>) sent.jsonSchema()).isNotEmpty();
+    }
+
+    @Test
+    void threeFailures_logOneInfoLineWithTheReasons() {
+        Logger logger = (Logger) LoggerFactory.getLogger(RecipeGenerationService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        logger.setLevel(Level.INFO);
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            ai.then(NOT_JSON, NOT_JSON, NOT_JSON);
+
+            assertThatThrownBy(() -> service.generate(USER, request(null, false, "tomato", "basil")))
+                    .isInstanceOf(GenerationFailedException.class);
+
+            assertThat(appender.list)
+                    .filteredOn(e -> e.getFormattedMessage().startsWith("AI generation failed"))
+                    .singleElement()
+                    .satisfies(e -> {
+                        assertThat(e.getLevel()).isEqualTo(Level.INFO);
+                        assertThat(e.getFormattedMessage())
+                                .startsWith("AI generation failed after 3 attempt(s): ")
+                                .contains("unreadable reply")
+                                .doesNotContain(USER.toString())
+                                .doesNotContain("tomato").doesNotContain("basil");
+                    });
+        } finally {
+            logger.detachAppender(appender);
+        }
     }
 }

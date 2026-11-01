@@ -11,12 +11,14 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import mk.ukim.finki.wp.recipeappbackend.generation.RecipeSchema;
 import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -241,5 +243,53 @@ class GroqRecipeAiTest {
     @Test
     void nameIsGroq() {
         assertThat(ai.name()).isEqualTo("groq");
+    }
+
+    private AiQuotaExceededException quotaWithRetryAfter(String retryAfter) {
+        var response = withStatus(HttpStatus.TOO_MANY_REQUESTS).contentType(MediaType.APPLICATION_JSON)
+                .body("{\"error\":{\"message\":\"rate limit\"}}");
+        if (retryAfter != null) {
+            response = response.header(HttpHeaders.RETRY_AFTER, retryAfter);
+        }
+        server.expect(requestTo(URL)).andRespond(response);
+        try {
+            ai.complete(request());
+        } catch (AiQuotaExceededException e) {
+            server.verify();
+            return e;
+        }
+        throw new AssertionError("expected a quota exception");
+    }
+
+    @Test
+    void status429_carriesTheRetryAfterHeader() {
+        assertThat(quotaWithRetryAfter("12").retryAfter()).isEqualTo(Duration.ofSeconds(12));
+    }
+
+    @Test
+    void status429_withoutRetryAfter_defaultsTo60s() {
+        assertThat(quotaWithRetryAfter(null).retryAfter()).isEqualTo(Duration.ofSeconds(60));
+    }
+
+    @Test
+    void status429_withAnUnparsableRetryAfter_defaultsTo60s() {
+        assertThat(quotaWithRetryAfter("garbage").retryAfter()).isEqualTo(Duration.ofSeconds(60));
+    }
+
+    @Test
+    void status429_withAHugeRetryAfter_isClampedTo300s() {
+        assertThat(quotaWithRetryAfter("9999").retryAfter()).isEqualTo(Duration.ofSeconds(300));
+    }
+
+    @Test
+    void status413_isUnavailable_notQuota() {
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+                .header(HttpHeaders.RETRY_AFTER, "5")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"error\":{\"message\":\"Request too large\"}}"));
+
+        assertThatThrownBy(() -> ai.complete(request()))
+                .isInstanceOf(AiUnavailableException.class)
+                .hasMessage("groq HTTP 413");
     }
 }

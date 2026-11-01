@@ -1,7 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.ai;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -10,16 +9,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Tries the active providers in order. After a quota answer a provider is skipped for
- * {@link #COOLDOWN}. Every provider quota-limited or cooling down gives
+ * Tries the active providers in order. After a quota answer a provider is skipped for the
+ * {@link AiQuotaExceededException#retryAfter()} it carries: the provider's {@code Retry-After} (1 to 300 s)
+ * or 60 s. Every provider quota-limited or cooling down gives
  * {@link AiQuotaExceededException}; any other mix of failures gives {@link AiUnavailableException};
  * no provider at all gives {@link AiNotConfiguredException}.
  *
- * <p>Logs one INFO line per provider call and never the prompt, the reply or a key.
+ * <p>Logs one INFO line per provider call and never the prompt, the reply or a key. A failed call's line
+ * ends with the reason: the message of a quota or unavailable exception (key-free by design, for example
+ * {@code reason="groq HTTP 413"}), or only the class name of any other exception.
  */
 public class FallbackRecipeAi implements RecipeAi {
-
-    static final Duration COOLDOWN = Duration.ofSeconds(60);
 
     private static final Logger log = LoggerFactory.getLogger(FallbackRecipeAi.class);
 
@@ -53,17 +53,26 @@ public class FallbackRecipeAi implements RecipeAi {
                 logCall(provider, reply.model(), "ok", started, reply.inputTokens(), reply.outputTokens());
                 return reply;
             } catch (AiQuotaExceededException e) {
-                cooldownUntil.put(provider.name(), clock.instant().plus(COOLDOWN));
-                logCall(provider, provider.model(), "quota", started, null, null);
+                cooldownUntil.put(provider.name(), clock.instant().plus(e.retryAfter()));
+                logFailure(provider, "quota", started, e);
             } catch (RuntimeException e) {
                 unavailable = true;
-                logCall(provider, provider.model(), "unavailable", started, null, null);
+                logFailure(provider, "unavailable", started, e);
             }
         }
         if (unavailable) {
             throw new AiUnavailableException("no AI provider could answer");
         }
         throw new AiQuotaExceededException("every AI provider is over its quota");
+    }
+
+    private static void logFailure(NamedRecipeAi provider, String outcome, long startedNanos, RuntimeException e) {
+        String reason = e instanceof AiQuotaExceededException || e instanceof AiUnavailableException
+                ? e.getMessage()
+                : e.getClass().getSimpleName();
+        log.info("ai call provider={} model={} outcome={} ms={} in=- out=- reason=\"{}\"",
+                provider.name(), provider.model(), outcome, (System.nanoTime() - startedNanos) / 1_000_000,
+                reason);
     }
 
     private static void logCall(NamedRecipeAi provider, String model, String outcome, long startedNanos,

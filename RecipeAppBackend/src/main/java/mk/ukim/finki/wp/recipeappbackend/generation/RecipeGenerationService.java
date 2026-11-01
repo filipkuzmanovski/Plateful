@@ -203,6 +203,9 @@ public class RecipeGenerationService {
             StoredRecipe recipe = mapper.fromDraft(draft, checked.extras());
             return save(userId, body, names, mealType, examples, reply, recipe, novel.score());
         }
+        // The reasons may name an ingredient; nothing else about the user is logged.
+        log.info("AI generation failed after {} attempt(s): {}", problems.size(),
+                String.join("; ", problems.stream().map(DraftProblem::reason).toList()));
         throw new GenerationFailedException();
     }
 
