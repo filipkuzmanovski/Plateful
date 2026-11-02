@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, cleanup, screen } from '@testing-library/react';
+import { act, cleanup, screen, within } from '@testing-library/react';
 import { server } from '@/test/server';
 import { renderApp } from '@/test/utils';
 import { pageOf, profileFixture } from '@/test/fixtures';
@@ -78,6 +78,25 @@ describe("Today's meals strip", () => {
     expectNoEmoji();
   });
 
+  it('lists the meals as one ordered list in Breakfast, Lunch, Dinner order', async () => {
+    signIn();
+    serve(READY);
+    renderApp('/');
+
+    const heading = await screen.findByRole('heading', { level: 2, name: "Today's meals" });
+    const section = heading.closest('section') as HTMLElement;
+    const list = await within(section).findByRole('list');
+    expect(list.tagName).toBe('OL');
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(3);
+    expect(items.map((li) => within(li).getByRole('link').textContent)).toEqual([
+      expect.stringContaining('Breakfast'),
+      expect.stringContaining('Lunch'),
+      expect.stringContaining('Dinner'),
+    ]);
+    expect(within(list).getAllByRole('link')).toHaveLength(3);
+  });
+
   it('comes after the page heading, search and filters, and before the results', async () => {
     signIn();
     serve(READY);
@@ -130,7 +149,7 @@ describe("Today's meals strip", () => {
   it('is not rendered, and asks for nothing, for anonymous users', async () => {
     const dates = serve(READY);
     renderApp('/');
-    await screen.findByText(/cook something/i);
+    await screen.findByText(/find tonight's dinner/i);
     expect(screen.queryByRole('heading', { name: "Today's meals" })).not.toBeInTheDocument();
     expect(dates).toEqual([]);
   });

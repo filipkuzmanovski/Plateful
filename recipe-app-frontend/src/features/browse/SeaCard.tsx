@@ -9,13 +9,13 @@ const ROWS = [
 /** A short field guide to one sea, shown under the Seas chips while that sea is ticked. */
 export function SeaCard({ sea }: { sea: SeaInfo }) {
   return (
-    <section aria-label={sea.label} className="animate-view-in rounded-2xl bg-paper p-4 ring-1 ring-sand">
-      <h4 className="mb-3 font-serif text-lg leading-tight font-semibold tracking-tight text-olive">{sea.label}</h4>
+    <section aria-label={sea.label} className="animate-view-in rounded-card border border-rule bg-surface p-4">
+      <h4 className="mb-3 font-serif text-lg leading-tight font-semibold tracking-[-0.015em] text-ink">{sea.label}</h4>
       <dl className="space-y-2.5">
         {ROWS.map((row) => (
           <div key={row.field}>
-            <dt className="text-[11px] font-semibold tracking-[0.12em] text-olive/70 uppercase">{row.label}</dt>
-            <dd className="mt-0.5 text-sm leading-snug text-olive">{sea[row.field]}</dd>
+            <dt className="text-[13px] font-semibold text-ink-soft">{row.label}</dt>
+            <dd className="mt-0.5 text-[15px] leading-snug text-ink">{sea[row.field]}</dd>
           </div>
         ))}
       </dl>

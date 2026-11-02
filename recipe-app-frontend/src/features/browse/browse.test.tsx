@@ -69,6 +69,12 @@ async function applyDrawer(drawer: HTMLElement) {
 
 // ---- non-filter behaviour (kept) ----
 
+test("has a level 1 heading \"Find tonight's dinner\"", async () => {
+  captureRecipes();
+  renderApp('/');
+  expect(await screen.findByRole('heading', { level: 1, name: "Find tonight's dinner" })).toBeInTheDocument();
+});
+
 test('renders recipe cards from the API', async () => {
   captureRecipes();
   renderApp('/');

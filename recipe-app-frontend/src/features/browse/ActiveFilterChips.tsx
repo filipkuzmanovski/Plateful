@@ -61,10 +61,10 @@ export function ActiveFilterChips({
             type="button"
             aria-label={`Remove ${chip.label}`}
             onClick={() => onChange(chip.remove(state))}
-            className="group inline-flex items-center gap-1.5 rounded-full border border-olive/15 bg-olive/[0.07] py-1.5 pr-2 pl-3.5 text-sm font-medium text-olive transition hover:border-olive/30 hover:bg-olive/[0.12] focus-visible:outline-olive active:scale-[0.97]"
+            className="group inline-flex min-h-10 items-center gap-1.5 rounded-full border border-field bg-tint py-1.5 pr-2 pl-3.5 text-[15px] font-medium text-ink transition-colors hover:border-ink-soft"
           >
             {chip.label}
-            <span className="flex size-5 items-center justify-center rounded-full bg-olive/10 transition group-hover:bg-olive group-hover:text-cream">
+            <span className="flex size-5 items-center justify-center rounded-full bg-surface transition-colors group-hover:bg-ink group-hover:text-on-ink">
               <X aria-hidden="true" className="size-3" strokeWidth={2.75} />
             </span>
           </button>

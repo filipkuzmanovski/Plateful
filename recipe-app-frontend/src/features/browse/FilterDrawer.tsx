@@ -51,7 +51,7 @@ export function FilterDrawer({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-olive/35 backdrop-blur-[2px] data-[state=closed]:animate-overlay-out" />
+        <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-scrim data-[state=closed]:animate-overlay-out" />
         <Dialog.Content
           ref={contentRef}
           onOpenAutoFocus={(e) => {
@@ -64,7 +64,7 @@ export function FilterDrawer({
             e.preventDefault();
             returnFocus.current?.focus();
           }}
-          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] animate-sheet-in flex-col rounded-t-[1.75rem] bg-paper shadow-lift ring-1 ring-sand/70 outline-none data-[state=closed]:animate-sheet-out sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-[27rem] sm:animate-drawer-in sm:rounded-none sm:rounded-l-[1.75rem] sm:data-[state=closed]:animate-drawer-out"
+          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] animate-sheet-in flex-col rounded-t-card border border-rule bg-surface shadow-float outline-none data-[state=closed]:animate-sheet-out sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-[27rem] sm:animate-drawer-in sm:rounded-none sm:rounded-l-card sm:data-[state=closed]:animate-drawer-out"
         >
           <DrawerPanel
             applied={applied}
@@ -164,10 +164,10 @@ function DrawerPanel({
 
   return (
     <>
-      <div aria-hidden="true" className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-sand sm:hidden" />
+      <div aria-hidden="true" className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-rule sm:hidden" />
 
       <header className="flex shrink-0 items-center justify-between gap-3 px-5 pt-4 pb-3 sm:px-7 sm:pt-7">
-        <Dialog.Title className="font-serif text-[1.75rem] leading-none font-semibold tracking-tight text-olive">
+        <Dialog.Title className="font-serif text-[28px] leading-none font-medium tracking-[-0.015em] text-ink">
           Filters
         </Dialog.Title>
         <Dialog.Description className="sr-only">
@@ -178,13 +178,13 @@ function DrawerPanel({
             type="button"
             onClick={clearAll}
             disabled={nothingToClear}
-            className="rounded-full px-3 py-1.5 text-sm font-semibold text-olive underline-offset-4 transition hover:bg-sand/60 focus-visible:outline-olive disabled:pointer-events-none disabled:text-olive/45"
+            className="min-h-10 rounded-full px-3 py-1.5 text-[15px] font-semibold text-ink transition-colors hover:bg-tint disabled:pointer-events-none disabled:opacity-45"
           >
             Clear all
           </button>
           <Dialog.Close
             aria-label="Close filters"
-            className="flex size-9 items-center justify-center rounded-full text-olive transition hover:bg-sand/60 focus-visible:outline-olive"
+            className="flex size-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-tint"
           >
             <X aria-hidden="true" className="size-5" strokeWidth={2} />
           </Dialog.Close>
@@ -250,12 +250,12 @@ function DrawerPanel({
                       key={i}
                       aria-hidden="true"
                       style={{ width: `${w}rem` }}
-                      className="h-[2.125rem] animate-pulse rounded-full bg-sand/60"
+                      className="h-10 animate-pulse rounded-full bg-tint"
                     />
                   ))}
                 </div>
               ) : cuisines.isError ? (
-                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-sand bg-cream px-4 py-3 text-sm text-olive">
+                <div className="flex flex-wrap items-center gap-3 rounded-card border border-rule bg-page px-4 py-3 text-[15px] text-ink">
                   <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-danger" />
                   <span className="flex-1">Couldn't load cuisines</span>
                   <Button type="button" variant="outline" className="!px-4 !py-1.5" onClick={() => void cuisines.refetch()}>
@@ -277,16 +277,16 @@ function DrawerPanel({
                     ))}
                   </div>
                   {withRecipes.length === 0 ? (
-                    <p className="text-sm text-olive/70">No cuisines have recipes yet.</p>
+                    <p className="text-[15px] text-ink-soft">No cuisines have recipes yet.</p>
                   ) : (
                     <button
                       ref={azLinkRef}
                       type="button"
                       onClick={() => setView('az')}
-                      className="group mt-3.5 -ml-1 inline-flex items-center gap-1 rounded-full px-1 py-1 text-sm font-semibold text-terracotta-deep transition focus-visible:outline-olive"
+                      className="mt-2 -ml-1 inline-flex min-h-10 items-center gap-1 rounded-full px-1 py-1 text-[15px] font-semibold text-accent-ink hover:underline"
                     >
                       All cuisines A–Z ({withRecipes.length})
-                      <ChevronRight aria-hidden="true" className="size-4 transition-transform group-hover:translate-x-0.5" strokeWidth={2.25} />
+                      <ChevronRight aria-hidden="true" className="size-4" strokeWidth={2.25} />
                     </button>
                   )}
                 </>
@@ -324,8 +324,8 @@ function DrawerPanel({
                           type="button"
                           aria-pressed={on}
                           onClick={() => setTime(on ? '' : String(m))}
-                          className={`rounded-full border px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap tabular-nums transition focus-visible:outline-olive ${
-                            on ? 'border-olive bg-olive text-cream' : 'border-sand bg-paper text-olive hover:border-olive/40'
+                          className={`min-h-10 rounded-full border px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap tabular-nums transition-colors ${
+                            on ? 'border-ink bg-ink text-on-ink' : 'border-field bg-surface text-ink hover:bg-tint'
                           }`}
                         >
                           {m} min
@@ -346,7 +346,7 @@ function DrawerPanel({
                 >
                   <div className="flex items-center gap-2">
                     <StarPreview value={draft.minRating} />
-                    {draft.minRating !== null && <span className="text-xs text-olive/70">and up</span>}
+                    {draft.minRating !== null && <span className="text-[13px] text-ink-soft">and up</span>}
                   </div>
                 </NumberField>
               </div>
@@ -355,8 +355,8 @@ function DrawerPanel({
         )}
       </div>
 
-      <footer className="shrink-0 border-t border-sand/70 bg-paper px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-7 sm:pb-6">
-        <Button type="button" className="w-full !py-3 text-[15px]" onClick={() => onApply(draft)}>
+      <footer className="shrink-0 border-t border-rule bg-surface px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-7 sm:pb-6">
+        <Button type="button" className="w-full" onClick={() => onApply(draft)}>
           {showLabel}
         </Button>
         <span role="status" className="sr-only">
@@ -370,7 +370,7 @@ function DrawerPanel({
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="mb-3 text-[11px] font-semibold tracking-[0.14em] text-olive/70 uppercase">{title}</h3>
+      <h3 className="mb-3 text-[15px] font-semibold text-ink">{title}</h3>
       {children}
     </section>
   );
@@ -399,7 +399,7 @@ function NumberField({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-olive">
+      <label htmlFor={id} className="mb-1.5 block text-[15px] font-semibold text-ink">
         {label}
       </label>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -412,16 +412,16 @@ function NumberField({
             aria-invalid={invalid}
             aria-describedby={invalid ? `${id}-hint` : undefined}
             {...inputProps}
-            className={`w-full rounded-xl border bg-paper py-2.5 pl-3.5 text-sm text-olive tabular-nums shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition [appearance:textfield] placeholder:text-olive/70 focus:ring-4 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+            className={`w-full rounded-lg border bg-surface py-2.5 pl-3.5 text-base text-ink tabular-nums transition [appearance:textfield] placeholder:text-ink-soft focus:ring-4 focus:outline-none sm:text-[15px] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
               suffix ? 'pr-11' : 'pr-3.5'
             } ${
               invalid
                 ? 'border-danger focus:border-danger focus:ring-danger/15'
-                : 'border-sand hover:border-olive/30 focus:border-olive/50 focus:ring-saffron/20'
+                : 'border-field hover:border-ink-soft focus:border-ink focus:ring-ink/15'
             }`}
           />
           {suffix && (
-            <span aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-xs font-medium text-olive/70">
+            <span aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-[13px] font-medium text-ink-soft">
               {suffix}
             </span>
           )}
@@ -429,7 +429,7 @@ function NumberField({
         {children}
       </div>
       {invalid && (
-        <p id={`${id}-hint`} role="alert" className="mt-1.5 text-xs font-medium text-danger">
+        <p id={`${id}-hint`} role="alert" className="mt-1.5 text-[13px] font-medium text-danger">
           {hint}
         </p>
       )}
@@ -445,10 +445,10 @@ function StarPreview({ value }: { value: number | null }) {
         const fill = value === null ? 0 : value >= i ? 100 : value >= i - 0.5 ? 50 : 0;
         return (
           <span key={i} className="relative size-4">
-            <Star className="absolute inset-0 size-4 fill-sand text-sand" strokeWidth={1.5} />
+            <Star className="absolute inset-0 size-4 fill-tint text-field" strokeWidth={1.5} />
             {fill > 0 && (
               <span className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${fill}%` }}>
-                <Star className="size-4 fill-saffron text-saffron" strokeWidth={1.5} />
+                <Star className="size-4 fill-accent text-accent" strokeWidth={1.5} />
               </span>
             )}
           </span>

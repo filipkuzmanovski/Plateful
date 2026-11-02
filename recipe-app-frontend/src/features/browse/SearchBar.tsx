@@ -50,7 +50,7 @@ export function SearchBar({ value, onSearch }: { value: string; onSearch: (q: st
     <form role="search" onSubmit={submit} className="relative mt-6 w-full sm:max-w-lg">
       <Search
         aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-olive/70"
+        className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-soft"
         strokeWidth={2.25}
       />
       <input
@@ -61,7 +61,7 @@ export function SearchBar({ value, onSearch }: { value: string; onSearch: (q: st
         value={text}
         onChange={(e) => change(e.target.value)}
         autoComplete="off"
-        className="h-11 w-full rounded-full border border-sand bg-paper pr-11 pl-11 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:appearance-none"
+        className="h-12 w-full rounded-full border border-field bg-surface pr-12 pl-11 text-base text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none sm:text-[15px] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:appearance-none"
       />
       {text !== '' && (
         <button
@@ -72,7 +72,7 @@ export function SearchBar({ value, onSearch }: { value: string; onSearch: (q: st
             commit('');
             inputRef.current?.focus();
           }}
-          className="absolute top-1/2 right-2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-olive/70 transition hover:bg-sand/60 hover:text-olive focus-visible:outline-olive"
+          className="absolute top-1/2 right-1.5 flex size-10 -translate-y-1/2 items-center justify-center rounded-full text-ink-soft transition hover:bg-tint hover:text-ink"
         >
           <X aria-hidden="true" className="size-4" strokeWidth={2.25} />
         </button>

@@ -59,27 +59,27 @@ export function CuisineAZ({
         <button
           type="button"
           onClick={onBack}
-          className="-ml-2 inline-flex items-center gap-0.5 rounded-full py-1.5 pr-3 pl-1.5 text-sm font-semibold text-olive transition hover:bg-sand/60 focus-visible:outline-olive"
+          className="-ml-2 inline-flex min-h-10 items-center gap-0.5 rounded-full py-1.5 pr-3 pl-1.5 text-[15px] font-semibold text-ink transition-colors hover:bg-tint"
         >
           <ChevronLeft aria-hidden="true" className="size-4" strokeWidth={2.25} />
           Back
         </button>
-        <h3 className="font-serif text-lg font-semibold tracking-tight text-olive">All cuisines</h3>
+        <h3 className="font-serif text-lg font-semibold tracking-[-0.015em] text-ink">All cuisines</h3>
         <button
           type="button"
           onClick={onBack}
-          className="-mr-2 rounded-full px-3 py-1.5 text-sm font-semibold text-olive/70 transition hover:bg-sand/60 hover:text-olive focus-visible:outline-olive"
+          className="-mr-2 min-h-10 rounded-full px-3 py-1.5 text-[15px] font-semibold text-ink-soft transition-colors hover:bg-tint hover:text-ink"
         >
           Done
         </button>
       </div>
 
-      <div className="sticky top-0 z-10 -mx-1 bg-paper px-1 pt-1 pb-3">
+      <div className="sticky top-0 z-10 -mx-1 bg-surface px-1 pt-1 pb-3">
         <label htmlFor={`${baseId}-search`} className="sr-only">
           Search cuisines
         </label>
         <div className="relative">
-          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" />
+          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-soft" />
           <input
             id={`${baseId}-search`}
             ref={searchRef}
@@ -88,13 +88,13 @@ export function CuisineAZ({
             placeholder="Search cuisines"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full rounded-full border border-sand bg-cream/60 py-2.5 pr-4 pl-10 text-sm text-olive transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/50 focus:bg-paper focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+            className="w-full rounded-full border border-field bg-surface py-2.5 pr-4 pl-10 text-base text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none sm:text-[15px]"
           />
         </div>
       </div>
 
       {groups.length === 0 ? (
-        <p className="py-10 text-center text-sm text-olive/70">
+        <p className="py-10 text-center text-[15px] text-ink-soft">
           {query.trim() ? `No cuisines match “${query.trim()}”` : 'No cuisines have recipes yet'}
         </p>
       ) : (
@@ -104,7 +104,7 @@ export function CuisineAZ({
               <section key={letter} id={groupId(letter)} aria-labelledby={`${groupId(letter)}-h`} className="scroll-mt-16 not-first:mt-4">
                 <h4
                   id={`${groupId(letter)}-h`}
-                  className="mb-1 font-serif text-lg leading-none font-semibold text-terracotta-deep"
+                  className="mb-1 font-serif text-lg leading-none font-semibold text-accent-strong"
                 >
                   {letter}
                 </h4>
@@ -113,10 +113,10 @@ export function CuisineAZ({
                     const checked = selected.includes(c.key);
                     const inputId = `${baseId}-c-${c.key}`;
                     return (
-                      <li key={c.key} className="border-b border-sand/60 last:border-b-0">
+                      <li key={c.key} className="border-b border-rule last:border-b-0">
                         <label
                           htmlFor={inputId}
-                          className="group flex cursor-pointer items-center gap-3 rounded-lg px-1.5 py-2.5 transition hover:bg-cream"
+                          className="group flex cursor-pointer items-center gap-3 min-h-10 rounded-lg px-1.5 py-2.5 transition-colors hover:bg-tint"
                         >
                           <span className="relative flex size-[1.125rem] shrink-0 items-center justify-center">
                             <input
@@ -125,16 +125,16 @@ export function CuisineAZ({
                               checked={checked}
                               onChange={() => onToggle(c.key)}
                               aria-describedby={`${inputId}-n`}
-                              className="peer size-full cursor-pointer appearance-none rounded-[5px] border-[1.5px] border-sand-deep bg-paper transition checked:border-olive checked:bg-olive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
+                              className="peer size-full cursor-pointer appearance-none rounded-[5px] border-[1.5px] border-field bg-surface transition checked:border-ink checked:bg-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                             />
                             <Check
                               aria-hidden="true"
                               strokeWidth={3}
-                              className="pointer-events-none absolute size-3 text-cream opacity-0 transition peer-checked:opacity-100"
+                              className="pointer-events-none absolute size-3 text-on-ink opacity-0 transition peer-checked:opacity-100"
                             />
                           </span>
-                          <span className={`flex-1 text-sm text-olive ${checked ? 'font-semibold' : ''}`}>{c.label}</span>
-                          <span aria-hidden="true" className="text-xs text-olive/70 tabular-nums">
+                          <span className={`flex-1 text-[15px] text-ink ${checked ? 'font-semibold' : ''}`}>{c.label}</span>
+                          <span aria-hidden="true" className="text-[13px] text-ink-soft tabular-nums">
                             {c.count}
                           </span>
                         </label>
@@ -157,13 +157,13 @@ export function CuisineAZ({
                     <button
                       type="button"
                       onClick={() => jumpTo(letter)}
-                      className="flex h-[1.15rem] w-6 items-center justify-center rounded text-[11px] font-bold text-olive transition hover:bg-sand/70 hover:text-terracotta-deep focus-visible:outline-olive"
+                      className="flex h-5 w-8 items-center justify-center rounded text-[13px] font-bold text-ink transition-colors hover:bg-tint hover:text-accent-ink"
                     >
                       {letter}
                     </button>
                   </li>
                 ) : (
-                  <li key={letter} aria-hidden="true" className="flex h-[1.15rem] w-6 items-center justify-center text-[11px] text-olive/25">
+                  <li key={letter} aria-hidden="true" className="flex h-5 w-8 items-center justify-center text-[13px] text-ink-soft/40">
                     {letter}
                   </li>
                 ),

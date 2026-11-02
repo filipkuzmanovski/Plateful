@@ -65,7 +65,7 @@ test('protectedRouteRedirectsToVerify', async () => {
 
 test('publicPageStillRenders', async () => {
   renderApp('/');
-  expect(await screen.findByRole('heading', { name: /cook something/i })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /find tonight's dinner/i })).toBeInTheDocument();
   expect(meCalls).toBe(0);
 });
 
