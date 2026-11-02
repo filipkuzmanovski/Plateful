@@ -27,7 +27,7 @@ function Avatar({ name, tone = 'tint' }: { name: string; tone?: 'tint' | 'ink' }
   return (
     <span
       aria-hidden="true"
-      className={`flex size-9 shrink-0 items-center justify-center rounded-full font-serif text-sm font-semibold ${
+      className={`flex size-9 shrink-0 items-center justify-center rounded-full font-serif text-[13px] font-semibold ${
         tone === 'ink' ? 'bg-ink text-on-ink' : 'bg-tint text-ink'
       }`}
     >

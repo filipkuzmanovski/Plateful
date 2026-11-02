@@ -176,7 +176,7 @@ export function PhotoCollage({
 }
 
 const iconButton =
-  'flex size-11 items-center justify-center rounded-full bg-surface/90 text-ink shadow-float transition hover:bg-surface focus-visible:outline-page';
+  'flex size-11 items-center justify-center rounded-full bg-surface/90 text-ink shadow-float transition hover:bg-surface focus-visible:outline-white';
 
 const VIDEO_ERROR = "This video couldn't be played.";
 

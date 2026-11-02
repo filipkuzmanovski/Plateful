@@ -119,3 +119,12 @@ test('an uploaded cover photo keeps its plain src', () => {
   expect(img).not.toHaveAttribute('srcset');
   expect(img).not.toHaveAttribute('sizes');
 });
+
+test('the viewer controls use an outline that shows on its always-black backdrop in both themes', async () => {
+  const user = userEvent.setup();
+  const desktop = renderCollage(3);
+  await user.click(desktop.getByRole('button', { name: 'Open photo 1 of 3' }));
+  for (const name of ['Close', 'Previous photo', 'Next photo']) {
+    expect(screen.getByRole('button', { name })).toHaveClass('focus-visible:outline-white');
+  }
+});

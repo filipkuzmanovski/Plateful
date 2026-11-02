@@ -53,7 +53,7 @@ export function RatingBox({ recipeId }: { recipeId: string }) {
               disabled={rate.isPending || unrate.isPending}
               onClick={() => (current === n ? unrate.mutate() : rate.mutate(n))}
               onMouseEnter={() => setHovered(n)}
-              className="group flex size-11 items-center justify-center rounded-full transition-colors hover:bg-tint disabled:opacity-50"
+              className="flex size-11 items-center justify-center rounded-full transition-colors hover:bg-tint disabled:opacity-50"
             >
               <Star
                 aria-hidden="true"
