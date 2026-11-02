@@ -41,9 +41,9 @@ export function PreferencesPanel() {
   if (preferences.isPending) return <Spinner />;
   if (preferences.isError) {
     return (
-      <div className="flex flex-wrap items-center gap-3 text-sm text-danger">
+      <div className="flex flex-wrap items-center gap-3 text-[15px] text-danger">
         <span>Couldn't load your preferences.</span>
-        <Button type="button" variant="outline" className="!px-3.5 !py-1" onClick={() => void preferences.refetch()}>
+        <Button type="button" variant="outline" onClick={() => void preferences.refetch()}>
           Retry
         </Button>
       </div>
@@ -51,8 +51,8 @@ export function PreferencesPanel() {
   }
 
   return (
-    <section className="max-w-3xl rounded-card bg-paper p-5 shadow-card ring-1 ring-sand/70 sm:p-7">
-      <p className="mb-6 text-sm text-olive/70">
+    <section className="max-w-3xl rounded-card border border-rule bg-surface p-5 sm:p-7">
+      <p className="mb-6 text-[15px] text-ink-soft">
         We use these to suggest recipes. Allergies and ingredients you avoid are always filtered out.
       </p>
       <PreferencesForm

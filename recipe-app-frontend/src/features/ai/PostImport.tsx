@@ -14,7 +14,7 @@ const MAX_CAPTION = 2200;
 const MAX_SCREENSHOTS = 2;
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
-const legendClass = 'mb-2 block text-[13px] font-semibold text-olive';
+const legendClass = 'mb-2 block text-[15px] font-semibold text-ink';
 
 const count = (n: number) => n.toLocaleString('en-US');
 
@@ -123,15 +123,15 @@ export function PostImport({
             rows={6}
             aria-describedby={overLimit ? `${counterId} ${overId}` : counterId}
             aria-invalid={overLimit || undefined}
-            className="w-full resize-y rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm leading-relaxed text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none aria-[invalid=true]:border-danger/60"
+            className="w-full resize-y rounded-lg border border-field bg-surface px-3.5 py-2.5 text-base leading-relaxed text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none aria-[invalid=true]:border-danger sm:text-[15px]"
           />
           <div className="mt-1.5 flex items-start justify-between gap-3">
             {overLimit
-              ? <span id={overId} className="text-xs font-medium text-danger">Shorten the caption to 2,200 characters.</span>
+              ? <span id={overId} className="text-[13px] font-medium text-danger">Shorten the caption to 2,200 characters.</span>
               : <span />}
             <span
               id={counterId}
-              className={`shrink-0 text-xs tabular-nums ${overLimit ? 'font-semibold text-danger' : 'text-olive/70'}`}
+              className={`shrink-0 text-[13px] tabular-nums ${overLimit ? 'font-semibold text-danger' : 'text-ink-soft'}`}
             >
               {count(length)} / {count(MAX_CAPTION)}
             </span>
@@ -154,10 +154,10 @@ export function PostImport({
             Add screenshots
           </Button>
           {tooMany && (
-            <p className="mt-2 text-xs font-medium text-olive">Choose up to {MAX_SCREENSHOTS} screenshots.</p>
+            <p className="mt-2 text-[13px] font-medium text-ink">Choose up to {MAX_SCREENSHOTS} screenshots.</p>
           )}
           <PhotoThumbs photos={photos} noun="screenshot" busy={busy} onRemove={onRemove} />
-          <p className="mt-3 text-xs leading-relaxed text-olive/70">
+          <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
             Tip: a screenshot of the recipe slide works best. Open the full caption (tap 'more') before you copy it.
           </p>
         </div>
@@ -169,8 +169,8 @@ export function PostImport({
             {busy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
             Make recipe
           </Button>
-          {left !== null && <p className="mt-2 text-xs text-olive/70">{left} left today</p>}
-          <p className="mt-3 text-xs leading-relaxed text-olive/70">
+          {left !== null && <p className="mt-2 text-[13px] text-ink-soft">{left} left today</p>}
+          <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
             Screenshots go to Groq only and are never stored. The caption may go to Groq or Google Gemini. Nothing
             about the post is kept.
           </p>
@@ -178,15 +178,15 @@ export function PostImport({
       </form>
 
       {/* Always mounted: a live region that appears already holding text is often not announced. */}
-      <div role="status" aria-live="polite" className={`text-sm font-medium text-olive ${busy ? 'mt-10' : ''}`}>
+      <div role="status" aria-live="polite" className={`text-[15px] font-medium text-ink ${busy ? 'mt-10' : ''}`}>
         {busy && <p>Reading the post and writing your recipe. This can take up to a minute.</p>}
       </div>
       {busy && (
-        <div aria-hidden="true" className="mt-4 animate-pulse space-y-4 rounded-card bg-paper p-6 shadow-card ring-1 ring-sand/70">
-          <div className="h-7 w-2/3 rounded-lg bg-sand/70" />
-          <div className="h-4 w-full rounded bg-sand/60" />
-          <div className="h-4 w-5/6 rounded bg-sand/60" />
-          <div className="h-24 rounded-xl bg-sand/50" />
+        <div aria-hidden="true" className="mt-4 animate-pulse space-y-4 rounded-card border border-rule bg-surface p-6">
+          <div className="h-7 w-2/3 rounded-lg bg-tint" />
+          <div className="h-4 w-full rounded bg-tint" />
+          <div className="h-4 w-5/6 rounded bg-tint" />
+          <div className="h-24 rounded-lg bg-tint" />
         </div>
       )}
 

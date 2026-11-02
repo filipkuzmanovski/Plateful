@@ -88,8 +88,8 @@ export function PhotoScan({
   const noFood = outcome !== null && outcome.found === 0 && outcome.leftOut === null;
 
   return (
-    <section aria-labelledby="photo-scan-heading" className="rounded-2xl border border-sand bg-paper p-4 sm:p-5">
-      <h2 id="photo-scan-heading" className="mb-3 text-[13px] font-semibold text-olive">From a photo</h2>
+    <section aria-labelledby="photo-scan-heading" className="rounded-card border border-rule bg-surface p-4 sm:p-5">
+      <h2 id="photo-scan-heading" className="mb-3 text-[15px] font-semibold text-ink">From a photo</h2>
 
       <input
         ref={inputRef}
@@ -109,7 +109,7 @@ export function PhotoScan({
         </Button>
       </div>
 
-      {tooMany && <p className="mt-2 text-xs font-medium text-olive">Choose up to {MAX_PHOTOS} photos.</p>}
+      {tooMany && <p className="mt-2 text-[13px] font-medium text-ink">Choose up to {MAX_PHOTOS} photos.</p>}
 
       <PhotoThumbs photos={photos} noun="photo" busy={busy} onRemove={onRemove} />
 
@@ -123,14 +123,14 @@ export function PhotoScan({
           Scan photos
         </Button>
         {left !== null && (
-          <p className="mt-2 text-xs text-olive/70">{plural(left, 'scan', 'scans')} left today</p>
+          <p className="mt-2 text-[13px] text-ink-soft">{plural(left, 'scan', 'scans')} left today</p>
         )}
       </div>
 
       {errorMessage && <div className="mt-3"><FormError>{errorMessage}</FormError></div>}
 
       {/* Always mounted: a live region that appears already holding text is often not announced. */}
-      <div role="status" aria-live="polite" className={`space-y-1.5 text-sm text-olive ${busy || outcome ? 'mt-3' : ''}`}>
+      <div role="status" aria-live="polite" className={`space-y-1.5 text-[15px] text-ink ${busy || outcome ? 'mt-3' : ''}`}>
         {busy && <p className="font-medium">Looking at your photos. This can take up to 30 seconds.</p>}
         {outcome && !busy && (
           <>
@@ -149,7 +149,7 @@ export function PhotoScan({
         )}
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-olive/70">
+      <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
         Photos go to Groq only to spot ingredients and are never stored. Keep people and papers out of the shot.
       </p>
     </section>

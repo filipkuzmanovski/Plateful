@@ -110,7 +110,7 @@ export function IngredientChipInput({
 
   return (
     <div>
-      <label htmlFor={inputId} className="mb-2 block text-[13px] font-semibold text-olive">
+      <label htmlFor={inputId} className="mb-2 block text-[15px] font-semibold text-ink">
         {label}
       </label>
 
@@ -121,10 +121,10 @@ export function IngredientChipInput({
             return (
               <li key={name} className="flex flex-col items-start gap-1">
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full py-1 pr-1 pl-3.5 text-sm font-medium ${
+                  className={`inline-flex min-h-10 items-center rounded-full pr-0 pl-4 text-[15px] font-medium ${
                     reason !== undefined
                       ? 'border border-danger bg-danger/10 text-danger'
-                      : 'bg-olive text-cream shadow-button'
+                      : 'bg-ink text-on-ink'
                   }`}
                 >
                   {name}
@@ -132,13 +132,15 @@ export function IngredientChipInput({
                     type="button"
                     aria-label={`Remove ${name}`}
                     onClick={() => remove(name)}
-                    className="flex size-6 items-center justify-center rounded-full transition hover:bg-cream/20 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-saffron"
+                    className={`flex size-10 items-center justify-center rounded-full transition-colors ${
+                      reason !== undefined ? 'hover:bg-danger/15' : 'hover:bg-on-ink/20'
+                    }`}
                   >
                     <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
                   </button>
                 </span>
                 {reason !== undefined && (
-                  <span className="pl-3.5 text-xs font-medium text-danger">{name}: {reason}</span>
+                  <span className="pl-4 text-[13px] font-medium text-danger">{name}: {reason}</span>
                 )}
               </li>
             );
@@ -156,7 +158,7 @@ export function IngredientChipInput({
         value={text}
         onChange={(e) => onType(e.target.value)}
         onKeyDown={onKeyDown}
-        className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none disabled:cursor-not-allowed disabled:bg-cream disabled:opacity-70"
+        className="w-full rounded-lg border border-field bg-surface px-3.5 py-2.5 text-base text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none disabled:cursor-not-allowed disabled:bg-tint disabled:opacity-70 sm:text-[15px]"
       />
 
       {shown.length > 0 && (
@@ -166,7 +168,7 @@ export function IngredientChipInput({
               <button
                 type="button"
                 onClick={() => pick(s)}
-                className="rounded-full border border-sand bg-paper px-3 py-1 text-sm text-olive transition hover:border-olive/40 hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
+                className="inline-flex min-h-10 items-center rounded-full border border-field bg-surface px-3.5 py-1 text-[15px] text-ink transition-colors hover:bg-tint"
               >
                 {s}
               </button>
@@ -175,7 +177,7 @@ export function IngredientChipInput({
         </ul>
       )}
 
-      {atMax && <p className="mt-1.5 text-xs text-olive/70">Up to {max} ingredients</p>}
+      {atMax && <p className="mt-1.5 text-[13px] text-ink-soft">Up to {max} ingredients</p>}
     </div>
   );
 }

@@ -42,11 +42,11 @@ type TabKey = (typeof TABS)[number]['key'];
 const tabId = (key: TabKey) => `cook-tab-${key}`;
 const panelId = (key: TabKey) => `cook-panel-${key}`;
 
-const legendClass = 'mb-2 text-[13px] font-semibold text-olive';
+const legendClass = 'mb-2 text-[15px] font-semibold text-ink';
 
 /** A radio dressed as a toggle chip; the native input stays in the tab order (sr-only). */
 const radioChip =
-  'inline-flex cursor-pointer items-center rounded-full border border-sand bg-paper px-3.5 py-1.5 text-sm font-medium text-olive transition select-none hover:border-olive/40 hover:bg-cream has-checked:border-olive has-checked:bg-olive has-checked:text-cream has-checked:shadow-button has-checked:hover:bg-olive/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-olive';
+  'inline-flex min-h-10 cursor-pointer items-center rounded-full border border-field bg-surface px-3.5 py-1.5 text-[15px] font-medium text-ink transition-colors select-none hover:bg-tint has-checked:border-ink has-checked:bg-ink has-checked:text-on-ink has-checked:hover:bg-ink/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink';
 
 /** What both tabs share: the generations left today and whether today's limit was hit. */
 interface CounterProps {
@@ -131,7 +131,7 @@ function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterP
           </div>
         </fieldset>
 
-        <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-olive select-none">
+        <label className="flex min-h-10 cursor-pointer items-center gap-3 text-[15px] font-medium text-ink select-none">
           <input
             type="checkbox"
             role="switch"
@@ -141,7 +141,7 @@ function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterP
           />
           <span
             aria-hidden="true"
-            className="relative h-6 w-11 shrink-0 rounded-full border border-sand bg-cream transition peer-checked:border-olive peer-checked:bg-olive peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-olive after:absolute after:top-0.5 after:left-0.5 after:size-4.5 after:rounded-full after:bg-olive/60 after:transition-transform peer-checked:after:translate-x-5 peer-checked:after:bg-cream"
+            className="relative h-6 w-11 shrink-0 rounded-full border border-field bg-tint transition-colors peer-checked:border-ink peer-checked:bg-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink after:absolute after:top-0.5 after:left-0.5 after:size-4.5 after:rounded-full after:bg-ink-soft after:transition-transform peer-checked:after:translate-x-5 peer-checked:after:bg-on-ink"
           />
           Only use what I have
         </label>
@@ -153,18 +153,18 @@ function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterP
             {generate.isPending && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
             Generate
           </Button>
-          {left !== null && <p className="mt-2 text-xs text-olive/70">{left} left today</p>}
+          {left !== null && <p className="mt-2 text-[13px] text-ink-soft">{left} left today</p>}
         </div>
       </form>
 
       {generate.isPending && (
         <div className="mt-10" role="status">
-          <p className="mb-4 text-sm font-medium text-olive">Creating your recipe. This can take up to a minute.</p>
-          <div aria-hidden="true" className="animate-pulse space-y-4 rounded-card bg-paper p-6 shadow-card ring-1 ring-sand/70">
-            <div className="h-7 w-2/3 rounded-lg bg-sand/70" />
-            <div className="h-4 w-full rounded bg-sand/60" />
-            <div className="h-4 w-5/6 rounded bg-sand/60" />
-            <div className="h-24 rounded-xl bg-sand/50" />
+          <p className="mb-4 text-[15px] font-medium text-ink">Creating your recipe. This can take up to a minute.</p>
+          <div aria-hidden="true" className="animate-pulse space-y-4 rounded-card border border-rule bg-surface p-6">
+            <div className="h-7 w-2/3 rounded-lg bg-tint" />
+            <div className="h-4 w-full rounded bg-tint" />
+            <div className="h-4 w-5/6 rounded bg-tint" />
+            <div className="h-24 rounded-lg bg-tint" />
           </div>
         </div>
       )}
@@ -243,10 +243,10 @@ export default function CookPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="font-serif text-4xl leading-[1.05] font-semibold tracking-tight text-olive sm:text-5xl">
+      <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-ink sm:text-5xl">
         Cook with what I have
       </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-olive/80">
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
         {TABS.find((t) => t.key === selected)?.intro}
       </p>
 
@@ -254,7 +254,7 @@ export default function CookPage() {
         role="tablist"
         aria-label="How to start"
         onKeyDown={onKeyDown}
-        className="mt-7 inline-flex max-w-full items-center gap-1 rounded-full max-sm:overflow-x-auto bg-paper p-1 shadow-card ring-1 ring-sand/70"
+        className="mt-7 flex border-b border-rule max-sm:overflow-x-auto"
       >
         {TABS.map(({ key, label }) => {
           const active = key === selected;
@@ -269,8 +269,8 @@ export default function CookPage() {
               aria-controls={panelId(key)}
               tabIndex={active ? 0 : -1}
               onClick={() => select(key)}
-              className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition duration-200 sm:px-5 ${
-                active ? 'bg-olive text-cream shadow-button' : 'text-olive hover:bg-sand/60'
+              className={`min-h-11 shrink-0 border-b-2 -mb-px px-4 text-[15px] font-semibold transition-colors duration-200 ${
+                active ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
               }`}
             >
               {label}

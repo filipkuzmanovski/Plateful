@@ -23,9 +23,9 @@ const DIETS: { key: Diet; label: string }[] = [
 
 /** A checkbox dressed as a toggle chip; the native input stays in the tab order (sr-only). */
 const checkChip =
-  'group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-sand bg-paper px-3.5 py-1.5 text-sm font-medium text-olive transition select-none hover:border-olive/40 hover:bg-cream has-checked:border-olive has-checked:bg-olive has-checked:text-cream has-checked:shadow-button has-checked:hover:border-olive has-checked:hover:bg-olive/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-olive';
+  'group inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-field bg-surface px-3.5 py-1.5 text-[15px] font-medium text-ink transition-colors select-none hover:bg-tint has-checked:border-ink has-checked:bg-ink has-checked:text-on-ink has-checked:hover:bg-ink/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink';
 
-const legendClass = 'mb-2 text-[13px] font-semibold text-olive';
+const legendClass = 'mb-2 text-[15px] font-semibold text-ink';
 
 function CheckChip({
   label,
@@ -130,15 +130,15 @@ export function PreferencesForm({
       <fieldset aria-describedby={allergyError ? allergyErrorId : undefined}>
         <legend className={legendClass}>Food allergies</legend>
         {allergenList.isError ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-sand bg-cream px-3.5 py-2.5 text-sm text-olive">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-rule bg-tint px-3.5 py-2.5 text-[15px] text-ink">
             <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-danger" />
             <span>Couldn't load the allergy list</span>
-            <Button type="button" variant="outline" className="!px-3.5 !py-1" onClick={() => void allergenList.refetch()}>
+            <Button type="button" variant="outline" onClick={() => void allergenList.refetch()}>
               Retry
             </Button>
           </div>
         ) : allergenList.isPending ? (
-          <p role="status" className="text-sm text-olive/70">Loading allergies…</p>
+          <p role="status" className="text-[15px] text-ink-soft">Loading allergies…</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {allergenList.data.map((a) => (
@@ -155,7 +155,7 @@ export function PreferencesForm({
           <CheckChip label="I have no food allergies" checked={noAllergies} onChange={toggleNone} />
         </div>
         {allergyError && (
-          <p id={allergyErrorId} role="alert" className="mt-2 text-xs font-medium text-danger">
+          <p id={allergyErrorId} role="alert" className="mt-2 text-[13px] font-medium text-danger">
             {allergyError}
           </p>
         )}

@@ -62,16 +62,18 @@ export function PhotoThumbs({
           <img
             src={p.url}
             alt={`${Noun} ${i + 1}`}
-            className="size-20 rounded-xl border border-sand object-cover sm:size-24"
+            className="size-20 rounded-md border border-rule object-cover sm:size-24"
           />
           <button
             type="button"
             aria-label={`Remove ${noun} ${i + 1}`}
             disabled={busy}
             onClick={() => onRemove(p.id)}
-            className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full bg-olive text-cream shadow-button transition hover:bg-olive/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron disabled:pointer-events-none disabled:opacity-45"
+            className="group absolute -top-3 -right-3 flex size-10 items-center justify-center rounded-full disabled:pointer-events-none disabled:opacity-45"
           >
-            <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
+            <span className="flex size-6 items-center justify-center rounded-full bg-ink text-on-ink ring-2 ring-surface transition-colors group-hover:bg-ink/90">
+              <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
+            </span>
           </button>
         </li>
       ))}

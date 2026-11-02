@@ -8,7 +8,7 @@ import { AiRecipeView } from './AiRecipeView';
 import { SaveAiRecipeButton } from './SaveAiRecipeButton';
 
 const outlineLink =
-  'inline-flex items-center justify-center gap-2 rounded-full border border-olive/20 bg-paper px-4 py-2 text-sm font-semibold whitespace-nowrap text-olive transition duration-200 hover:border-olive/50 hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive';
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-field bg-surface px-5 py-2 text-[15px] font-semibold whitespace-nowrap text-ink transition-colors duration-200 hover:bg-tint';
 
 /** The generated recipe with its actions. The recipe is read through the cache so Save/Saved stays current. */
 export function CookResult({
@@ -28,14 +28,14 @@ export function CookResult({
       recipe={current}
       actions={
         <>
-          <Button type="button" variant="outline" disabled={busy} onClick={onAgain} className="!px-4 !py-2">
-            <RefreshCw aria-hidden="true" className="size-3.5" strokeWidth={2} />
+          <Button type="button" variant="outline" disabled={busy} onClick={onAgain}>
+            <RefreshCw aria-hidden="true" className="size-4" strokeWidth={2} />
             Generate another
           </Button>
           <SaveAiRecipeButton id={current.id} saved={current.saved} />
           <Link to={`/ai-recipes/${encodeURIComponent(current.id)}`} className={outlineLink}>
             Open
-            <ArrowUpRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            <ArrowUpRight aria-hidden="true" className="size-4" strokeWidth={2} />
           </Link>
         </>
       }

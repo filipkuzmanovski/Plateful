@@ -297,6 +297,20 @@ describe('Cook page tabs', () => {
     expect(screen.queryByRole('button', { name: 'Generate' })).not.toBeInTheDocument();
   });
 
+  it('underlineTabBar_selectedTabHasInkBorder', async () => {
+    signedIn();
+    renderApp('/cook');
+
+    const ingredientsTab = await screen.findByRole('tab', { name: 'From my ingredients' });
+    const postTab = screen.getByRole('tab', { name: 'From a post' });
+    expect(ingredientsTab).toHaveClass('border-ink');
+    expect(postTab).not.toHaveClass('border-ink');
+
+    await userEvent.setup().click(postTab);
+    expect(postTab).toHaveClass('border-ink');
+    expect(ingredientsTab).not.toHaveClass('border-ink');
+  });
+
   it('arrowKeys_moveBetweenTabs', async () => {
     signedIn();
     const user = userEvent.setup();
