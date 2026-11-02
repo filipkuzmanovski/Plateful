@@ -5314,7 +5314,8 @@ What changed (the "Cookbook" direction)
     everything else.
   - Recipes sit on the page without boxes. Only things that float (menus,
     dialogs, the filter drawer, toasts) have a shadow.
-  - Today's meals is set like a printed menu, and now has photos.
+  - Today's meals is set like a printed menu: three text rows (label,
+    title, time) separated by dotted rules.
   - A recipe page shows the ingredients in a tinted panel, and the steps
     have large numbers hanging in the margin.
   - /cook and the profile page use simple underline tabs.
@@ -5352,7 +5353,7 @@ Contrast rules (checked in both modes):
     as the only edge of a control. Anything small and saffron uses
     accent-ink instead.
 The old names (olive, cream, paper, sand, saffron, terracotta, muted) and
-the old card shadows are deleted. Nothing in src uses them any more, and
+the old card shadows are deleted. No class in src uses them any more, and
 the built CSS no longer contains them.
 
 Dark mode
@@ -5362,7 +5363,8 @@ Dark mode
   - Your choice is remembered per browser under the key plateful.theme.
   - A tiny script in index.html sets the mode before the page paints, so a
     reload in dark mode does not flash white first.
-  - Dark has its own values for every colour above (spec section 4.1).
+  - Dark has its own values for every colour above (on-accent stays the
+    same; spec section 4.1).
   - The photo and video viewer stays black, and the two-factor QR code stays
     on a white square so that it still scans.
 
@@ -5398,6 +5400,16 @@ Tests
     started at 58 files and 708 tests). npm run build succeeded.
   - The behaviour tests were not weakened. Only class names that named old
     colours were updated to the new names.
+  - Browser check: the branch was looked at in a browser at 1280px and 375px,
+    in light and dark: the home page (hero, search, filters, error state),
+    the theme menu by keyboard, login, signup, About, Privacy and the filter
+    drawer. There was no sideways scrolling at 375px, the focus ring was
+    visible, and there were no console errors apart from the backend being
+    down.
+  - NOT checked in a browser, because the backend was not running and the
+    check could not sign in: recipe cards, the recipe page, Today's meals,
+    /cook, the profile, New recipe and the admin pages. These are in your
+    manual steps below.
 
 Your manual steps
 -----------------
