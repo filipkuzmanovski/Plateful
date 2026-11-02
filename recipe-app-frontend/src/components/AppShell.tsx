@@ -9,6 +9,7 @@ import { IdleSessionGuard } from '@/auth/IdleSessionGuard';
 import { OnboardingRedirect } from '@/auth/OnboardingRedirect';
 import { ErrorBoundary } from './ErrorBoundary';
 import SiteFooter from './SiteFooter';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
   `relative rounded-full px-2.5 py-1.5 sm:px-3 transition-colors ${
@@ -65,6 +66,7 @@ export default function AppShell() {
   }, [menuOpen]);
 
   return (
+    <ThemeProvider>
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-30 border-b border-sand/80 bg-paper/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
@@ -181,5 +183,6 @@ export default function AppShell() {
         }}
       />
     </div>
+    </ThemeProvider>
   );
 }

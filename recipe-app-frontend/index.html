@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfbf7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#161a14" />
+    <script>
+      (function () {
+        var c = null;
+        try { c = localStorage.getItem('plateful.theme'); } catch (e) {}
+        var dark = c === 'dark' || (c !== 'light' && !!window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
     <title>Plateful</title>
   </head>
   <body>

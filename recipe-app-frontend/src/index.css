@@ -1,34 +1,53 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/inter';
-/* Fraunces with the optical-size axis: tight, high-contrast at display sizes, sturdier at small sizes. */
-@import '@fontsource-variable/fraunces/opsz.css';
-@import '@fontsource-variable/fraunces/opsz-italic.css';
+@import '@fontsource-variable/hanken-grotesk';
+/* Newsreader with the optical-size axis: sturdier at small sizes, finer at display sizes. */
+@import '@fontsource-variable/newsreader/opsz.css';
+@import '@fontsource-variable/newsreader/opsz-italic.css';
 
 @theme {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Fraunces Variable', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-sans: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
 
-  /* Golden Hour palette (spec section 1) */
-  --color-cream: #fbf6ee;
-  --color-paper: #fffdf8;
-  --color-olive: #2f3a2b;
-  --color-saffron: #e8a33d;
-  --color-terracotta: #c65d3b;
-  --color-sand: #eadfcd;
-  --color-muted: #8a8a7a;
-  /* Deep tones for text and borders on washes: terracotta-deep about 5.6:1, saffron-deep about 6.3:1 on their tints. */
-  --color-terracotta-deep: #9c4329;
-  --color-saffron-deep: #7a4f16;
-  --color-sand-deep: #b8a586;
-  /* Semantic: destructive actions. A warm brick that sits in the palette and passes AA on cream. */
+  /*
+   * Cookbook palette, light values (spec 4.1). The dark values are redefined under
+   * :root[data-theme='dark'] below. `accent` is 2.3:1 in light mode: decoration only, never text.
+   */
+  --color-page: #fbfbf7;
+  --color-surface: #ffffff;
+  --color-tint: #eaede2;
+  --color-ink: #263022;
+  --color-ink-soft: #535d4c;
+  --color-rule: #d6dacc;
+  --color-field: #7d8873;
+  --color-accent: #e2992e;
+  --color-accent-strong: #b06f12;
+  --color-accent-ink: #7a4f16;
+  --color-on-accent: #263022;
+  --color-on-ink: #fbfbf7;
   --color-danger: #a63d2a;
+  --color-on-danger: #fbfbf7;
+  --color-scrim: rgb(38 48 34 / 0.4);
 
-  /* Soft, olive-tinted depth */
+  /* Temporary aliases so unrefactored components keep working in both modes. Deleted in Task 10. */
+  --color-olive: var(--color-ink);
+  --color-cream: var(--color-page);
+  --color-paper: var(--color-surface);
+  --color-sand: var(--color-tint);
+  --color-muted: var(--color-ink-soft);
+  --color-saffron: var(--color-accent);
+  --color-saffron-deep: var(--color-accent-ink);
+  --color-terracotta: var(--color-accent-ink);
+  --color-terracotta-deep: var(--color-accent-ink);
+  --color-sand-deep: var(--color-field);
+
+  /* Only things that float get a shadow (menus, dialogs, the drawer, toasts). */
+  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.06), 0 12px 32px -8px rgb(0 0 0 / 0.22);
+  /* Old shadows, used by unrefactored components. Deleted in Task 10. */
   --shadow-card: 0 1px 2px rgb(47 58 43 / 0.05), 0 4px 16px -4px rgb(47 58 43 / 0.1);
   --shadow-lift: 0 2px 4px rgb(47 58 43 / 0.05), 0 18px 36px -12px rgb(47 58 43 / 0.24);
   --shadow-button: 0 1px 2px rgb(47 58 43 / 0.16), 0 4px 12px -4px rgb(47 58 43 / 0.35);
 
-  --radius-card: 1.25rem;
+  --radius-card: 0.75rem;
 
   /* Dialog entrance. Animates `scale`/`opacity` only, so Tailwind's `translate` centering is untouched. */
   --animate-overlay-in: overlay-in 160ms ease-out;
@@ -106,21 +125,37 @@
 }
 
 @layer base {
+  /* Dark values (spec 4.1). The first-paint script in index.html and ThemeProvider set data-theme. */
+  :root[data-theme='dark'] {
+    --color-page: #161a14;
+    --color-surface: #1e241b;
+    --color-tint: #252c22;
+    --color-ink: #ecebe0;
+    --color-ink-soft: #b3b8a8;
+    --color-rule: #3a4335;
+    --color-field: #76816c;
+    --color-accent: #f0b354;
+    --color-accent-strong: #f0b354;
+    --color-accent-ink: #f0b354;
+    --color-on-accent: #263022;
+    --color-on-ink: #161a14;
+    --color-danger: #f0907a;
+    --color-on-danger: #161a14;
+    --color-scrim: rgb(0 0 0 / 0.6);
+  }
+
   html {
-    background-color: var(--color-cream);
+    background-color: var(--color-page);
   }
 
   body {
-    @apply min-h-screen bg-cream font-sans text-olive antialiased;
-    /* A faint late-afternoon glow from the top right. */
-    background-image: radial-gradient(70rem 32rem at 90% -12rem, rgb(232 163 61 / 0.1), transparent 70%);
-    background-repeat: no-repeat;
+    @apply min-h-screen bg-page font-sans text-ink antialiased;
     font-optical-sizing: auto;
   }
 
   ::selection {
-    background-color: rgb(232 163 61 / 0.3);
-    color: var(--color-olive);
+    background-color: color-mix(in oklab, var(--color-accent) 35%, transparent);
+    color: var(--color-ink);
   }
 
   /*
@@ -137,9 +172,9 @@
     cursor: not-allowed;
   }
 
-  /* One consistent olive focus ring for keyboard users (about 11:1 on cream; saffron was about 2:1, below WCAG 1.4.11). */
+  /* One consistent ink focus ring for keyboard users (11:1 or more on page in both modes). */
   :focus-visible {
-    outline: 2px solid var(--color-olive);
+    outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
 
