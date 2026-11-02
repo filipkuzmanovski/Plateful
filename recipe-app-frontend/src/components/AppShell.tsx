@@ -21,8 +21,8 @@ const navBase = ({ isActive }: { isActive: boolean }) =>
 
 const navLink = (state: { isActive: boolean }) => `inline-flex ${navBase(state)}`;
 
-/** Links that only fit once there is room; below `sm` they live in the user menu. */
-const wideOnly = (state: { isActive: boolean }) => `hidden sm:inline-flex ${navBase(state)}`;
+/** Links that only fit once there is room; below `md` they live in the user menu. */
+const wideOnly = (state: { isActive: boolean }) => `hidden md:inline-flex ${navBase(state)}`;
 
 const pillLink =
   'inline-flex min-h-11 items-center rounded-full px-4 font-semibold whitespace-nowrap transition-colors';
@@ -70,7 +70,7 @@ function ReviewQueueMenuItem({ onNavigate }: { onNavigate: () => void }) {
       to="/admin/review"
       onClick={onNavigate}
       aria-label={count > 0 ? `Review queue, ${count} pending` : undefined}
-      className={`${menuItem} sm:hidden`}
+      className={`${menuItem} md:hidden`}
     >
       <ClipboardCheck aria-hidden="true" className="size-4 text-ink-soft" />
       <span className="flex-1">Review queue</span>
@@ -114,8 +114,8 @@ export default function AppShell() {
               Plateful<span className="text-accent">.</span>
             </Link>
             <nav className="flex items-center gap-1 text-[15px] sm:gap-2">
-              {/* Signed in, Browse is the wordmark's job on phones; signed out it stays. */}
-              <NavLink to="/" end className={status === 'ready' ? wideOnly : navLink}>Browse</NavLink>
+              {/* Signed in (or half signed in), Browse is the wordmark's job on phones; signed out it stays. */}
+              <NavLink to="/" end className={status === 'ready' || status === 'needs-mfa' ? wideOnly : navLink}>Browse</NavLink>
               {status === 'ready' && <NavLink to="/cook" className={navLink}>Cook</NavLink>}
               {status === 'ready' && (
                 <NavLink to="/recipes/new" className={(s) => `${wideOnly(s)} gap-1`}>
@@ -152,7 +152,7 @@ export default function AppShell() {
                       <Link
                         to="/recipes/new"
                         onClick={() => setMenuOpen(false)}
-                        className={`${menuItem} sm:hidden`}
+                        className={`${menuItem} md:hidden`}
                       >
                         <Plus aria-hidden="true" className="size-4 text-ink-soft" />
                         New recipe
@@ -178,12 +178,15 @@ export default function AppShell() {
                 </button>
               ) : status === 'needs-mfa' ? (
                 <>
-                  <Link
-                    to="/verify-2fa"
-                    className={`${pillLink} ml-1 bg-ink text-on-ink hover:bg-ink/90`}
-                  >
-                    Finish signing in
-                  </Link>
+                  {/* Already on the verify page, the link would only point at itself. */}
+                  {location.pathname !== '/verify-2fa' && (
+                    <Link
+                      to="/verify-2fa"
+                      className={`${pillLink} ml-1 bg-ink text-on-ink hover:bg-ink/90`}
+                    >
+                      Finish signing in
+                    </Link>
+                  )}
                   <button
                     onClick={handleSignOut}
                     className={`${pillLink} border border-field bg-surface text-ink hover:bg-tint`}

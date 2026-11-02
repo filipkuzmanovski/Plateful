@@ -9,7 +9,11 @@ import type { MyProfile } from '@/lib/types';
 
 const BASE = 'http://localhost:8080';
 
-const mocks = vi.hoisted(() => ({ signedIn: true }));
+const b64url = (o: unknown) =>
+  btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const aal1Token = `${b64url({ alg: 'HS256' })}.${b64url({ aal: 'aal1' })}.sig`;
+
+const mocks = vi.hoisted(() => ({ signedIn: true, needsMfa: false }));
 
 vi.mock('@/auth/supabaseClient', () => ({
   supabase: {
@@ -17,12 +21,19 @@ vi.mock('@/auth/supabaseClient', () => ({
       getSession: async () => ({
         data: {
           session: mocks.signedIn
-            ? { access_token: 'test-token', user: { id: 'u-1', email: 'jane@example.com' } }
+            ? { access_token: mocks.needsMfa ? aal1Token : 'test-token', user: { id: 'u-1', email: 'jane@example.com' } }
             : null,
         },
       }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
       signOut: async () => {},
+      mfa: {
+        getAuthenticatorAssuranceLevel: async () => ({
+          data: { currentLevel: 'aal1', nextLevel: 'aal2' },
+          error: null,
+        }),
+        listFactors: async () => ({ data: { all: [], totp: [{ id: 'f1', friendly_name: 'Phone' }] }, error: null }),
+      },
     },
   },
 }));
@@ -37,6 +48,7 @@ function serve(profile: MyProfile, pending = 3) {
 
 beforeEach(() => {
   mocks.signedIn = true;
+  mocks.needsMfa = false;
 });
 
 test('adminUserMenuHasPhoneLinksProfileAndSignOut', async () => {
@@ -88,7 +100,7 @@ test('phoneHiddenHeaderLinksNeverCarryABareDisplayClass', async () => {
   for (const link of wideOnly) {
     const tokens = link.className.split(/\s+/);
     expect(tokens).toContain('hidden');
-    expect(tokens).toContain('sm:inline-flex');
+    expect(tokens).toContain('md:inline-flex');
     // A bare display class ties with `hidden` and wins by CSS order, so the link would show on phones.
     for (const display of ['inline-flex', 'flex', 'block', 'inline-block', 'inline', 'grid']) {
       expect(tokens).not.toContain(display);
@@ -106,7 +118,43 @@ test('userMenuItemsOnlyForPhonesDoNotCarryHiddenOrInlineDisplayConflicts', async
   const menu = within(screen.getByTestId('user-menu'));
   for (const name of ['New recipe', 'Review queue, 3 pending']) {
     const tokens = (await menu.findByRole('link', { name })).className.split(/\s+/);
-    expect(tokens).toContain('sm:hidden');
+    expect(tokens).toContain('md:hidden');
     expect(tokens).not.toContain('hidden');
   }
 });
+
+
+describe('while two-factor verification is pending', () => {
+  beforeEach(() => {
+    mocks.needsMfa = true;
+    server.use(http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))));
+  });
+
+  test('browseIsWideOnlySoTheHeaderFitsOnPhones', async () => {
+    renderApp('/');
+
+    await screen.findByRole('link', { name: 'Finish signing in' });
+    const tokens = within(screen.getByRole('banner')).getByRole('link', { name: 'Browse' }).className.split(/\s+/);
+    expect(tokens).toContain('hidden');
+    expect(tokens).toContain('md:inline-flex');
+    for (const display of ['inline-flex', 'flex', 'block', 'inline-block', 'inline', 'grid']) {
+      expect(tokens).not.toContain(display);
+    }
+  });
+
+  test('finishSigningInLinkShowsOutsideTheVerifyPage', async () => {
+    renderApp('/');
+
+    expect(await screen.findByRole('link', { name: 'Finish signing in' })).toHaveAttribute('href', '/verify-2fa');
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+  });
+
+  test('noFinishSigningInLinkOnTheVerifyPage', async () => {
+    renderApp('/verify-2fa');
+
+    expect(await screen.findByRole('heading', { name: /two-factor verification/i })).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Finish signing in' })).not.toBeInTheDocument();
+  });
+});
+
