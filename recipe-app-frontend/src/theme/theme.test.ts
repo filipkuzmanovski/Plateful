@@ -71,6 +71,24 @@ describe('applyTheme', () => {
     expect(document.documentElement.dataset.theme).toBe('light');
     expect(document.documentElement.style.colorScheme).toBe('light');
   });
+
+  it('sets both theme-color metas to the resolved page colour', () => {
+    const metas = ['light', 'dark'].map((mode) => {
+      const meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      meta.media = `(prefers-color-scheme: ${mode})`;
+      document.head.appendChild(meta);
+      return meta;
+    });
+    try {
+      applyTheme('dark');
+      expect(metas.map((m) => m.content)).toEqual(['#161a14', '#161a14']);
+      applyTheme('light');
+      expect(metas.map((m) => m.content)).toEqual(['#fbfbf7', '#fbfbf7']);
+    } finally {
+      metas.forEach((m) => m.remove());
+    }
+  });
 });
 
 describe('systemPrefersDark', () => {

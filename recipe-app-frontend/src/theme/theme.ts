@@ -34,7 +34,14 @@ export function resolveTheme(choice: ThemeChoice, prefersDark: boolean): Resolve
   return choice;
 }
 
+/** The page colour per mode (the `page` token); the browser chrome follows the chosen mode, not the device's. */
+const THEME_COLOR: Record<ResolvedTheme, string> = { light: '#fbfbf7', dark: '#161a14' };
+
 export function applyTheme(resolved: ResolvedTheme): void {
   document.documentElement.dataset.theme = resolved;
   document.documentElement.style.colorScheme = resolved;
+  // index.html has one theme-color tag per device mode; both are set so an explicit choice wins.
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute('content', THEME_COLOR[resolved]);
+  });
 }
