@@ -29,19 +29,19 @@ export function RatingBox({ recipeId }: { recipeId: string }) {
   const unrate = useMutation({ mutationFn: () => deleteMyRating(recipeId), onSuccess: invalidate, onError });
 
   if (status !== 'ready') {
-    return <p className="text-sm text-olive/70">Sign in to rate this recipe.</p>;
+    return <p className="text-[15px] text-ink-soft">Sign in to rate this recipe.</p>;
   }
   // Wait for the current rating before showing stars, so a click can't race the load
   // (clicking the already-rated star must un-rate, not re-PUT).
   if (myRating.isPending) {
-    return <p className="text-sm text-olive/70">Loading your rating…</p>;
+    return <p className="text-[15px] text-ink-soft">Loading your rating…</p>;
   }
   const current = myRating.data ?? null;
   const shown = hovered ?? current;
 
   return (
     <div>
-      <p className="mb-1.5 text-[13px] font-semibold text-olive">Your rating</p>
+      <p className="mb-1.5 text-[13px] font-semibold text-ink-soft">Your rating</p>
       <div className="-ml-1.5 flex" onMouseLeave={() => setHovered(null)}>
         {[1, 2, 3, 4, 5].map((n) => {
           const lit = shown !== null && n <= shown;
@@ -53,20 +53,20 @@ export function RatingBox({ recipeId }: { recipeId: string }) {
               disabled={rate.isPending || unrate.isPending}
               onClick={() => (current === n ? unrate.mutate() : rate.mutate(n))}
               onMouseEnter={() => setHovered(n)}
-              className="group rounded-full p-1.5 transition disabled:opacity-50"
+              className="group flex size-11 items-center justify-center rounded-full transition-colors hover:bg-tint disabled:opacity-50"
             >
               <Star
                 aria-hidden="true"
                 strokeWidth={1.5}
-                className={`size-7 transition duration-150 group-hover:scale-110 group-active:scale-95 ${
-                  lit ? 'fill-saffron text-saffron' : 'fill-transparent text-muted'
+                className={`size-7 transition-colors duration-150 ${
+                  lit ? 'fill-accent text-accent' : 'fill-transparent text-field'
                 }`}
               />
             </button>
           );
         })}
       </div>
-      {current !== null && <p className="mt-1 text-xs text-olive/70">Click your star again to remove.</p>}
+      {current !== null && <p className="mt-1 text-[13px] text-ink-soft">Click your star again to remove.</p>}
     </div>
   );
 }

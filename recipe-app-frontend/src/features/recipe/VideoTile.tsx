@@ -76,7 +76,7 @@ export function VideoTile({
       type="button"
       aria-label={`Play video, ${secondsLabel(video.durationSeconds)}`}
       onClick={(e) => onOpen(e.currentTarget)}
-      className={`group relative block min-h-0 min-w-0 cursor-pointer overflow-hidden bg-sand focus-visible:outline-offset-[-6px] ${className}`}
+      className={`group relative block min-h-0 min-w-0 cursor-pointer overflow-hidden bg-tint focus-visible:outline-offset-[-6px] ${className}`}
     >
       <video
         ref={videoRef}
@@ -88,11 +88,11 @@ export function VideoTile({
         preload="none"
         aria-hidden="true"
         tabIndex={-1}
-        className="pointer-events-none absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+        className="pointer-events-none absolute inset-0 size-full object-cover"
       />
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <span
-          className={`flex items-center justify-center rounded-full bg-paper/90 text-olive shadow-lift transition group-hover:bg-paper ${
+          className={`flex items-center justify-center rounded-full bg-surface/90 text-ink shadow-float transition group-hover:bg-surface ${
             compact ? 'size-8' : 'size-12'
           }`}
         >
@@ -104,16 +104,16 @@ export function VideoTile({
         </span>
       </span>
       <span
-        className={`pointer-events-none absolute rounded-full bg-olive/85 font-semibold text-cream tabular-nums ${
-          compact ? 'right-1 bottom-1 px-1.5 text-[10px] leading-4' : 'right-2 bottom-2 px-2 py-0.5 text-[11px]'
+        className={`pointer-events-none absolute rounded-full bg-ink/85 font-semibold text-on-ink tabular-nums ${
+          compact ? 'right-1 bottom-1 px-1.5 text-[12px] leading-4' : 'right-2 bottom-2 px-2 py-0.5 text-[13px]'
         }`}
       >
         {formatClock(video.durationSeconds)}
       </span>
-      {/* Keyboard focus: a cream band just outside the olive outline, so the focus ring reads on dark and light posters. */}
+      {/* Keyboard focus: a page-coloured band just outside the ink outline, so the focus ring reads on dark and light posters. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 ring-inset group-focus-visible:ring-4 group-focus-visible:ring-cream"
+        className="pointer-events-none absolute inset-0 ring-inset group-focus-visible:ring-4 group-focus-visible:ring-page"
       />
       {children}
     </button>

@@ -19,7 +19,7 @@ export default function AiRecipePage() {
         icon={notFound ? SearchX : CircleAlert}
         action={
           notFound ? undefined : (
-            <Link to="/" className="text-sm font-semibold text-olive underline underline-offset-4 hover:decoration-saffron">
+            <Link to="/" className="text-[15px] font-semibold text-ink underline decoration-rule underline-offset-4 hover:decoration-ink">
               Back to all recipes
             </Link>
           )

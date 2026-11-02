@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronLeft, ChevronRight, UtensilsCrossed, X } from 'lucide-react';
+import { DETAIL_IMAGE_SIZES, recipeImageSrcSet } from '@/lib/recipeImage';
 import type { RecipeVideo } from '@/lib/types';
 import { VideoTile } from './VideoTile';
 
@@ -27,32 +28,39 @@ type TileProps = {
   label: string;
   /** The cover is above the fold, so it loads eagerly; everything else waits until it is near the viewport. */
   eager?: boolean;
+  /** The cover is shown large, so it offers the browser the photo's other sizes. */
+  responsive?: boolean;
   className?: string;
   onOpen: (opener: HTMLElement) => void;
   children?: ReactNode;
 };
 
-/** One photo as a button. `overflow-hidden` plus the hover scale gives a slow, gentle zoom inside a fixed frame. */
-function Tile({ src, alt, label, eager = false, className = '', onOpen, children }: TileProps) {
+/** One photo as a button. Hover only darkens it slightly; there is no zoom. */
+function Tile({ src, alt, label, eager = false, responsive = false, className = '', onOpen, children }: TileProps) {
+  const srcSet = responsive ? recipeImageSrcSet(src) : undefined;
   return (
     <button
       type="button"
       aria-label={label}
       onClick={(e) => onOpen(e.currentTarget)}
-      className={`group relative block min-h-0 min-w-0 cursor-pointer overflow-hidden bg-sand focus-visible:outline-offset-[-6px] ${className}`}
+      className={`group relative block min-h-0 min-w-0 cursor-pointer overflow-hidden bg-tint focus-visible:outline-offset-[-6px] ${className}`}
     >
       <img
         src={src}
+        srcSet={srcSet}
+        sizes={srcSet ? DETAIL_IMAGE_SIZES : undefined}
         alt={alt}
         loading={eager ? undefined : 'lazy'}
         decoding="async"
         draggable={false}
-        className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+        className="absolute inset-0 size-full object-cover"
       />
-      {/* Keyboard focus: a cream band just outside the olive outline, so the focus ring reads on dark and light photos. */}
+      {/* Hover: a slight darkening of the photo. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-ink/0 transition-colors group-hover:bg-ink/10" />
+      {/* Keyboard focus: a page-coloured band just outside the ink outline, so the focus ring reads on dark and light photos. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 ring-inset group-focus-visible:ring-4 group-focus-visible:ring-cream"
+        className="pointer-events-none absolute inset-0 ring-inset group-focus-visible:ring-4 group-focus-visible:ring-page"
       />
       {children}
     </button>
@@ -82,7 +90,7 @@ export function PhotoCollage({
 
   if (total === 0) {
     return (
-      <div className="flex aspect-[4/3] items-center justify-center bg-sand text-olive/30">
+      <div className="flex aspect-[4/3] items-center justify-center bg-tint text-ink-soft">
         <UtensilsCrossed aria-hidden="true" className="size-14" strokeWidth={1.25} />
       </div>
     );
@@ -110,6 +118,7 @@ export function PhotoCollage({
         alt={`${title}, photo ${n} of ${photos.length}`}
         label={`Open photo ${n} of ${photos.length}`}
         eager={i === 0}
+        responsive={i === 0}
         onOpen={show(i)}
         className={className}
       >
@@ -145,7 +154,7 @@ export function PhotoCollage({
             i,
             wideCount === 3 && i === 0 ? 'col-span-2 row-span-2' : '',
             i === WIDE_TILES - 1 && hidden > 0 && (
-              <span className="absolute inset-0 flex items-center justify-center bg-olive/55 font-serif text-4xl font-medium text-cream transition-colors group-hover:bg-olive/65">
+              <span className="absolute inset-0 flex items-center justify-center bg-ink/55 font-serif text-4xl font-medium text-on-ink transition-colors group-hover:bg-ink/65">
                 +{hidden}
               </span>
             ),
@@ -167,7 +176,7 @@ export function PhotoCollage({
 }
 
 const iconButton =
-  'flex size-11 items-center justify-center rounded-full bg-paper/90 text-olive shadow-lift transition hover:bg-paper focus-visible:outline-cream';
+  'flex size-11 items-center justify-center rounded-full bg-surface/90 text-ink shadow-float transition hover:bg-surface focus-visible:outline-page';
 
 const VIDEO_ERROR = "This video couldn't be played.";
 
@@ -187,7 +196,7 @@ function ViewerVideo({ video, title, open }: { video: RecipeVideo; title: string
 
   if (failed) {
     return (
-      <p role="alert" className="rounded-2xl bg-paper px-6 py-5 text-center font-medium text-olive shadow-lift">
+      <p role="alert" className="rounded-card bg-surface px-6 py-5 text-center font-medium text-ink shadow-float">
         {VIDEO_ERROR}
       </p>
     );
@@ -202,7 +211,7 @@ function ViewerVideo({ video, title, open }: { video: RecipeVideo; title: string
       autoPlay
       playsInline
       onError={() => setFailed(true)}
-      className="max-h-full max-w-full animate-overlay-in rounded-2xl bg-olive object-contain shadow-lift ring-1 ring-cream/20"
+      className="max-h-full max-w-full animate-overlay-in rounded-md bg-black object-contain shadow-float"
     />
   );
 }
@@ -254,7 +263,7 @@ export function PhotoViewer({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-olive/80 backdrop-blur-sm data-[state=closed]:animate-overlay-out" />
+        <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-black/85 data-[state=closed]:animate-overlay-out" />
         <Dialog.Content
           onKeyDown={onKeyDown}
           onOpenAutoFocus={() => {
@@ -287,7 +296,7 @@ export function PhotoViewer({
                 key={index}
                 src={item.src}
                 alt={`${title}, photo ${photoNumber(media, index)} of ${media.filter((m) => m.kind === 'photo').length}`}
-                className="max-h-full max-w-full animate-overlay-in rounded-2xl object-contain shadow-lift ring-1 ring-cream/20"
+                className="max-h-full max-w-full animate-overlay-in rounded-md object-contain shadow-float"
               />
             )
           )}
@@ -300,7 +309,7 @@ export function PhotoViewer({
             <>
               <span
                 aria-live="polite"
-                className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-olive/60 px-3.5 py-1.5 text-sm font-medium text-cream tabular-nums sm:top-6"
+                className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-surface/90 px-3.5 py-1.5 text-[15px] font-medium text-ink tabular-nums sm:top-6"
               >
                 {index + 1} / {total}
               </span>

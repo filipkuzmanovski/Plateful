@@ -11,7 +11,7 @@ function NewTab() {
 }
 
 const linkClass =
-  'inline-flex items-center justify-center gap-2 rounded-full border border-olive/20 bg-paper px-4 py-2 text-sm font-semibold text-olive transition hover:border-olive/50 hover:bg-cream focus-visible:ring-4 focus-visible:ring-saffron/30 focus-visible:outline-none';
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-field bg-surface px-4 text-[15px] font-semibold text-ink transition-colors hover:bg-tint';
 
 /** "Share" on the recipe page: the native share sheet when the browser has one, otherwise a small menu of links. */
 export function ShareRecipe({ recipe }: { recipe: Pick<RecipeDisplay, 'id' | 'title' | 'image'> }) {
@@ -68,23 +68,23 @@ export function ShareRecipe({ recipe }: { recipe: Pick<RecipeDisplay, 'id' | 'ti
 
   return (
     <>
-      <Button type="button" variant="outline" onClick={share} className="!px-4 !py-2">
+      <Button type="button" variant="outline" onClick={share}>
         <Share2 aria-hidden="true" className="size-3.5" />
         Share
       </Button>
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-olive/35 backdrop-blur-[2px]" />
+          <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-scrim" />
           <Dialog.Content
             onCloseAutoFocus={(e) => {
               e.preventDefault();
               returnFocus.current?.focus();
             }}
-            className="fixed top-1/2 left-1/2 z-50 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 animate-dialog-in rounded-card bg-paper p-6 shadow-lift ring-1 ring-sand sm:p-7">
-            <Dialog.Title className="font-serif text-2xl font-semibold tracking-tight text-olive">
+            className="fixed top-1/2 left-1/2 z-50 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 animate-dialog-in rounded-card border border-rule bg-surface p-6 shadow-float sm:p-7">
+            <Dialog.Title className="font-serif text-2xl font-medium tracking-[-0.015em] text-ink">
               Share this recipe
             </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-relaxed text-olive/70">
+            <Dialog.Description className="mt-2 text-[15px] leading-relaxed text-ink-soft">
               Copy the link, or send it to a friend.
             </Dialog.Description>
             <div className="mt-5 flex gap-2">
@@ -94,9 +94,9 @@ export function ShareRecipe({ recipe }: { recipe: Pick<RecipeDisplay, 'id' | 'ti
                 aria-label="Recipe link"
                 value={links.url}
                 onFocus={(e) => e.currentTarget.select()}
-                className="min-w-0 flex-1 rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+                className="min-w-0 flex-1 rounded-lg border border-field bg-surface px-3.5 py-2.5 text-base text-ink focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none sm:text-[15px]"
               />
-              <Button type="button" variant="primary" onClick={copy} className="!px-4 !py-2">
+              <Button type="button" variant="primary" onClick={copy}>
                 <Copy aria-hidden="true" className="size-3.5" />
                 Copy link
               </Button>

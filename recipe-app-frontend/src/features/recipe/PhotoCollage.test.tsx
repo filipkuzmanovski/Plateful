@@ -102,3 +102,20 @@ test('the phone layout opens the same viewer', async () => {
   await user.click(phone.getByRole('button', { name: 'Open photo 4 of 4' }));
   expect(within(await screen.findByRole('dialog')).getByText('4 / 4')).toBeInTheDocument();
 });
+
+test('the cover of a Spoonacular photo offers its other sizes; the other tiles and other hosts do not', () => {
+  const cover = 'https://img.spoonacular.com/recipes/716429-636x393.jpg';
+  render(<PhotoCollage photos={[cover, 'https://img.spoonacular.com/recipes/1-636x393.jpg']} title="Pasta" />);
+  const desktop = within(screen.getByTestId('collage-desktop'));
+  const first = desktop.getByAltText('Pasta, photo 1 of 2');
+  expect(first).toHaveAttribute('srcset', expect.stringContaining('716429-312x231.jpg 312w'));
+  expect(first).toHaveAttribute('sizes', '(min-width: 1024px) 460px, 100vw');
+  expect(desktop.getByAltText('Pasta, photo 2 of 2')).not.toHaveAttribute('srcset');
+});
+
+test('an uploaded cover photo keeps its plain src', () => {
+  const desktop = renderCollage(1);
+  const img = desktop.getByAltText('Pasta, photo 1 of 1');
+  expect(img).not.toHaveAttribute('srcset');
+  expect(img).not.toHaveAttribute('sizes');
+});

@@ -50,7 +50,7 @@ export function SavedAiRecipes() {
   }, [emptyLaterPage, page, lastPage]);
 
   if (saved.isPending || emptyLaterPage) return <Spinner />;
-  if (saved.isError) return <p className="text-sm text-danger">Couldn't load saved AI recipes.</p>;
+  if (saved.isError) return <p className="text-[15px] text-danger">Couldn't load saved AI recipes.</p>;
 
   if (saved.data.content.length === 0) {
     return <EmptyState icon={Sparkles}>No saved AI recipes yet.</EmptyState>;
@@ -58,20 +58,20 @@ export function SavedAiRecipes() {
 
   return (
     <>
-      <ul className="grid gap-3">
+      <ul className="divide-y divide-rule border-y border-rule">
         {saved.data.content.map((r) => (
           <li
             key={r.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-paper p-4 shadow-card ring-1 ring-sand/70 sm:px-5"
+            className="flex flex-wrap items-center justify-between gap-3 py-4"
           >
             <div className="min-w-0">
               <Link
                 to={`/ai-recipes/${r.id}`}
-                className="font-serif text-lg font-semibold text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
+                className="font-serif text-lg font-semibold text-ink underline decoration-rule underline-offset-4 transition-colors hover:decoration-ink"
               >
                 {r.title}
               </Link>
-              <p className="mt-1 text-sm text-olive/70">
+              <p className="mt-1 text-[15px] text-ink-soft">
                 <span className="font-semibold">{kindLabel(r)}</span>
                 {r.savedAt && <> · Saved {savedDate(r.savedAt)}</>}
               </p>
@@ -82,7 +82,6 @@ export function SavedAiRecipes() {
               aria-label={`Remove ${r.title} from AI recipes`}
               disabled={remove.isPending && remove.variables === r.id}
               onClick={() => remove.mutate(r.id)}
-              className="!px-4 !py-2"
             >
               Remove
             </Button>

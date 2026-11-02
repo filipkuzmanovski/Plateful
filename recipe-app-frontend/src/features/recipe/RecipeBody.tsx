@@ -7,14 +7,14 @@ import type { RecipeDisplay } from '@/lib/types';
 import { ingredientLine } from '@/lib/ingredientLine';
 import { PhotoCollage } from './PhotoCollage';
 
-/** One time/servings fact in the photo card: a terracotta icon, a value and a small label. */
+/** One time/servings fact: a small icon, a value in the serif and a label. */
 function Fact({ icon: Icon, value, label }: { icon: LucideIcon; value: ReactNode; label: string }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-2xl bg-cream px-2 py-3 text-center">
-      <Icon aria-hidden="true" className="size-4.5 text-terracotta" strokeWidth={1.75} />
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1 px-2 text-center">
+      <Icon aria-hidden="true" className="size-4.5 text-ink-soft" strokeWidth={1.75} />
       {/* dt before dd for valid markup; `order-last` shows the label under the value. */}
-      <dt className="order-last text-xs text-olive/70">{label}</dt>
-      <dd className="font-serif text-lg leading-tight font-semibold text-olive tabular-nums">{value}</dd>
+      <dt className="order-last text-[13px] text-ink-soft">{label}</dt>
+      <dd className="font-serif text-[22px] leading-tight font-medium text-ink tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -30,7 +30,7 @@ function DietBadges({ recipe }: { recipe: RecipeDisplay }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {badges.map((b) => (
-        <Pill key={b} tone="ink" className="py-1">
+        <Pill key={b} className="py-1">
           <Leaf aria-hidden="true" className="size-3" strokeWidth={2} />
           {b}
         </Pill>
@@ -51,7 +51,7 @@ export function RecipeBody({
   after,
 }: {
   recipe: RecipeDisplay;
-  /** Under the facts, inside the photo card (the rating box). */
+  /** Under the facts, in the photo column (the rating box). */
   asideExtra?: ReactNode;
   /** Above the cuisine tags (the author's review banner). */
   banner?: ReactNode;
@@ -64,13 +64,15 @@ export function RecipeBody({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
-      {/* Left: sticky photo and facts card */}
+      {/* Left: sticky photo and facts */}
       <aside>
-        <div className="overflow-hidden rounded-card bg-paper shadow-card ring-1 ring-sand/70 lg:sticky lg:top-24">
-          <PhotoCollage photos={recipe.photos} video={recipe.video ?? null} title={recipe.title} />
-          <div className="space-y-5 p-5 sm:p-6">
+        <div className="space-y-5 lg:sticky lg:top-24">
+          <div className="overflow-hidden rounded-md">
+            <PhotoCollage photos={recipe.photos} video={recipe.video ?? null} title={recipe.title} />
+          </div>
+          <div className="space-y-5">
             {hasFacts && (
-              <dl className="flex gap-2">
+              <dl className="flex divide-x divide-rule border-y border-rule py-4">
                 {recipe.readyInMinutes !== null && (
                   <Fact icon={Clock} value={`${recipe.readyInMinutes} min`} label="total" />
                 )}
@@ -106,7 +108,7 @@ export function RecipeBody({
             ))}
           </div>
         )}
-        <h1 className="font-serif text-4xl leading-[1.05] font-semibold tracking-tight text-balance text-olive sm:text-5xl">
+        <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-balance text-ink sm:text-5xl">
           {recipe.title}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -114,7 +116,7 @@ export function RecipeBody({
           {recipe.user ? (
             <Link
               to={`/users/${recipe.user.id}`}
-              className="text-sm text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
+              className="text-[15px] text-ink underline decoration-rule underline-offset-4 transition hover:decoration-ink"
             >
               by {recipe.user.firstName} {recipe.user.lastName}
             </Link>
@@ -124,37 +126,37 @@ export function RecipeBody({
                 href={recipe.sourceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
+                className="inline-flex items-center gap-1 text-[15px] text-ink underline decoration-rule underline-offset-4 transition hover:decoration-ink"
               >
                 From {recipe.sourceName}
-                <ExternalLink aria-hidden="true" className="size-3.5 text-olive/60" />
+                <ExternalLink aria-hidden="true" className="size-3.5 text-ink-soft" />
               </a>
             ) : (
-              <span className="text-sm text-olive/70">From {recipe.sourceName}</span>
+              <span className="text-[15px] text-ink-soft">From {recipe.sourceName}</span>
             )
           ) : null}
         </div>
         {actions && <div className="mt-5 flex flex-wrap gap-2">{actions}</div>}
 
         <SectionHeading>Ingredients</SectionHeading>
-        <ul className="rounded-card bg-paper p-2 shadow-card ring-1 ring-sand/70">
+        <ul className="rounded-card bg-tint p-2">
           {recipe.ingredients.map((ing, i) => {
             const line = ingredientLine(ing.ingredientName, ing.originalText);
             return (
               <li key={i}>
-                <label className="group flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-cream">
+                <label className="group flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface/60">
                   <span className="relative mt-0.5 flex size-5 shrink-0">
                     <input
                       type="checkbox"
-                      className="peer size-5 cursor-pointer appearance-none rounded-md border border-olive/30 bg-paper transition checked:border-olive checked:bg-olive"
+                      className="peer size-5 cursor-pointer appearance-none rounded-md border border-field bg-surface transition checked:border-ink checked:bg-ink"
                     />
                     <Check
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 m-auto size-3.5 text-cream opacity-0 transition-opacity peer-checked:opacity-100"
+                      className="pointer-events-none absolute inset-0 m-auto size-3.5 text-on-ink opacity-0 transition-opacity peer-checked:opacity-100"
                       strokeWidth={3}
                     />
                   </span>
-                  <span className="text-[15px] leading-relaxed text-olive transition-colors group-has-checked:text-olive/70 group-has-checked:line-through group-has-checked:decoration-olive/40">
+                  <span className="text-base leading-relaxed text-ink transition-colors group-has-checked:text-ink-soft group-has-checked:line-through group-has-checked:decoration-ink-soft">
                     {line.name && <><strong className="font-semibold">{line.name}</strong>, </>}
                     {line.text}
                   </span>
@@ -169,19 +171,19 @@ export function RecipeBody({
           <ol className="space-y-6">
             {recipe.instructionsSteps.map((step) => (
               <li key={step.number} className="flex gap-4 sm:gap-5">
-                <span className="w-8 shrink-0 text-right font-serif text-3xl leading-none font-medium text-terracotta italic tabular-nums">
+                <span className="w-10 shrink-0 font-serif text-4xl leading-none font-medium text-accent-strong tabular-nums">
                   {step.number}
                 </span>
-                <span className="pt-1 text-[15px] leading-relaxed text-olive">{step.step}</span>
+                <span className="max-w-prose pt-1 text-base leading-relaxed text-ink">{step.step}</span>
               </li>
             ))}
           </ol>
         ) : recipe.instructions ? (
-          <p className="text-[15px] leading-relaxed whitespace-pre-line text-olive">
+          <p className="max-w-prose text-base leading-relaxed whitespace-pre-line text-ink">
             {recipe.instructions.replace(/<[^>]+>/g, ' ').replace(/\s+\n/g, '\n').trim()}
           </p>
         ) : (
-          <p className="text-sm text-olive/70 italic">No instructions provided.</p>
+          <p className="text-[15px] text-ink-soft italic">No instructions provided.</p>
         )}
 
         {after}

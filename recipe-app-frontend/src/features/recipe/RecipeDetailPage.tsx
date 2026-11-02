@@ -106,7 +106,7 @@ export default function RecipeDetailPage() {
       <EmptyState
         icon={notFound ? SearchX : CircleAlert}
         action={
-          <Link to="/" className="text-sm font-semibold text-olive underline underline-offset-4 hover:decoration-saffron">
+          <Link to="/" className="text-[15px] font-semibold text-ink underline decoration-rule underline-offset-4 hover:decoration-ink">
             Back to all recipes
           </Link>
         }
@@ -126,7 +126,7 @@ export default function RecipeDetailPage() {
       recipe={recipe}
       asideExtra={
         acceptsFeedback && (
-          <div className="border-t border-sand pt-5">
+          <div className="border-t border-rule pt-5">
             <RatingBox recipeId={recipe.id} />
           </div>
         )
@@ -140,12 +140,12 @@ export default function RecipeDetailPage() {
             <>
               <Link
                 to={`/recipes/${recipe.id}/edit`}
-                className="inline-flex items-center gap-2 rounded-full border border-olive/20 bg-paper px-4 py-2 text-sm font-semibold text-olive transition hover:border-olive/50 hover:bg-cream"
+                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-field bg-surface px-4 text-[15px] font-semibold text-ink transition-colors hover:bg-tint"
               >
                 <Pencil aria-hidden="true" className="size-3.5" />
                 Edit
               </Link>
-              <Button variant="danger" className="!px-4 !py-2" onClick={() => setConfirmDelete(true)}>
+              <Button variant="danger" onClick={() => setConfirmDelete(true)}>
                 <Trash2 aria-hidden="true" className="size-3.5" />
                 Delete recipe
               </Button>
@@ -164,7 +164,6 @@ export default function RecipeDetailPage() {
             <>
               <Button
                 variant="danger"
-                className="!px-4 !py-2"
                 onClick={() => { setReasonError(null); setRemoving(true); }}
               >
                 <ShieldX aria-hidden="true" className="size-3.5" />
@@ -189,7 +188,7 @@ export default function RecipeDetailPage() {
         acceptsFeedback && (
           <>
             <SectionHeading>
-              Comments <span className="font-sans text-base font-medium text-olive/70 tabular-nums">({recipe.commentCount})</span>
+              Comments <span className="font-sans text-base font-medium text-ink-soft tabular-nums">({recipe.commentCount})</span>
             </SectionHeading>
             <section aria-label="comments">
               <CommentsSection recipeId={recipe.id} recipeOwnerId={recipe.user?.id ?? null} />

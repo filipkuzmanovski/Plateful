@@ -17,18 +17,18 @@ const showError = (e: unknown) =>
   toast.error(e instanceof ApiError ? e.detail : 'Something went wrong');
 
 const fieldClass =
-  'min-w-0 flex-1 rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none';
+  'min-w-0 flex-1 rounded-lg border border-field bg-surface px-3.5 py-2.5 text-base text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none sm:text-[15px]';
 
 /** A small round-ended text action under a comment (Edit, Delete). */
 const actionClass =
-  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-olive/70 transition-colors';
+  'inline-flex min-h-10 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-soft transition-colors';
 
-function Avatar({ name, tone = 'sand' }: { name: string; tone?: 'sand' | 'olive' }) {
+function Avatar({ name, tone = 'tint' }: { name: string; tone?: 'tint' | 'ink' }) {
   return (
     <span
       aria-hidden="true"
       className={`flex size-9 shrink-0 items-center justify-center rounded-full font-serif text-sm font-semibold ${
-        tone === 'olive' ? 'bg-olive text-cream' : 'bg-sand text-olive'
+        tone === 'ink' ? 'bg-ink text-on-ink' : 'bg-tint text-ink'
       }`}
     >
       {name.charAt(0).toUpperCase()}
@@ -91,12 +91,10 @@ function ReactionButtons({
         aria-pressed={active}
         disabled={disabled}
         onClick={() => (active ? unreact.mutate() : react.mutate(isLike))}
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+        className={`inline-flex items-center gap-1.5 min-h-10 rounded-full px-3 text-[13px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
           active
-            ? isLike
-              ? 'bg-saffron/15 text-saffron-deep'
-              : 'bg-terracotta/10 text-terracotta-deep'
-            : 'text-olive/70 hover:bg-sand/60 hover:text-olive'
+            ? 'bg-accent/15 text-accent-ink'
+            : 'text-ink-soft hover:bg-tint hover:text-ink'
         }`}
       >
         <Icon aria-hidden="true" className="size-3.5" strokeWidth={active ? 2.25 : 1.75} />
@@ -193,16 +191,16 @@ export function CommentsSection({
   });
 
   if (query.isPending) return <Spinner />;
-  if (query.isError) return <p className="text-sm text-danger">Couldn't load comments.</p>;
+  if (query.isError) return <p className="text-[15px] text-danger">Couldn't load comments.</p>;
 
   return (
     <div>
       {status === 'ready' ? (
         <form
-          className="mb-8 flex items-center gap-3"
+          className="mb-8 flex items-center gap-3 rounded-card border border-rule bg-surface p-3"
           onSubmit={(e) => { e.preventDefault(); if (draft.trim()) post.mutate(); }}
         >
-          {profile && <Avatar name={profile.firstName} tone="olive" />}
+          {profile && <Avatar name={profile.firstName} tone="ink" />}
           <input
             aria-label="Add a comment"
             placeholder="Add a comment…"
@@ -214,15 +212,15 @@ export function CommentsSection({
           <Button type="submit" disabled={post.isPending || !draft.trim()}>Post</Button>
         </form>
       ) : (
-        <p className="mb-8 flex items-center gap-2.5 rounded-2xl bg-sand/40 px-4 py-3 text-sm text-olive">
-          <MessageCircle aria-hidden="true" className="size-4 shrink-0 text-olive/60" />
+        <p className="mb-8 flex items-center gap-2.5 rounded-card bg-tint px-4 py-3 text-[15px] text-ink">
+          <MessageCircle aria-hidden="true" className="size-4 shrink-0 text-ink-soft" />
           Sign in to join the conversation.
         </p>
       )}
 
       <ul
         aria-busy={query.isPlaceholderData}
-        className={`space-y-5 transition-opacity${query.isPlaceholderData ? ' opacity-50' : ''}`}
+        className={`divide-y divide-rule transition-opacity${query.isPlaceholderData ? ' opacity-50' : ''}`}
       >
         {query.data.content.map((comment) => {
           const isAuthor = profile?.id === comment.user.id;
@@ -231,16 +229,16 @@ export function CommentsSection({
           const canDelete = isAuthor || (!canRemove && recipeOwnerId !== null && profile?.id === recipeOwnerId);
           const date = formatDate(comment.createdAt);
           return (
-            <li key={comment.id} className="flex gap-3">
+            <li key={comment.id} className="flex gap-3 py-5">
               <Avatar name={comment.user.firstName} />
               <div className="min-w-0 flex-1">
-                <div className="rounded-2xl rounded-tl-md bg-paper px-4 py-3 shadow-card ring-1 ring-sand/60">
-                  <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                    <span className="font-semibold text-olive">
+                <div>
+                  <p className="flex flex-wrap items-baseline gap-x-2 text-[15px]">
+                    <span className="font-semibold text-ink">
                       {comment.user.firstName} {comment.user.lastName}
                     </span>
                     {date && comment.createdAt && (
-                      <time dateTime={comment.createdAt} className="text-xs text-olive/70">{date}</time>
+                      <time dateTime={comment.createdAt} className="text-[13px] text-ink-soft">{date}</time>
                     )}
                   </p>
                   {editingId === comment.id ? (
@@ -261,12 +259,12 @@ export function CommentsSection({
                       </div>
                     </form>
                   ) : (
-                    <p className="mt-1 text-[15px] leading-relaxed break-words whitespace-pre-line text-olive">
+                    <p className="mt-1 max-w-prose text-base leading-relaxed break-words whitespace-pre-line text-ink">
                       {comment.body}
                     </p>
                   )}
                 </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-1">
+                <div className="mt-2 flex flex-wrap items-center gap-1 -ml-2.5">
                   <ReactionButtons
                     comment={comment}
                     recipeId={recipeId}
@@ -276,7 +274,7 @@ export function CommentsSection({
                   {isAuthor && editingId !== comment.id && (
                     <button
                       aria-label={`Edit comment by ${comment.user.firstName} ${comment.user.lastName}`}
-                      className={`${actionClass} hover:bg-sand/60 hover:text-olive`}
+                      className={`${actionClass} hover:bg-tint hover:text-ink`}
                       onClick={() => { setEditingId(comment.id); setEditDraft(comment.body); }}
                     >
                       <Pencil aria-hidden="true" className="size-3" />
@@ -310,7 +308,7 @@ export function CommentsSection({
         })}
       </ul>
       {query.data.content.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-sand px-4 py-8 text-center text-sm text-olive/70">
+        <p className="rounded-card border border-dashed border-rule px-4 py-8 text-center text-[15px] text-ink-soft">
           No comments yet.
         </p>
       )}

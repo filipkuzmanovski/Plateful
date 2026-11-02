@@ -24,12 +24,12 @@ export function HiddenRecipePage({
   const { saved } = useSaveControl(recipeId);
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center gap-4 px-4 py-16 text-center">
-      <h1 className="font-serif text-4xl leading-[1.05] font-semibold tracking-tight text-balance text-olive sm:text-5xl">
+      <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-balance text-ink sm:text-5xl">
         {approvedTitle}
       </h1>
-      <p className="text-[15px] leading-relaxed text-olive/70">{COPY[state]}</p>
+      <p className="text-base leading-relaxed text-ink-soft">{COPY[state]}</p>
       {saved && <SaveRecipeButton recipeId={recipeId} />}
-      <Link to="/" className="text-sm font-semibold text-olive underline underline-offset-4 hover:decoration-saffron">
+      <Link to="/" className="text-[15px] font-semibold text-ink underline decoration-rule underline-offset-4 hover:decoration-ink">
         Back to all recipes
       </Link>
     </div>
