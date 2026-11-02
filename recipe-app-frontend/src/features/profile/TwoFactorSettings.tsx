@@ -215,7 +215,7 @@ export function TwoFactorSettings() {
       {loaded && (
         <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-olive">
           Status
-          <Pill tone={count > 0 ? 'olive' : 'sand'}>
+          <Pill tone={count > 0 ? 'ink' : 'tint'}>
             {count === 0 ? 'Off' : `On: ${count} ${count === 1 ? 'device' : 'devices'}`}
           </Pill>
         </p>

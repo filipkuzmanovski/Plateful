@@ -3,46 +3,51 @@ import { Clock, UtensilsCrossed, Video } from 'lucide-react';
 import type { RecipeDisplay } from '@/lib/types';
 import { StarDisplay } from './StarDisplay';
 import { Pill } from './ui';
+import { CARD_IMAGE_SIZES, recipeImageSrcSet } from '@/lib/recipeImage';
 import { BookmarkButton } from '@/features/saved/BookmarkButton';
 import { StatusBadge } from '@/features/review/StatusBadge';
 
 export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
   return (
-    // The wrapper carries the hover lift so the bookmark (a sibling of the link, never inside it) rises with the card.
-    <div className="group relative flex transition duration-300 ease-out hover:-translate-y-1">
-      <Link
-        to={`/recipes/${recipe.id}`}
-        className="flex flex-1 flex-col overflow-hidden rounded-card bg-paper shadow-card ring-1 ring-sand/70 transition duration-300 ease-out group-hover:shadow-lift group-hover:ring-sand"
-      >
-        <div className="relative aspect-[4/3] overflow-hidden bg-sand">
+    // No container: the photo and the text sit straight on the page. The bookmark is a sibling of the
+    // link (never inside it), so the link is the `group` and the bookmark only needs the wrapper to anchor to.
+    <div className="relative flex">
+      <Link to={`/recipes/${recipe.id}`} className="group flex flex-1 flex-col gap-3">
+        <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-tint">
           {recipe.image ? (
             <img
               src={recipe.image}
+              srcSet={recipeImageSrcSet(recipe.image)}
+              sizes={CARD_IMAGE_SIZES}
               alt=""
               loading="lazy"
-              className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+              className="size-full object-cover"
             />
           ) : (
-            <div className="flex size-full items-center justify-center bg-sand text-olive/30">
+            <div className="flex size-full items-center justify-center bg-tint text-ink-soft">
               <UtensilsCrossed aria-hidden="true" className="size-10" strokeWidth={1.25} />
             </div>
           )}
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 bg-ink/0 transition-colors duration-200 group-hover:bg-ink/6 group-focus-visible:bg-ink/6"
+          />
           {recipe.video && (
             // Top left; the bookmark owns the top right, and the review status badge sits in the text below.
-            <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-olive/85 px-2.5 py-1 text-xs font-semibold text-cream shadow-button">
+            <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2.5 py-1 text-[13px] font-semibold text-on-ink">
               <Video aria-hidden="true" className="size-3.5" strokeWidth={2} />
               Video
             </span>
           )}
         </div>
-        <div className="flex flex-1 flex-col gap-2.5 px-4 pt-3.5 pb-4">
-          <h3 className="line-clamp-2 font-serif text-lg leading-snug font-semibold text-olive transition-colors group-hover:text-terracotta">
+        <div className="flex flex-1 flex-col gap-2">
+          <h3 className="line-clamp-2 font-serif text-base leading-snug font-semibold tracking-[-0.015em] break-words text-ink decoration-1 underline-offset-4 group-hover:underline group-focus-visible:underline sm:text-lg">
             {recipe.title}
           </h3>
-          <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-soft">
             <StarDisplay average={recipe.averageRating} count={recipe.ratingCount} />
             {recipe.readyInMinutes !== null && (
-              <span className="inline-flex items-center gap-1 text-sm text-olive/70 tabular-nums">
+              <span className="inline-flex items-center gap-1 tabular-nums">
                 <Clock aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
                 {recipe.readyInMinutes} min
               </span>
@@ -54,7 +59,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
           {recipe.cuisines.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {recipe.cuisines.map((c) => (
-                <Pill key={c} tone="saffron" className="capitalize">{c}</Pill>
+                <Pill key={c} tone="accent" className="capitalize">{c}</Pill>
               ))}
             </div>
           )}

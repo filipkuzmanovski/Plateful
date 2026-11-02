@@ -79,7 +79,7 @@ export function AiRecipeView({ recipe, actions }: { recipe: GeneratedRecipe; act
               {diets.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {diets.map((d) => (
-                    <Pill key={d} tone="olive" className="py-1">
+                    <Pill key={d} tone="ink" className="py-1">
                       <Leaf aria-hidden="true" className="size-3" strokeWidth={2} />
                       {d}
                     </Pill>
@@ -93,7 +93,7 @@ export function AiRecipeView({ recipe, actions }: { recipe: GeneratedRecipe; act
         <article className="min-w-0">
           {cuisineLabel && (
             <div className="mb-3 flex flex-wrap gap-1.5">
-              <Pill tone="saffron">{cuisineLabel}</Pill>
+              <Pill tone="accent">{cuisineLabel}</Pill>
             </div>
           )}
           <h1 className="font-serif text-4xl leading-[1.05] font-semibold tracking-tight text-balance text-olive sm:text-5xl">

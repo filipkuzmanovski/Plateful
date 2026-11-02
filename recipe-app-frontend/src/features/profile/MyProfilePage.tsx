@@ -92,7 +92,7 @@ export default function MyProfilePage() {
             )}
             {recipes.data && recipes.data.content.length > 0 && (
               <>
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4">
                   {recipes.data.content.map((r) => <RecipeCard key={r.id} recipe={r} />)}
                 </div>
                 <Pagination page={recipes.data.page.number} totalPages={recipes.data.page.totalPages} onPage={setPage} />

@@ -12,8 +12,8 @@ export function pageWindow(page: number, totalPages: number): (number | 'gap')[]
   return out;
 }
 
-const round = 'flex size-9 items-center justify-center rounded-full text-sm font-semibold tabular-nums transition sm:size-10';
-const navBtn = `${round} text-olive hover:bg-sand/60 disabled:pointer-events-none disabled:opacity-35`;
+const round = 'flex size-10 items-center justify-center rounded-full text-[15px] font-semibold tabular-nums transition-colors';
+const navBtn = `${round} text-ink hover:bg-tint disabled:pointer-events-none disabled:opacity-35`;
 
 export function Pagination({
   page,
@@ -27,13 +27,13 @@ export function Pagination({
   if (totalPages <= 1) return null;
   return (
     <nav aria-label="Pagination" className="mt-12 flex justify-center">
-      <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-full bg-paper p-1 shadow-card ring-1 ring-sand/70 sm:gap-1">
+      <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-0.5 sm:gap-1">
         <button aria-label="Previous page" disabled={page <= 0} onClick={() => onPage(page - 1)} className={navBtn}>
           <ChevronLeft aria-hidden="true" className="size-4" />
         </button>
         {pageWindow(page, totalPages).map((entry, idx) =>
           entry === 'gap' ? (
-            <span key={`gap-${idx}`} aria-hidden="true" className="flex h-9 w-6 items-center justify-center text-muted sm:h-10">
+            <span key={`gap-${idx}`} aria-hidden="true" className="flex h-10 w-6 items-center justify-center text-ink-soft">
               <Ellipsis className="size-4" />
             </span>
           ) : (
@@ -43,7 +43,7 @@ export function Pagination({
               aria-current={entry === page ? 'page' : undefined}
               onClick={() => onPage(entry)}
               className={`${round} ${
-                entry === page ? 'bg-olive text-cream shadow-button' : 'text-olive hover:bg-sand/60'
+                entry === page ? 'bg-ink text-on-ink' : 'text-ink hover:bg-tint'
               }`}
             >
               {entry + 1}

@@ -172,7 +172,7 @@ export function PhotoPicker({
               <img src={publicPhotoUrl(path)} alt={`Photo ${i + 1}`} className="size-full object-cover" />
               {i === 0 && (
                 <span className="absolute top-1.5 left-1.5">
-                  <Pill tone="olive" className="bg-paper/90 shadow-button">
+                  <Pill tone="tint" className="bg-paper/90 shadow-button">
                     Cover
                   </Pill>
                 </span>

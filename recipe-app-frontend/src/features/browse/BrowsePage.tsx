@@ -137,7 +137,7 @@ export default function BrowsePage() {
         <>
           <div
             aria-busy={busy}
-            className={`grid grid-cols-1 gap-6 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${busyClass}`}
+            className={`grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4 transition-opacity ${busyClass}`}
           >
             {query.data.content.map((recipe) => (
               <RecipeCard key={recipe.id} recipe={recipe} />

@@ -30,7 +30,7 @@ function DietBadges({ recipe }: { recipe: RecipeDisplay }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {badges.map((b) => (
-        <Pill key={b} tone="olive" className="py-1">
+        <Pill key={b} tone="ink" className="py-1">
           <Leaf aria-hidden="true" className="size-3" strokeWidth={2} />
           {b}
         </Pill>
@@ -102,7 +102,7 @@ export function RecipeBody({
         {recipe.cuisines.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {recipe.cuisines.map((c) => (
-              <Pill key={c} tone="saffron" className="capitalize">{c}</Pill>
+              <Pill key={c} tone="accent" className="capitalize">{c}</Pill>
             ))}
           </div>
         )}

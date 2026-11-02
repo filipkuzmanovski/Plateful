@@ -209,7 +209,7 @@ function DrawerPanel({
                 {REGIONS.map((r) => (
                   <Chip
                     key={r.key}
-                    tone="saffron"
+                    tone="accent"
                     selected={draft.region.includes(r.key)}
                     onClick={() => patch({ region: toggleIn(draft.region, r.key) })}
                   >
@@ -224,7 +224,7 @@ function DrawerPanel({
                 {seaChips.map((s) => (
                   <Chip
                     key={s.key}
-                    tone="saffron"
+                    tone="accent"
                     selected={draft.sea.includes(s.key)}
                     onClick={() => patch({ sea: toggleIn(draft.sea, s.key) })}
                   >

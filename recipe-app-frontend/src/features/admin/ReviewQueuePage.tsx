@@ -40,7 +40,7 @@ function QueueRow({ recipe }: { recipe: RecipeDisplay }) {
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-serif text-xl leading-tight font-semibold text-olive">{recipe.title}</span>
-            {review?.everApproved && <Pill tone="saffron" className="font-semibold">Re-review</Pill>}
+            {review?.everApproved && <Pill tone="accent" className="font-semibold">Re-review</Pill>}
           </span>
           <span className="mt-1 block text-sm text-olive/70">
             {recipe.user && <>by {recipe.user.firstName} {recipe.user.lastName}</>}

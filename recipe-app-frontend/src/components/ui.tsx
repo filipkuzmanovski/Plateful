@@ -4,10 +4,10 @@ import { LoaderCircle, type LucideIcon } from 'lucide-react';
 type ButtonVariant = 'primary' | 'outline' | 'danger' | 'ghost';
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: 'bg-olive text-cream shadow-button hover:-translate-y-px hover:bg-olive/90 hover:shadow-lift',
-  outline: 'border border-olive/20 bg-paper text-olive hover:border-olive/50 hover:bg-cream',
-  danger: 'border border-danger/35 bg-paper text-danger hover:border-danger hover:bg-danger hover:text-paper',
-  ghost: 'text-olive hover:bg-sand/60',
+  primary: 'bg-ink text-on-ink hover:bg-ink/90',
+  outline: 'border border-field bg-surface text-ink hover:bg-tint',
+  danger: 'border border-danger/50 bg-surface text-danger hover:bg-danger hover:text-on-danger',
+  ghost: 'text-ink hover:bg-tint',
 };
 
 export function Button({
@@ -17,7 +17,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold whitespace-nowrap transition duration-200 ease-out active:translate-y-0 disabled:pointer-events-none disabled:opacity-45 ${buttonVariants[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 min-h-11 rounded-full px-5 py-2 text-[15px] font-semibold whitespace-nowrap transition-colors duration-200 ease-out disabled:pointer-events-none disabled:opacity-45 ${buttonVariants[variant]} ${className}`}
       {...props}
     />
   );
@@ -34,9 +34,9 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[13px] font-semibold text-olive">{label}</span>
+      <span className="mb-1.5 block text-[15px] font-semibold text-ink">{label}</span>
       {children}
-      {error && <span role="alert" className="mt-1.5 block text-xs font-medium text-danger">{error}</span>}
+      {error && <span role="alert" className="mt-1.5 block text-[13px] font-medium text-danger">{error}</span>}
     </label>
   );
 }
@@ -44,7 +44,7 @@ export function Field({
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+      className="w-full rounded-lg border border-field bg-surface px-3.5 py-2.5 text-base text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none sm:text-[15px]"
       {...props}
     />
   );
@@ -52,7 +52,7 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
 
 export function SectionHeading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="mt-10 mb-4 flex items-center gap-4 font-serif text-2xl font-semibold tracking-tight text-olive after:h-px after:flex-1 after:bg-sand">
+    <h2 className="mt-10 mb-4 border-b border-ink pb-1.5 font-serif text-[28px] font-medium tracking-[-0.015em] text-ink">
       {children}
     </h2>
   );
@@ -60,22 +60,26 @@ export function SectionHeading({ children }: { children: ReactNode }) {
 
 export function Spinner() {
   return (
-    <p role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-olive/70">
-      <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-saffron" />
+    <p role="status" className="flex items-center justify-center gap-2 py-16 text-[15px] text-ink-soft">
+      <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-ink-soft" />
       Loading…
     </p>
   );
 }
 
 const chipTones = {
-  olive: {
-    on: 'border-olive bg-olive text-cream shadow-button',
-    off: 'border-sand bg-paper text-olive hover:border-olive/40 hover:bg-cream',
+  ink: {
+    on: 'border-ink bg-ink text-on-ink',
+    off: 'border-field bg-surface text-ink hover:bg-tint',
+    badgeOn: 'bg-on-ink/15 text-on-ink',
+    badgeOff: 'bg-tint text-ink-soft',
   },
-  /* Regions: a warm saffron wash, deep terracotta when on (cream on terracotta-deep is about 6:1). */
-  saffron: {
-    on: 'border-terracotta-deep bg-terracotta-deep font-semibold text-cream shadow-button',
-    off: 'border-transparent bg-saffron/15 font-semibold text-saffron-deep hover:bg-saffron/25',
+  /* Regions: a saffron wash when off, solid saffron when on. */
+  accent: {
+    on: 'border-accent bg-accent font-semibold text-on-accent',
+    off: 'border-transparent bg-accent/15 font-semibold text-accent-ink hover:bg-accent/25',
+    badgeOn: 'bg-on-accent/15 text-on-accent',
+    badgeOff: 'bg-accent/15 text-accent-ink',
   },
 } as const;
 
@@ -85,7 +89,7 @@ export function Chip({
   onClick,
   children,
   count,
-  tone = 'olive',
+  tone = 'ink',
   className = '',
   ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'children'> & {
@@ -100,7 +104,7 @@ export function Chip({
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition duration-150 focus-visible:outline-olive active:scale-[0.97] ${
+      className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[15px] font-medium transition-colors duration-150 ${
         chipTones[tone][selected ? 'on' : 'off']
       } ${className}`}
       {...props}
@@ -108,8 +112,8 @@ export function Chip({
       {children}
       {count !== undefined && (
         <span
-          className={`rounded-full px-1.5 text-[11px] leading-[1.125rem] font-semibold tabular-nums ${
-            selected ? 'bg-cream/15 text-cream' : 'bg-sand/70 text-olive/75'
+          className={`rounded-full px-1.5 text-[12px] leading-[1.125rem] font-bold tabular-nums ${
+            chipTones[tone][selected ? 'badgeOn' : 'badgeOff']
           }`}
         >
           {count}
@@ -120,16 +124,16 @@ export function Chip({
 }
 
 const pillTones = {
-  sand: 'bg-sand/70 text-olive',
-  saffron: 'bg-saffron/15 text-saffron-deep',
-  olive: 'bg-olive/10 text-olive',
-  terracotta: 'bg-terracotta/10 text-terracotta-deep',
+  tint: 'bg-tint text-ink',
+  accent: 'bg-accent/15 text-accent-ink',
+  ink: 'bg-ink text-on-ink',
+  danger: 'bg-danger/10 text-danger',
 } as const;
 
 /** A small, non-interactive label (cuisine tag, macro, badge). */
 export function Pill({
   children,
-  tone = 'sand',
+  tone = 'tint',
   className = '',
 }: {
   children: ReactNode;
@@ -138,14 +142,14 @@ export function Pill({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${pillTones[tone]} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[13px] font-medium ${pillTones[tone]} ${className}`}
     >
       {children}
     </span>
   );
 }
 
-/** A centered, quiet message for empty and error states: a soft icon medallion above serif text. */
+/** A centered, quiet message for empty and error states: a small icon above a serif sentence. */
 export function EmptyState({
   icon: Icon,
   children,
@@ -156,11 +160,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 px-4 py-16 text-center">
-      <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-full bg-sand/60">
-        <Icon className="size-6 text-muted" strokeWidth={1.5} />
-      </span>
-      <p className="max-w-sm font-serif text-xl text-olive">{children}</p>
+    <div className="flex flex-col items-center gap-3 px-4 py-16 text-center">
+      <Icon aria-hidden="true" className="size-6 text-ink-soft" strokeWidth={1.5} />
+      <p className="max-w-sm font-serif text-[22px] leading-snug text-ink">{children}</p>
       {action}
     </div>
   );
