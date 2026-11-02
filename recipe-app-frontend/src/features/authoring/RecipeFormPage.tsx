@@ -61,11 +61,11 @@ const DIET_LABELS = {
   dairyFree: 'Dairy free',
 } as const;
 
-/** A rounded paper card holding one part of the form. */
+/** A surface panel with a rule border holding one part of the form. */
 function FormSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-card bg-paper p-5 shadow-card ring-1 ring-sand/70 sm:p-7">
-      <h2 className="mb-5 font-serif text-2xl font-semibold tracking-tight text-olive">{title}</h2>
+    <section className="rounded-card border border-rule bg-surface p-5 sm:p-7">
+      <h2 className="mb-5 border-b border-ink pb-1.5 font-serif text-[22px] font-medium tracking-[-0.015em] text-ink">{title}</h2>
       {children}
     </section>
   );
@@ -73,9 +73,9 @@ function FormSection({ title, children }: { title: string; children: ReactNode }
 
 /** A checkbox dressed as a toggle chip; the native input stays in the tab order (sr-only). */
 const checkChip =
-  'group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-sand bg-paper px-3.5 py-1.5 text-sm font-medium text-olive transition select-none hover:border-olive/40 hover:bg-cream has-checked:border-olive has-checked:bg-olive has-checked:text-cream has-checked:shadow-button has-checked:hover:border-olive has-checked:hover:bg-olive/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-olive';
-const inlineError = 'mt-1 block text-xs font-medium text-danger';
-const removeButton = '!size-10 shrink-0 !p-0 !text-olive/70 hover:!bg-danger/10 hover:!text-danger';
+  'group inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-field bg-surface px-3.5 py-1.5 text-[15px] font-medium text-ink transition-colors select-none hover:bg-tint has-checked:border-ink has-checked:bg-ink has-checked:text-on-ink has-checked:hover:bg-ink/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink';
+const inlineError = 'mt-1 block text-[13px] font-medium text-danger';
+const removeButton = '!size-10 shrink-0 !p-0 !text-ink-soft hover:!bg-danger/10 hover:!text-danger';
 
 const toInt = (s: string) => (s.trim() === '' ? null : Number(s));
 const toNull = (s: string) => (s.trim() === '' ? null : s);
@@ -212,10 +212,10 @@ export default function RecipeFormPage() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-3xl">
       <header className="mb-8">
-        <h1 className="font-serif text-4xl leading-tight font-semibold tracking-tight text-olive sm:text-5xl">
+        <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-ink sm:text-5xl">
           {id ? 'Edit recipe' : 'New recipe'}
         </h1>
-        <p className="mt-2 text-olive/70">
+        <p className="mt-2 text-[15px] text-ink-soft">
           {id ? 'Polish the details and save your changes.' : 'Share something you love to cook.'}
         </p>
       </header>
@@ -240,7 +240,7 @@ export default function RecipeFormPage() {
                 )}
               />
               {errors.photos?.message && (
-                <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{errors.photos.message}</p>
+                <p role="alert" className="mt-1.5 text-[13px] font-medium text-danger">{errors.photos.message}</p>
               )}
             </div>
             <div>
@@ -260,7 +260,7 @@ export default function RecipeFormPage() {
                 )}
               />
               {errors.video?.message && (
-                <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{errors.video.message}</p>
+                <p role="alert" className="mt-1.5 text-[13px] font-medium text-danger">{errors.video.message}</p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -274,7 +274,7 @@ export default function RecipeFormPage() {
 
         <FormSection title="Tags">
           <fieldset>
-            <legend className="mb-2 text-[13px] font-semibold text-olive">Diet</legend>
+            <legend className="mb-2 text-[15px] font-semibold text-ink">Diet</legend>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(DIET_LABELS) as (keyof typeof DIET_LABELS)[]).map((flag) => (
                 <label key={flag} className={checkChip}>
@@ -298,7 +298,7 @@ export default function RecipeFormPage() {
 
         <FormSection title="Ingredients">
           {errors.ingredients?.message && (
-            <p role="alert" className="mb-3 text-xs font-medium text-danger">{errors.ingredients.message}</p>
+            <p role="alert" className="mb-3 text-[13px] font-medium text-danger">{errors.ingredients.message}</p>
           )}
           <div className="space-y-2.5">
             {ingredients.fields.map((field, i) => (
@@ -346,22 +346,22 @@ export default function RecipeFormPage() {
           <Field label="Free-text instructions" error={errors.instructions?.message}>
             <textarea
               rows={5}
-              className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm leading-relaxed text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+              className="w-full rounded-lg border border-field bg-surface px-3.5 py-2.5 text-base leading-relaxed text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none sm:text-[15px]"
               {...register('instructions')}
             />
           </Field>
-          <p className="mt-6 mb-2 text-[13px] font-semibold text-olive">
-            Structured steps <span className="font-normal text-olive/70">(optional)</span>
+          <p className="mt-6 mb-2 text-[15px] font-semibold text-ink">
+            Structured steps <span className="font-normal text-ink-soft">(optional)</span>
           </p>
           {(errors.steps?.message ?? errors.steps?.root?.message) && (
-            <p role="alert" className="mb-2 text-xs font-medium text-danger">
+            <p role="alert" className="mb-2 text-[13px] font-medium text-danger">
               {errors.steps?.message ?? errors.steps?.root?.message}
             </p>
           )}
           <div className="space-y-2.5">
             {steps.fields.map((field, i) => (
               <div key={field.id} className="flex items-start gap-3">
-                <span className="w-7 shrink-0 pt-1 text-right font-serif text-2xl leading-none font-medium text-terracotta italic tabular-nums">
+                <span className="w-7 shrink-0 pt-1 text-right font-serif text-2xl leading-none font-medium text-accent-strong tabular-nums">
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -391,14 +391,14 @@ export default function RecipeFormPage() {
 
       {/* Save stays within reach on long forms. */}
       {needsReviewNotice && (
-        <p className="mt-6 rounded-2xl border border-saffron/40 bg-saffron/15 px-4 py-3 text-sm font-medium text-saffron-deep">
+        <p className="mt-6 rounded-card border border-accent/40 bg-accent/15 px-4 py-3 text-[15px] font-medium text-accent-ink">
           Saving changes sends this recipe back for review. It will be hidden from others until it's approved.
         </p>
       )}
 
       <div className="sticky bottom-4 z-10 mt-8 flex items-center justify-end gap-3">
-        {photosBusy && <p className="rounded-full bg-paper/90 px-3 py-1.5 text-xs text-olive/70 ring-1 ring-sand">Waiting for photos to finish uploading</p>}
-        <div className="rounded-full bg-paper/90 p-1.5 shadow-lift ring-1 ring-sand backdrop-blur-md">
+        {photosBusy && <p className="rounded-full border border-rule bg-surface/95 px-3 py-1.5 text-[13px] text-ink-soft">Waiting for photos to finish uploading</p>}
+        <div className="rounded-full border border-rule bg-surface/95 p-1.5">
           <Button type="submit" disabled={isSubmitting || photosBusy || videoBusy}>Save recipe</Button>
         </div>
       </div>

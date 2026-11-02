@@ -27,7 +27,7 @@ type Problem = 'changed' | 'reviewed' | 'gone' | 'mfa';
 interface Decision { revision: number; reason?: string }
 
 const backLink = (
-  <Link to="/admin/review" className="text-sm font-semibold text-olive underline underline-offset-4 hover:decoration-saffron">
+  <Link to="/admin/review" className="text-[15px] font-semibold text-ink underline decoration-rule underline-offset-4 hover:decoration-ink">
     Back to the queue
   </Link>
 );
@@ -114,10 +114,10 @@ function ReviewRecipeView({ id }: { id: string }) {
     <>
       {!decided && <div className="mb-6">{backLink}</div>}
       <RecipeBody recipe={recipe} />
-      <div className="sticky bottom-0 z-20 mt-10 -mx-4 border-t border-sand bg-paper/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+      <div className="sticky bottom-4 z-20 mt-10 rounded-card border border-rule bg-surface px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           {message && (
-            <div role="alert" className="min-w-0 text-sm font-medium text-danger">
+            <div role="alert" className="min-w-0 text-[15px] font-medium text-danger">
               {message}
             </div>
           )}

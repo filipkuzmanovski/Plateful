@@ -10,7 +10,7 @@ export function AdminMfaPanel() {
       action={
         <Link
           to="/me"
-          className="inline-flex items-center justify-center rounded-full bg-olive px-5 py-2.5 text-sm font-semibold whitespace-nowrap text-cream shadow-button transition duration-200 ease-out hover:-translate-y-px hover:bg-olive/90 hover:shadow-lift"
+          className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 py-2 text-[15px] font-semibold whitespace-nowrap text-on-ink transition-colors duration-200 ease-out hover:bg-ink/90"
         >
           Open two-factor settings
         </Link>

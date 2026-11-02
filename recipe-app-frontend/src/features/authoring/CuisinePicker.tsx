@@ -100,7 +100,7 @@ export function CuisinePicker({
 
   return (
     <div>
-      <label htmlFor={inputId} className="mb-2 block text-[13px] font-semibold text-olive">
+      <label htmlFor={inputId} className="mb-2 block text-[15px] font-semibold text-ink">
         Cuisines
       </label>
 
@@ -109,14 +109,14 @@ export function CuisinePicker({
           {value.map((key) => (
             <li
               key={key}
-              className="inline-flex items-center gap-1 rounded-full bg-olive py-1 pr-1 pl-3.5 text-sm font-medium text-cream shadow-button"
+              className="inline-flex min-h-10 items-center gap-1 rounded-full bg-ink py-0 pr-0 pl-3.5 text-[15px] font-medium text-on-ink"
             >
               {labelOf(key)}
               <button
                 type="button"
                 aria-label={`Remove ${labelOf(key)}`}
                 onClick={() => remove(key)}
-                className="flex size-6 items-center justify-center rounded-full transition hover:bg-cream/20 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-saffron"
+                className="flex size-10 items-center justify-center rounded-full transition-colors hover:bg-on-ink/20 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-on-ink"
               >
                 <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
               </button>
@@ -126,7 +126,7 @@ export function CuisinePicker({
       )}
 
       {cuisines.isError ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-sand bg-cream px-3.5 py-2.5 text-sm text-olive">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-rule bg-tint px-3.5 py-2.5 text-[15px] text-ink">
           <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-danger" />
           <span>Couldn't load cuisines</span>
           <Button type="button" variant="outline" className="!px-3.5 !py-1" onClick={() => void cuisines.refetch()}>
@@ -155,17 +155,17 @@ export function CuisinePicker({
             onClick={() => setOpen(true)}
             onBlur={() => setOpen(false)}
             onKeyDown={onKeyDown}
-            className="w-full rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none disabled:cursor-not-allowed disabled:bg-cream disabled:opacity-70"
+            className="w-full rounded-lg border border-field bg-surface px-3.5 py-2.5 text-base text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none disabled:cursor-not-allowed disabled:bg-tint disabled:opacity-70 sm:text-[15px]"
           />
           <ul
             id={listId}
             role="listbox"
             aria-label="Cuisine options"
             hidden={!showList}
-            className="absolute z-20 mt-1.5 max-h-64 w-full overflow-auto rounded-xl bg-paper p-1.5 shadow-lift ring-1 ring-sand"
+            className="absolute z-20 mt-1.5 max-h-64 w-full overflow-auto rounded-card border border-rule bg-surface p-1.5 shadow-float"
           >
             {options.length === 0 ? (
-              <li role="presentation" className="px-3 py-2 text-sm text-olive/70">No matching cuisines</li>
+              <li role="presentation" className="px-3 py-2 text-[15px] text-ink-soft">No matching cuisines</li>
             ) : (
               options.map((c, i) => (
                 <li
@@ -179,7 +179,7 @@ export function CuisinePicker({
                     select(c.key);
                   }}
                   onMouseEnter={() => setActive(i)}
-                  className={`cursor-pointer rounded-lg px-3 py-2 text-sm text-olive ${i === activeIndex ? 'bg-sand/70' : ''}`}
+                  className={`cursor-pointer rounded-lg px-3 py-2 text-[15px] text-ink ${i === activeIndex ? 'bg-tint' : ''}`}
                 >
                   {c.label}
                 </li>
@@ -189,8 +189,8 @@ export function CuisinePicker({
         </div>
       )}
 
-      {atMax && <p className="mt-1.5 text-xs text-olive/70">Up to {max} cuisines</p>}
-      {error && <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{error}</p>}
+      {atMax && <p className="mt-1.5 text-[13px] text-ink-soft">Up to {max} cuisines</p>}
+      {error && <p role="alert" className="mt-1.5 text-[13px] font-medium text-danger">{error}</p>}
     </div>
   );
 }

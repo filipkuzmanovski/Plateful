@@ -40,22 +40,22 @@ function PreviewDialog({ src, poster, onClose }: { src: string; poster: string; 
   return (
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-olive/35 backdrop-blur-[2px]" />
+        <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-scrim" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="fixed top-1/2 left-1/2 z-50 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 animate-dialog-in rounded-card bg-paper p-4 shadow-lift ring-1 ring-sand sm:p-5"
+          className="fixed top-1/2 left-1/2 z-50 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 animate-dialog-in rounded-card border border-rule bg-surface p-4 shadow-float sm:p-5"
         >
           <div className="mb-3 flex items-center justify-between gap-3">
-            <Dialog.Title className="font-serif text-xl font-semibold tracking-tight text-olive">
+            <Dialog.Title className="font-serif text-[22px] font-semibold tracking-[-0.015em] text-ink">
               Video preview
             </Dialog.Title>
             <Dialog.Close asChild>
-              <Button type="button" variant="ghost" aria-label="Close" className="!size-9 !p-0">
+              <Button type="button" variant="ghost" aria-label="Close" className="!size-10 !p-0">
                 <X aria-hidden="true" className="size-4" />
               </Button>
             </Dialog.Close>
           </div>
-          <video controls autoPlay playsInline src={src} poster={poster} className="max-h-[70vh] w-full rounded-xl bg-olive" />
+          <video controls autoPlay playsInline src={src} poster={poster} className="max-h-[70vh] w-full rounded-md bg-tint" />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -170,15 +170,15 @@ export function VideoPicker({
 
   return (
     <section aria-labelledby={labelId}>
-      <span id={labelId} className="mb-2 block text-[13px] font-semibold text-olive">
+      <span id={labelId} className="mb-2 block text-[15px] font-semibold text-ink">
         Video (optional)
       </span>
 
       {value && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-xl bg-sand ring-1 ring-sand">
+          <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-md bg-tint">
             <img src={publicVideoUrl(value.posterPath)} alt="Video poster" className="size-full object-cover" />
-            <span className="absolute right-1.5 bottom-1.5 rounded-full bg-olive/85 px-2 py-0.5 text-[11px] font-semibold text-cream tabular-nums">
+            <span className="absolute right-1.5 bottom-1.5 rounded-sm bg-ink/85 px-1.5 py-0.5 text-[13px] font-semibold text-on-ink tabular-nums">
               {formatClock(value.durationSeconds)}
             </span>
           </div>
@@ -220,14 +220,14 @@ export function VideoPicker({
       />
 
       {busy && (
-        <p role="status" className="mt-2 flex items-center gap-2 text-sm text-olive/70">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-saffron" />
+        <p role="status" className="mt-2 flex items-center gap-2 text-[15px] text-ink-soft">
+          <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-ink-soft" />
           Uploading video…
         </p>
       )}
-      <p className="mt-2 text-xs text-olive/70">MP4, WebM or MOV, up to {MAX_VIDEO_SECONDS} seconds and 50 MB.</p>
+      <p className="mt-2 text-[13px] text-ink-soft">MP4, WebM or MOV, up to {MAX_VIDEO_SECONDS} seconds and 50 MB.</p>
       {message && (
-        <p role="alert" className="mt-1.5 text-xs font-medium text-danger">
+        <p role="alert" className="mt-1.5 text-[13px] font-medium text-danger">
           {message}
         </p>
       )}

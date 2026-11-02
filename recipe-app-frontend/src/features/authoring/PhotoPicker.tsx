@@ -24,7 +24,7 @@ const revokePreviewUrl = (url: string) => {
 };
 
 const iconButton =
-  'flex size-7 items-center justify-center rounded-full bg-paper/90 text-olive shadow-button transition hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-saffron disabled:pointer-events-none disabled:opacity-40';
+  'flex size-10 items-center justify-center rounded-full bg-surface/90 text-ink transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ink disabled:pointer-events-none disabled:opacity-40';
 
 /**
  * Multi-photo picker. `value` is the ordered list of uploaded storage paths (position 0 is the
@@ -161,18 +161,18 @@ export function PhotoPicker({
 
   return (
     <section aria-labelledby={labelId}>
-      <span id={labelId} className="mb-2 block text-[13px] font-semibold text-olive">
+      <span id={labelId} className="mb-2 block text-[15px] font-semibold text-ink">
         Photos
       </span>
 
       {(value.length > 0 || tiles.length > 0) && (
-        <ul className="mb-3 grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+        <ul className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           {value.map((path, i) => (
-            <li key={path} className="relative aspect-square overflow-hidden rounded-xl bg-sand ring-1 ring-sand">
+            <li key={path} className="relative aspect-square overflow-hidden rounded-md bg-tint">
               <img src={publicPhotoUrl(path)} alt={`Photo ${i + 1}`} className="size-full object-cover" />
               {i === 0 && (
                 <span className="absolute top-1.5 left-1.5">
-                  <Pill tone="tint" className="bg-paper/90 shadow-button">
+                  <Pill tone="tint" className="bg-surface/90 text-ink">
                     Cover
                   </Pill>
                 </span>
@@ -211,7 +211,7 @@ export function PhotoPicker({
           {tiles.map((tile, i) => {
             const n = value.length + i + 1;
             return (
-              <li key={tile.id} className="relative aspect-square overflow-hidden rounded-xl bg-sand ring-1 ring-sand">
+              <li key={tile.id} className="relative aspect-square overflow-hidden rounded-md bg-tint">
                 {tile.status === 'pending' ? (
                   <>
                     {tile.previewUrl && (
@@ -222,7 +222,7 @@ export function PhotoPicker({
                       aria-label={`Uploading photo ${n}`}
                       className="absolute inset-0 flex items-center justify-center"
                     >
-                      <LoaderCircle aria-hidden="true" className="size-6 animate-spin text-saffron" />
+                      <LoaderCircle aria-hidden="true" className="size-6 animate-spin text-ink-soft" />
                     </span>
                     <button
                       type="button"
@@ -234,15 +234,15 @@ export function PhotoPicker({
                     </button>
                   </>
                 ) : (
-                  <div className="flex size-full flex-col items-center justify-center gap-1.5 bg-cream p-1.5 text-center">
-                    <p role="alert" className="line-clamp-3 text-[11px] leading-tight font-medium text-danger">
+                  <div className="flex size-full flex-col items-center justify-center gap-1.5 overflow-auto rounded-md border border-dashed border-field bg-surface p-1.5 text-center">
+                    <p role="alert" className="line-clamp-3 text-[13px] leading-tight font-medium text-danger">
                       {tile.message}
                     </p>
                     <div className="flex flex-wrap justify-center gap-1">
-                      <Button type="button" variant="outline" className="!px-2.5 !py-0.5 !text-xs" onClick={() => retry(tile)}>
+                      <Button type="button" variant="outline" className="!min-h-10 !px-2.5 !py-0.5 !text-[13px]" onClick={() => retry(tile)}>
                         Retry
                       </Button>
-                      <Button type="button" variant="ghost" className="!px-2.5 !py-0.5 !text-xs" onClick={() => removePending(tile)}>
+                      <Button type="button" variant="ghost" className="!min-h-10 !px-2.5 !py-0.5 !text-[13px]" onClick={() => removePending(tile)}>
                         Remove
                       </Button>
                     </div>
@@ -273,11 +273,11 @@ export function PhotoPicker({
         }}
       />
 
-      <p className="mt-2 text-xs text-olive/70">
+      <p className="mt-2 text-[13px] text-ink-soft">
         Up to {MAX_PHOTOS} photos. The first one is the cover.
       </p>
       {notices.map((m) => (
-        <p key={m} role="alert" className="mt-1.5 text-xs font-medium text-danger">
+        <p key={m} role="alert" className="mt-1.5 text-[13px] font-medium text-danger">
           {m}
         </p>
       ))}

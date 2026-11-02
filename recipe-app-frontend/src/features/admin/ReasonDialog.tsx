@@ -32,7 +32,7 @@ function ReasonForm({
 
   return (
     <form onSubmit={submit} className="mt-4">
-      <label htmlFor={fieldId} className="mb-1.5 block text-[13px] font-semibold text-olive">
+      <label htmlFor={fieldId} className="mb-1.5 block text-[15px] font-semibold text-ink">
         Reason
       </label>
       <textarea
@@ -42,13 +42,13 @@ function ReasonForm({
         rows={5}
         required
         aria-describedby={countId}
-        className="w-full resize-y rounded-xl border border-sand bg-paper px-3.5 py-2.5 text-sm text-olive shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition placeholder:text-olive/70 hover:border-olive/30 focus:border-olive/60 focus:ring-4 focus:ring-saffron/20 focus:outline-none"
+        className="w-full resize-y rounded-lg border border-field bg-surface px-3.5 py-2.5 text-base text-ink transition placeholder:text-ink-soft hover:border-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/15 focus:outline-none sm:text-[15px]"
       />
       <div className="mt-1.5 flex items-start justify-between gap-3">
-        {error ? <span role="alert" className="text-xs font-medium text-danger">{error}</span> : <span />}
+        {error ? <span role="alert" className="text-[13px] font-medium text-danger">{error}</span> : <span />}
         <span
           id={countId}
-          className={`text-xs tabular-nums ${length > MAX_REASON ? 'font-semibold text-danger' : 'text-olive/70'}`}
+          className={`text-[13px] tabular-nums ${length > MAX_REASON ? 'font-semibold text-danger' : 'text-ink-soft'}`}
         >
           {length}/{MAX_REASON}
         </span>
@@ -89,10 +89,10 @@ export function ReasonDialog({
     // Escape and overlay clicks are ignored mid-request, so the dialog cannot vanish before the outcome is known.
     <Dialog.Root open={open} onOpenChange={(o) => !o && !busy && onCancel()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-olive/35 backdrop-blur-[2px]" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 animate-dialog-in rounded-card bg-paper p-6 shadow-lift ring-1 ring-sand sm:p-7">
-          <Dialog.Title className="font-serif text-2xl font-semibold tracking-tight text-olive">{title}</Dialog.Title>
-          <Dialog.Description className="mt-2 text-sm leading-relaxed text-olive/70">
+        <Dialog.Overlay className="fixed inset-0 z-50 animate-overlay-in bg-scrim" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 animate-dialog-in rounded-card border border-rule bg-surface p-6 shadow-float sm:p-7">
+          <Dialog.Title className="font-serif text-[22px] font-semibold tracking-[-0.015em] text-ink">{title}</Dialog.Title>
+          <Dialog.Description className="mt-2 text-[15px] leading-relaxed text-ink-soft">
             {description}
           </Dialog.Description>
           {/* Mounted only while open, so every opening starts with an empty reason. */}

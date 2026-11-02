@@ -35,20 +35,20 @@ function QueueRow({ recipe }: { recipe: RecipeDisplay }) {
     <li>
       <Link
         to={`/admin/review/${recipe.id}`}
-        className="group flex items-center gap-4 rounded-card bg-paper px-5 py-4 shadow-card ring-1 ring-sand/70 transition hover:-translate-y-px hover:ring-olive/30"
+        className="group flex min-h-11 items-center gap-4 px-1 py-4 transition-colors hover:bg-tint sm:px-3"
       >
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="font-serif text-xl leading-tight font-semibold text-olive">{recipe.title}</span>
+            <span className="font-serif text-xl leading-tight font-semibold tracking-[-0.015em] text-ink decoration-1 underline-offset-4 group-hover:underline">{recipe.title}</span>
             {review?.everApproved && <Pill tone="accent" className="font-semibold">Re-review</Pill>}
           </span>
-          <span className="mt-1 block text-sm text-olive/70">
+          <span className="mt-1 block text-[15px] text-ink-soft">
             {recipe.user && <>by {recipe.user.firstName} {recipe.user.lastName}</>}
             {recipe.user && submitted && ' · '}
             {review && submitted && <time dateTime={review.submittedAt}>submitted {submitted}</time>}
           </span>
         </span>
-        <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-olive/40 transition group-hover:text-olive" />
+        <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-ink-soft" />
       </Link>
     </li>
   );
@@ -71,20 +71,20 @@ export default function ReviewQueuePage() {
     return isAdminMfaSetupRequired(queue.error) ? (
       <AdminMfaPanel />
     ) : (
-      <p className="text-sm text-danger">Couldn't load the review queue.</p>
+      <p className="text-[15px] text-danger">Couldn't load the review queue.</p>
     );
   }
 
   return (
     <>
-      <h1 className="font-serif text-4xl leading-[1.05] font-semibold tracking-tight text-olive sm:text-5xl">
+      <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-ink sm:text-5xl">
         Review queue
       </h1>
       {queue.data.content.length === 0 ? (
         <EmptyState icon={ClipboardCheck}>Nothing to review right now.</EmptyState>
       ) : (
         <>
-          <ul className="mt-8 space-y-3">
+          <ul className="mt-8 divide-y divide-rule border-y border-rule">
             {queue.data.content.map((recipe) => (
               <QueueRow key={recipe.id} recipe={recipe} />
             ))}
