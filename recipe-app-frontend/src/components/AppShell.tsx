@@ -12,13 +12,17 @@ import SiteFooter from './SiteFooter';
 import ThemeMenu from './ThemeMenu';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
-const navLink = ({ isActive }: { isActive: boolean }) =>
-  `inline-flex min-h-10 items-center border-b-2 px-2.5 transition-colors sm:px-3 ${
+// The display class is not part of the base: a bare `inline-flex` would beat `hidden` (same specificity,
+// later in the generated CSS) and keep wide-only links on phones.
+const navBase = ({ isActive }: { isActive: boolean }) =>
+  `min-h-10 items-center border-b-2 px-2.5 transition-colors sm:px-3 ${
     isActive ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
   }`;
 
+const navLink = (state: { isActive: boolean }) => `inline-flex ${navBase(state)}`;
+
 /** Links that only fit once there is room; below `sm` they live in the user menu. */
-const wideOnly = (state: { isActive: boolean }) => `${navLink(state)} hidden sm:inline-flex`;
+const wideOnly = (state: { isActive: boolean }) => `hidden sm:inline-flex ${navBase(state)}`;
 
 const pillLink =
   'inline-flex min-h-11 items-center rounded-full px-4 font-semibold whitespace-nowrap transition-colors';

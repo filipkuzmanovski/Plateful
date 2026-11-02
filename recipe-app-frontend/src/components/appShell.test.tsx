@@ -74,3 +74,39 @@ test('signedOutHeaderHasThemeButtonAndSignIn', async () => {
   expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Browse' })).toBeInTheDocument();
   expectNoEmoji();
 });
+
+test('phoneHiddenHeaderLinksNeverCarryABareDisplayClass', async () => {
+  serve({ ...profileFixture, isAdmin: true }, 3);
+  renderApp('/');
+
+  const header = within(screen.getByRole('banner'));
+  const wideOnly = [
+    await header.findByRole('link', { name: 'Review queue, 3 pending' }),
+    header.getByRole('link', { name: 'New recipe' }),
+    header.getByRole('link', { name: 'Browse' }),
+  ];
+  for (const link of wideOnly) {
+    const tokens = link.className.split(/\s+/);
+    expect(tokens).toContain('hidden');
+    expect(tokens).toContain('sm:inline-flex');
+    // A bare display class ties with `hidden` and wins by CSS order, so the link would show on phones.
+    for (const display of ['inline-flex', 'flex', 'block', 'inline-block', 'inline', 'grid']) {
+      expect(tokens).not.toContain(display);
+    }
+  }
+  // Cook stays on phones.
+  expect(header.getByRole('link', { name: 'Cook' }).className.split(/\s+/)).not.toContain('hidden');
+});
+
+test('userMenuItemsOnlyForPhonesDoNotCarryHiddenOrInlineDisplayConflicts', async () => {
+  serve({ ...profileFixture, isAdmin: true }, 3);
+  renderApp('/');
+
+  await userEvent.click(await screen.findByRole('button', { name: /jane/i }));
+  const menu = within(screen.getByTestId('user-menu'));
+  for (const name of ['New recipe', 'Review queue, 3 pending']) {
+    const tokens = (await menu.findByRole('link', { name })).className.split(/\s+/);
+    expect(tokens).toContain('sm:hidden');
+    expect(tokens).not.toContain('hidden');
+  }
+});
