@@ -65,35 +65,33 @@ export function ProfileTabs({
 
   return (
     <div className="mt-10">
-      <div className="mb-6 flex items-center gap-4 after:h-px after:flex-1 after:bg-sand">
-        <div
-          role="tablist"
-          aria-label="Your recipes and preferences"
-          onKeyDown={onKeyDown}
-          className="inline-flex max-w-full items-center gap-1 rounded-full max-sm:overflow-x-auto bg-paper p-1 shadow-card ring-1 ring-sand/70"
-        >
-          {TABS.map(({ key, label }) => {
-            const active = key === selected;
-            return (
-              <button
-                key={key}
-                ref={(el) => { tabRefs.current[key] = el; }}
-                type="button"
-                role="tab"
-                id={tabId(key)}
-                aria-selected={active}
-                aria-controls={panelId(key)}
-                tabIndex={active ? 0 : -1}
-                onClick={() => select(key)}
-                className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition duration-200 sm:px-5 ${
-                  active ? 'bg-olive text-cream shadow-button' : 'text-olive hover:bg-sand/60'
-                }`}
-              >
-                {key === 'mine' && needsAttention > 0 ? `${label} · ${needsAttention} needs attention` : label}
-              </button>
-            );
-          })}
-        </div>
+      <div
+        role="tablist"
+        aria-label="Your recipes and preferences"
+        onKeyDown={onKeyDown}
+        className="mb-6 flex border-b border-rule max-sm:overflow-x-auto"
+      >
+        {TABS.map(({ key, label }) => {
+          const active = key === selected;
+          return (
+            <button
+              key={key}
+              ref={(el) => { tabRefs.current[key] = el; }}
+              type="button"
+              role="tab"
+              id={tabId(key)}
+              aria-selected={active}
+              aria-controls={panelId(key)}
+              tabIndex={active ? 0 : -1}
+              onClick={() => select(key)}
+              className={`min-h-11 shrink-0 border-b-2 px-4 sm:-mb-px text-[15px] font-semibold transition-colors duration-200 ${
+                active ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
+              }`}
+            >
+              {key === 'mine' && needsAttention > 0 ? `${label} · ${needsAttention} needs attention` : label}
+            </button>
+          );
+        })}
       </div>
       {TABS.map(({ key }) => (
         <div key={key} role="tabpanel" id={panelId(key)} aria-labelledby={tabId(key)} tabIndex={0} hidden={key !== selected}>

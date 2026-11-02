@@ -1,11 +1,13 @@
 import { Link } from 'react-router';
 import { EyeOff } from 'lucide-react';
 import type { HiddenState } from '@/lib/types';
+import { Pill } from '@/components/ui';
 import { BookmarkButton } from './BookmarkButton';
 
-const BADGES: Record<HiddenState, { label: string; className: string }> = {
-  under_review: { label: 'Under review', className: 'bg-saffron/15 text-saffron-deep' },
-  unavailable: { label: 'Unavailable', className: 'bg-sand text-olive' },
+// Pill tones: "accent" is the saffron wash; "tint" carries full-strength `text-ink` (small text on tint needs it for 4.5:1).
+const BADGES: Record<HiddenState, { label: string; tone: 'accent' | 'tint' }> = {
+  under_review: { label: 'Under review', tone: 'accent' },
+  unavailable: { label: 'Unavailable', tone: 'tint' },
 };
 
 /**
@@ -13,26 +15,21 @@ const BADGES: Record<HiddenState, { label: string; className: string }> = {
  * while approved, in the same footprint as RecipeCard. The bookmark is a sibling of the link, never inside it.
  */
 export function SavedStubCard({ id, approvedTitle, state }: { id: string; approvedTitle: string; state: HiddenState }) {
-  const { label, className } = BADGES[state];
+  const { label, tone } = BADGES[state];
   return (
-    <div className="group relative flex transition duration-300 ease-out hover:-translate-y-1">
-      <Link
-        to={`/recipes/${id}`}
-        className="flex flex-1 flex-col overflow-hidden rounded-card bg-paper shadow-card ring-1 ring-sand/70 transition duration-300 ease-out group-hover:shadow-lift group-hover:ring-sand"
-      >
-        <div className="aspect-[4/3] overflow-hidden bg-sand">
-          <div className="flex size-full items-center justify-center bg-sand text-olive/30">
+    <div className="relative flex">
+      <Link to={`/recipes/${id}`} className="group flex flex-1 flex-col gap-3">
+        <div className="aspect-[4/3] overflow-hidden rounded-md border border-rule bg-tint">
+          <div className="flex size-full items-center justify-center text-ink-soft">
             <EyeOff aria-hidden="true" className="size-10" strokeWidth={1.25} />
           </div>
         </div>
-        <div className="flex flex-1 flex-col gap-2.5 px-4 pt-3.5 pb-4">
-          <h3 className="line-clamp-2 font-serif text-lg leading-snug font-semibold text-olive transition-colors group-hover:text-terracotta">
+        <div className="flex flex-1 flex-col gap-2">
+          <h3 className="line-clamp-2 font-serif text-base leading-snug font-semibold tracking-[-0.015em] break-words text-ink decoration-1 underline-offset-4 group-hover:underline group-focus-visible:underline sm:text-lg">
             {approvedTitle}
           </h3>
           <div className="mt-auto">
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>
-              {label}
-            </span>
+            <Pill tone={tone}>{label}</Pill>
           </div>
         </div>
       </Link>

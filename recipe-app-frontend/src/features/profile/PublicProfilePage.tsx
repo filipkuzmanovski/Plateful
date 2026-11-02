@@ -28,9 +28,9 @@ function PublicProfileContent({ id }: { id: string }) {
       />
       <SectionHeading>Recipes</SectionHeading>
       {recipes.isPending && <Spinner />}
-      {recipes.isError && <p className="text-sm text-danger">Couldn't load recipes.</p>}
+      {recipes.isError && <p className="text-[15px] text-danger">Couldn't load recipes.</p>}
       {recipes.data && recipes.data.content.length === 0 && (
-        <p className="rounded-card border border-dashed border-sand px-4 py-10 text-center text-sm text-olive/70">
+        <p className="rounded-card border border-dashed border-rule px-4 py-10 text-center text-[15px] text-ink-soft">
           No recipes published yet.
         </p>
       )}

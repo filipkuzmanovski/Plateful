@@ -209,11 +209,11 @@ export function TwoFactorSettings() {
 
   return (
     <div>
-      <p className="text-sm text-olive/70">
+      <p className="text-[15px] text-ink-soft">
         Ask for a 6-digit code from an authenticator app each time you sign in.
       </p>
       {loaded && (
-        <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-olive">
+        <p className="mt-4 flex items-center gap-2 text-[15px] font-semibold text-ink">
           Status
           <Pill tone={count > 0 ? 'ink' : 'tint'}>
             {count === 0 ? 'Off' : `On: ${count} ${count === 1 ? 'device' : 'devices'}`}
@@ -222,7 +222,7 @@ export function TwoFactorSettings() {
       )}
 
       {justEnabled && (
-        <p role="status" className="mt-4 rounded-xl bg-olive/10 px-3.5 py-2.5 text-sm font-medium text-olive">
+        <p role="status" className="mt-4 rounded-lg bg-tint px-3.5 py-2.5 text-[15px] font-medium text-ink">
           Two-factor authentication is on
         </p>
       )}
@@ -235,21 +235,20 @@ export function TwoFactorSettings() {
       {!loaded && !loadError && <Spinner />}
 
       {count > 0 && (
-        <ul className="mt-4 divide-y divide-sand/70 rounded-xl ring-1 ring-sand/70">
+        <ul className="mt-4 divide-y divide-rule rounded-lg border border-rule">
           {list.map((f) => {
             const added = addedOn(f.created_at);
             return (
               <li key={f.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-olive">{removeLabel(f)}</p>
-                  {added && <p className="text-xs text-olive/70">Added {added}</p>}
+                  <p className="truncate text-[15px] font-semibold text-ink">{removeLabel(f)}</p>
+                  {added && <p className="text-[13px] text-ink-soft">Added {added}</p>}
                 </div>
                 <Button
                   type="button"
                   variant="danger"
                   aria-label={`Remove ${removeLabel(f)}`}
                   onClick={() => { setError(null); setRemoveTarget(f); }}
-                  className="px-4 py-1.5"
                 >
                   Remove
                 </Button>
@@ -276,15 +275,16 @@ export function TwoFactorSettings() {
 
       {step.kind === 'scan' && (
         <form onSubmit={onConfirm} className="mt-5 max-w-sm space-y-4">
-          <p className="text-sm text-olive/70">
+          <p className="text-[15px] text-ink-soft">
             Scan this QR code with your authenticator app, then enter the 6-digit code it shows.
           </p>
-          <div className="inline-block rounded-2xl bg-paper p-4 ring-1 ring-sand">
+          {/* The one literal colour: authenticator apps cannot read a light-on-dark QR code, so it always sits on white. */}
+          <span className="inline-block rounded-md bg-white p-3">
             <img src={step.pending.qr} alt="QR code for your authenticator app" className="size-44" />
-          </div>
+          </span>
           <div>
-            <p className="text-[13px] font-semibold text-olive">Can't scan? Enter this key</p>
-            <p className="mt-1 font-mono text-sm tracking-wider break-all text-olive select-all">
+            <p className="text-[13px] font-semibold text-ink-soft">Can't scan? Enter this key</p>
+            <p className="mt-1 font-mono text-[15px] tracking-wider break-all text-ink select-all">
               {step.pending.secret}
             </p>
           </div>

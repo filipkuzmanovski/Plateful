@@ -52,6 +52,8 @@ test('enrollShowsQrAndSecretThenConfirms', async () => {
 
   const qr = await screen.findByRole('img', { name: 'QR code for your authenticator app' });
   expect(qr).toHaveAttribute('src', 'data:image/svg+xml;utf8,<svg/>');
+  // Authenticator apps cannot read a light-on-dark code: the QR always sits on a white tile.
+  expect(qr.parentElement).toHaveClass('bg-white');
   expect(screen.getByText("Can't scan? Enter this key")).toBeInTheDocument();
   expect(screen.getByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
   expect(mocks.enroll).toHaveBeenCalledWith({ factorType: 'totp', friendlyName: 'Authenticator 1' });

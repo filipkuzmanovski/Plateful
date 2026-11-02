@@ -118,6 +118,8 @@ describe('profile tabs', () => {
     const savedTab = await screen.findByRole('tab', { name: 'Saved' });
     expect(savedTab).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'My recipes' })).toHaveAttribute('aria-selected', 'false');
+    expect(savedTab).toHaveClass('border-ink');
+    expect(screen.getByRole('tab', { name: 'My recipes' })).not.toHaveClass('border-ink');
     expect(await screen.findByText('Saved Soup')).toBeInTheDocument();
     expect(screen.queryByText('My Own Pie')).not.toBeInTheDocument();
 

@@ -77,9 +77,9 @@ describe('saved stub cards', () => {
 
     const goneCard = screen.getByRole('heading', { name: 'Gone Gratin' }).closest('a') as HTMLElement;
     expect(within(goneCard).getByText('Unavailable')).toBeInTheDocument();
-    // Small text on sand needs full-strength olive to reach 4.5:1.
-    expect(within(goneCard).getByText('Unavailable')).toHaveClass('text-olive');
-    expect(within(goneCard).getByText('Unavailable')).not.toHaveClass('text-olive/70');
+    // Small text on tint needs full-strength ink to reach 4.5:1.
+    expect(within(goneCard).getByText('Unavailable')).toHaveClass('text-ink');
+    expect(within(goneCard).getByText('Unavailable')).not.toHaveClass('text-ink-soft');
     expect(goneCard).toHaveAttribute('href', '/recipes/h-2');
     expect(goneCard.querySelector('img')).toBeNull();
 
