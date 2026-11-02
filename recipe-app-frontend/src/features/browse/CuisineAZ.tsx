@@ -104,7 +104,7 @@ export function CuisineAZ({
               <section key={letter} id={groupId(letter)} aria-labelledby={`${groupId(letter)}-h`} className="scroll-mt-16 not-first:mt-4">
                 <h4
                   id={`${groupId(letter)}-h`}
-                  className="mb-1 font-serif text-lg leading-none font-semibold text-accent-strong"
+                  className="mb-1 font-serif text-lg leading-none font-semibold text-accent-ink"
                 >
                   {letter}
                 </h4>
