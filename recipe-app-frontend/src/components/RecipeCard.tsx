@@ -21,17 +21,13 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
               sizes={CARD_IMAGE_SIZES}
               alt=""
               loading="lazy"
-              className="size-full object-cover"
+              className="size-full object-cover transition-[filter] duration-200 group-hover:brightness-95 group-focus-visible:brightness-95"
             />
           ) : (
             <div className="flex size-full items-center justify-center bg-tint text-ink-soft">
               <UtensilsCrossed aria-hidden="true" className="size-10" strokeWidth={1.25} />
             </div>
           )}
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 bg-ink/0 transition-colors duration-200 group-hover:bg-ink/6 group-focus-visible:bg-ink/6"
-          />
           {recipe.video && (
             // Top left; the bookmark owns the top right, and the review status badge sits in the text below.
             <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2.5 py-1 text-[13px] font-semibold text-on-ink">

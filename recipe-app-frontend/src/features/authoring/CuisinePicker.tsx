@@ -116,7 +116,7 @@ export function CuisinePicker({
                 type="button"
                 aria-label={`Remove ${labelOf(key)}`}
                 onClick={() => remove(key)}
-                className="flex size-10 items-center justify-center rounded-full transition-colors hover:bg-on-ink/20 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-on-ink"
+                className="flex size-10 items-center justify-center rounded-full transition-colors hover:bg-on-ink/20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-on-ink"
               >
                 <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
               </button>

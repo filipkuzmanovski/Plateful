@@ -53,10 +53,9 @@ function Tile({ src, alt, label, eager = false, responsive = false, className = 
         loading={eager ? undefined : 'lazy'}
         decoding="async"
         draggable={false}
-        className="absolute inset-0 size-full object-cover"
+        className="absolute inset-0 size-full object-cover transition-[filter] group-hover:brightness-90"
       />
-      {/* Hover: a slight darkening of the photo. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-ink/0 transition-colors group-hover:bg-ink/10" />
+      {/* Hover: a slight darkening of the photo (brightness, so it works in both themes). */}
       {/* Keyboard focus: a page-coloured band just outside the ink outline, so the focus ring reads on dark and light photos. */}
       <span
         aria-hidden="true"
@@ -154,7 +153,8 @@ export function PhotoCollage({
             i,
             wideCount === 3 && i === 0 ? 'col-span-2 row-span-2' : '',
             i === WIDE_TILES - 1 && hidden > 0 && (
-              <span className="absolute inset-0 flex items-center justify-center bg-ink/55 font-serif text-4xl font-medium text-on-ink transition-colors group-hover:bg-ink/65">
+              // Mode-fixed dark scrim with white text (photo viewer allowance): `ink` is near-white in dark mode and would wash the photo out.
+              <span className="absolute inset-0 flex items-center justify-center bg-black/55 font-serif text-4xl font-medium text-white transition-colors group-hover:bg-black/65">
                 +{hidden}
               </span>
             ),

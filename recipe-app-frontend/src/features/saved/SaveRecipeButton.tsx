@@ -13,7 +13,7 @@ export function SaveRecipeButton({ recipeId }: { recipeId: string }) {
       disabled={disabled}
       aria-disabled={pending || undefined}
       onClick={toggle}
-      className={`aria-disabled:cursor-wait ${saved ? '!border-ink !bg-tint' : ''}`}
+      className={`aria-disabled:cursor-wait ${saved ? '!border-ink !bg-tint hover:!bg-rule' : ''}`}
     >
       <Bookmark
         aria-hidden="true"

@@ -84,7 +84,7 @@ export function ProfileTabs({
               aria-controls={panelId(key)}
               tabIndex={active ? 0 : -1}
               onClick={() => select(key)}
-              className={`min-h-11 shrink-0 border-b-2 px-4 sm:-mb-px text-[15px] font-semibold transition-colors duration-200 ${
+              className={`min-h-11 shrink-0 border-b-2 px-4 sm:-mb-px text-[15px] font-semibold transition-colors duration-200 focus-visible:-outline-offset-2 ${
                 active ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
               }`}
             >

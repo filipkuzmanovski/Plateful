@@ -59,7 +59,7 @@ export function RatingBox({ recipeId }: { recipeId: string }) {
                 aria-hidden="true"
                 strokeWidth={1.5}
                 className={`size-7 transition-colors duration-150 ${
-                  lit ? 'fill-accent text-accent' : 'fill-transparent text-field'
+                  lit ? 'fill-accent text-accent-strong' : 'fill-transparent text-field'
                 }`}
               />
             </button>

@@ -280,7 +280,7 @@ export function TwoFactorSettings() {
           </p>
           {/* The one literal colour: authenticator apps cannot read a light-on-dark QR code, so it always sits on white. */}
           <span className="inline-block rounded-md bg-white p-3">
-            <img src={step.pending.qr} alt="QR code for your authenticator app" className="size-44" />
+            <img src={step.pending.qr} alt="QR code for your authenticator app" className="block size-44" />
           </span>
           <div>
             <p className="text-[13px] font-semibold text-ink-soft">Can't scan? Enter this key</p>

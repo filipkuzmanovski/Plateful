@@ -50,7 +50,7 @@ function PreviewDialog({ src, poster, onClose }: { src: string; poster: string; 
               Video preview
             </Dialog.Title>
             <Dialog.Close asChild>
-              <Button type="button" variant="ghost" aria-label="Close" className="!size-10 !p-0">
+              <Button type="button" variant="ghost" aria-label="Close" className="!size-10 !min-h-10 !p-0">
                 <X aria-hidden="true" className="size-4" />
               </Button>
             </Dialog.Close>

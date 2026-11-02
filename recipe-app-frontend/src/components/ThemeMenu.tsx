@@ -97,7 +97,7 @@ export default function ThemeMenu() {
               aria-checked={choice === value}
               tabIndex={-1}
               onClick={() => choose(value)}
-              className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[15px] text-ink transition-colors hover:bg-tint focus-visible:bg-tint"
+              className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[15px] text-ink transition-colors hover:bg-tint focus-visible:bg-tint"
             >
               <Icon aria-hidden="true" className="size-4 text-ink-soft" />
               <span className="flex-1">{label}</span>

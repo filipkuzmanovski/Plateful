@@ -48,7 +48,7 @@ export function SelectMenuItem({
   return (
     <Select.Item
       value={value}
-      className="relative flex cursor-pointer items-center gap-2.5 rounded-lg py-2 pr-9 pl-3 text-[15px] font-medium text-ink outline-none select-none data-[highlighted]:bg-tint data-[state=checked]:font-semibold"
+      className="relative flex cursor-pointer items-center gap-2.5 rounded-lg py-2 pr-9 pl-3 text-[15px] font-medium text-ink outline-0 select-none data-[highlighted]:bg-tint data-[highlighted]:outline-2 data-[highlighted]:-outline-offset-2 data-[highlighted]:outline-ink data-[state=checked]:font-semibold"
     >
       {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-ink-soft" strokeWidth={2} />}
       <Select.ItemText>{children}</Select.ItemText>

@@ -75,7 +75,7 @@ function FormSection({ title, children }: { title: string; children: ReactNode }
 const checkChip =
   'group inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-field bg-surface px-3.5 py-1.5 text-[15px] font-medium text-ink transition-colors select-none hover:bg-tint has-checked:border-ink has-checked:bg-ink has-checked:text-on-ink has-checked:hover:bg-ink/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink';
 const inlineError = 'mt-1 block text-[13px] font-medium text-danger';
-const removeButton = '!size-10 shrink-0 !p-0 !text-ink-soft hover:!bg-danger/10 hover:!text-danger';
+const removeButton = '!size-10 !min-h-10 shrink-0 !p-0 !text-ink-soft hover:!bg-danger/10 hover:!text-danger';
 
 const toInt = (s: string) => (s.trim() === '' ? null : Number(s));
 const toNull = (s: string) => (s.trim() === '' ? null : s);
@@ -361,7 +361,7 @@ export default function RecipeFormPage() {
           <div className="space-y-2.5">
             {steps.fields.map((field, i) => (
               <div key={field.id} className="flex items-start gap-3">
-                <span className="w-7 shrink-0 pt-1 text-right font-serif text-2xl leading-none font-medium text-accent-strong tabular-nums">
+                <span className="w-7 shrink-0 pt-1 text-right font-serif text-2xl leading-none font-medium text-accent-ink tabular-nums">
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">

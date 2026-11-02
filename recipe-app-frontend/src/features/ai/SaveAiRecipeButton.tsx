@@ -24,7 +24,7 @@ export function SaveAiRecipeButton({ id, saved }: { id: string; saved: boolean }
       aria-pressed={saved}
       aria-disabled={toggle.isPending || undefined}
       onClick={() => { if (!toggle.isPending) toggle.mutate(); }}
-      className={`aria-disabled:cursor-wait ${saved ? '!border-ink !bg-tint' : ''}`}
+      className={`aria-disabled:cursor-wait ${saved ? '!border-ink !bg-tint hover:!bg-rule' : ''}`}
     >
       <Bookmark aria-hidden="true" className={`size-4 ${saved ? 'fill-accent' : 'fill-transparent'}`} strokeWidth={2} />
       {saved ? 'Saved' : 'Save'}
