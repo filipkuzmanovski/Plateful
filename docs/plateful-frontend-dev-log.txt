@@ -5324,7 +5324,9 @@ What changed (the "Cookbook" direction)
     to recipe, recipe from an Instagram post, Today's meals).
   - No more all-caps labels, no single italic word in headings, no cards
     that lift or zoom when you hover. Text is at least 13px, inputs are
-    16px on phones, and buttons and icons are at least 40 to 44px to tap.
+    16px on phones, and buttons and icon buttons are at least 40 to 44px to
+    tap (the A-Z cuisine letters and the footer links are text links and
+    are not held to that).
 
 Colour tokens, by role
 ----------------------
@@ -5373,7 +5375,10 @@ Phone header
   - On a phone the header shows the logo, Cook, the theme menu and your
     avatar.
   - New recipe and Review queue (admins) moved into the avatar menu, next to
-    My profile and Sign out.
+    My profile and Sign out. They come back into the header bar from the md
+    breakpoint (768px) up, because an admin's bar does not fit below that.
+  - While two-factor sign-in is unfinished, Browse is also hidden on phones,
+    and the "Finish signing in" link is left out on the verify page itself.
   - The recipe grid shows two cards per row on phones.
 
 Sharper photos
@@ -5390,13 +5395,13 @@ Two lessons worth keeping
      as "hidden" and "inline-flex") by the order they appear in the
      stylesheet, not by the order in the class list. This broke the phone
      header. Put the responsive part on one side only: "hidden
-     sm:inline-flex".
+     md:inline-flex".
   2. A negative margin inside a tab bar that scrolls sideways gets clipped.
      The tab underline overlap is therefore "sm:-mb-px" (wide screens only).
 
 Tests
 -----
-  - Frontend: npx vitest run, 64 files, 752 tests passing (the refresh
+  - Frontend: npx vitest run, 64 files, 756 tests passing (the refresh
     started at 58 files and 708 tests). npm run build succeeded.
   - The behaviour tests were not weakened. Only class names that named old
     colours were updated to the new names.
