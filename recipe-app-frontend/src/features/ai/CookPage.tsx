@@ -269,7 +269,7 @@ export default function CookPage() {
               aria-controls={panelId(key)}
               tabIndex={active ? 0 : -1}
               onClick={() => select(key)}
-              className={`min-h-11 shrink-0 border-b-2 -mb-px px-4 text-[15px] font-semibold transition-colors duration-200 ${
+              className={`min-h-11 shrink-0 border-b-2 px-4 sm:-mb-px text-[15px] font-semibold transition-colors duration-200 ${
                 active ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
               }`}
             >

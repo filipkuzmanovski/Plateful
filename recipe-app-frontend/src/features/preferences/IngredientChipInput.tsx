@@ -133,7 +133,7 @@ export function IngredientChipInput({
                     aria-label={`Remove ${name}`}
                     onClick={() => remove(name)}
                     className={`flex size-10 items-center justify-center rounded-full transition-colors ${
-                      reason !== undefined ? 'hover:bg-danger/15' : 'hover:bg-on-ink/20'
+                      reason !== undefined ? 'hover:bg-danger/15' : 'hover:bg-on-ink/20 focus-visible:outline-on-ink focus-visible:-outline-offset-2'
                     }`}
                   >
                     <X aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
