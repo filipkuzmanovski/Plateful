@@ -124,6 +124,22 @@ describe('About us', () => {
     expect(main).toHaveTextContent(/spoonacular/i);
     expect(within(main).getByRole('link', { name: /contact/i })).toHaveAttribute('href', '/contact');
   });
+
+  test('lists the recipe features, including the AI ones, and no longer promises up to 6 photos', async () => {
+    renderApp('/about');
+    await screen.findByRole('heading', { level: 1, name: 'About us' });
+    const section = document.getElementById('what-you-can-do')!;
+    expect(section).not.toBeNull();
+    const items = within(section).getAllByRole('listitem').map((li) => li.textContent);
+    expect(items).toContain('Post your own recipes with photos and a video.');
+    expect(items).toContain(
+      'Cook with what you have: list your ingredients or scan your fridge, and get a new recipe made for you.',
+    );
+    expect(items).toContain('Turn a recipe post into your own version, adjusted to your food preferences.');
+    expect(items).toContain('See three meals made for you each day.');
+    expect(screen.getByRole('main')).not.toHaveTextContent(/up to 6 photos/i);
+    expectNoEmoji(section);
+  });
 });
 
 describe('Privacy Policy', () => {

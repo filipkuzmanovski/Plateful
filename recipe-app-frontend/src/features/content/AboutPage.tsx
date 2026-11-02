@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { SITE } from '@/content/site';
-import { ContentPage, Ul } from './ContentPage';
+import { ContentPage, contentLinkClass, Ul } from './ContentPage';
 
 export default function AboutPage() {
   return (
@@ -29,7 +29,13 @@ export default function AboutPage() {
                 Pacific, and the Gulf of Mexico.
               </li>
               <li>Filter by diet, cooking time and rating, search by title or ingredient, and sort the results.</li>
-              <li>Post your own recipes with up to 6 photos.</li>
+              <li>Post your own recipes with photos and a video.</li>
+              <li>
+                Cook with what you have: list your ingredients or scan your fridge, and get a new recipe made for
+                you.
+              </li>
+              <li>Turn a recipe post into your own version, adjusted to your food preferences.</li>
+              <li>See three meals made for you each day.</li>
               <li>Rate recipes, leave comments and like the ones you enjoy.</li>
               <li>Protect your account with two-factor authentication.</li>
             </Ul>
@@ -62,10 +68,7 @@ export default function AboutPage() {
           body: (
             <p>
               Questions, ideas or something that looks wrong? Please{' '}
-              <Link
-                to="/contact"
-                className="font-semibold text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron"
-              >
+              <Link to="/contact" className={contentLinkClass}>
                 contact us
               </Link>
               .

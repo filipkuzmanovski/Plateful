@@ -62,23 +62,23 @@ export function ContentPage({
     <div className="grid gap-8 lg:grid-cols-[16rem_minmax(0,65ch)] lg:gap-16">
       <header className="lg:pt-1">
         <div className="lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:flex-col">
-          <h1 className="font-serif text-4xl leading-[1.1] font-semibold tracking-tight text-olive sm:text-5xl">
+          <h1 className="font-serif text-4xl leading-[1.1] font-semibold tracking-[-0.015em] text-ink sm:text-5xl">
             {title}
           </h1>
           {showUpdated && (
-            <p className="mt-3 text-sm text-olive/70">Last updated: {SITE.legalLastUpdated}</p>
+            <p className="mt-3 text-[15px] text-ink-soft">Last updated: {SITE.legalLastUpdated}</p>
           )}
           {hasIndex && (
             <nav
               aria-label="On this page"
-              className="mt-8 hidden border-t border-sand pt-5 lg:block lg:min-h-0 lg:overflow-y-auto"
+              className="mt-8 hidden border-t border-rule pt-5 lg:block lg:min-h-0 lg:overflow-y-auto"
             >
-              <ul className="space-y-1.5 text-sm">
+              <ul className="space-y-1.5 text-[15px]">
                 {sections!.map((s) => (
                   <li key={s.id}>
                     <a
                       href={`#${s.id}`}
-                      className="rounded-sm text-olive/75 underline decoration-transparent underline-offset-4 transition-colors hover:text-olive hover:decoration-olive/50"
+                      className="rounded-sm text-ink-soft underline decoration-transparent underline-offset-4 transition-colors hover:text-ink hover:decoration-ink"
                     >
                       {s.title}
                     </a>
@@ -89,11 +89,11 @@ export function ContentPage({
           )}
         </div>
       </header>
-      <div className="min-w-0 space-y-5 text-[15px] leading-7 text-olive/90 sm:text-base sm:leading-8">
-        {lede && <p className="font-serif text-xl leading-8 text-olive sm:text-[1.35rem] sm:leading-9">{lede}</p>}
+      <div className="min-w-0 max-w-prose space-y-5 text-base leading-relaxed text-ink">
+        {lede && <p className="font-serif text-xl leading-relaxed text-ink sm:text-[22px]">{lede}</p>}
         {sections?.map((s) => (
           <section key={s.id} id={s.id} className="scroll-mt-20 space-y-3 pt-4">
-            <h2 className="font-serif text-2xl font-semibold tracking-tight text-olive">
+            <h2 className="font-serif text-[28px] leading-tight font-medium tracking-[-0.015em] text-ink">
               {s.title}
             </h2>
             {s.body}
@@ -105,9 +105,13 @@ export function ContentPage({
   );
 }
 
+/** A link in the prose: ink text with a rule underline that darkens on hover. */
+export const contentLinkClass =
+  'font-semibold text-ink underline decoration-rule underline-offset-4 transition hover:decoration-ink';
+
 /** A bulleted list in the prose column. */
 export function Ul({ children }: { children: ReactNode }) {
-  return <ul className="list-disc space-y-1.5 pl-5 marker:text-saffron">{children}</ul>;
+  return <ul className="list-disc space-y-1.5 pl-5 marker:text-accent">{children}</ul>;
 }
 
 /** The contact address as a mailto link. */
@@ -115,7 +119,7 @@ export function MailLink({ className = '' }: { className?: string }) {
   return (
     <a
       href={`mailto:${SITE.contactEmail}`}
-      className={`font-semibold text-olive underline decoration-olive/30 underline-offset-4 transition hover:decoration-saffron ${className}`}
+      className={`${contentLinkClass} ${className}`}
     >
       {SITE.contactEmail}
     </a>
@@ -124,5 +128,5 @@ export function MailLink({ className = '' }: { className?: string }) {
 
 /** Inline emphasis for a defined term in the prose. */
 export function Strong({ children }: { children: ReactNode }) {
-  return <strong className="font-semibold text-olive">{children}</strong>;
+  return <strong className="font-semibold text-ink">{children}</strong>;
 }

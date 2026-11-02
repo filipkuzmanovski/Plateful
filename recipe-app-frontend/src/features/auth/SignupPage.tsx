@@ -69,16 +69,16 @@ export default function SignupPage() {
       footer={<>Have an account? <Link to="/login" className={authLinkClass}>Sign in</Link></>}
     >
       {existingAccount ? (
-        <p role="status" className="flex items-start gap-3 rounded-2xl bg-saffron/15 px-4 py-3.5 text-sm text-olive">
-          <UserCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-saffron-deep" />
+        <p role="status" className="flex items-start gap-3 rounded-lg bg-accent/15 px-4 py-3.5 text-[15px] text-ink">
+          <UserCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-accent-ink" />
           <span>
             An account with this email already exists.{' '}
             <Link to="/login" className={authLinkClass}>Sign in</Link>
           </span>
         </p>
       ) : confirmEmail ? (
-        <p role="status" className="flex items-start gap-3 rounded-2xl bg-saffron/15 px-4 py-3.5 text-sm text-olive">
-          <MailCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-saffron-deep" />
+        <p role="status" className="flex items-start gap-3 rounded-lg bg-accent/15 px-4 py-3.5 text-[15px] text-ink">
+          <MailCheck aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-accent-ink" />
           Check your email to confirm your account, then sign in.
         </p>
       ) : (

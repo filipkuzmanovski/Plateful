@@ -52,8 +52,8 @@ export default function LoginPage() {
       footer={<>No account? <Link to="/signup" className={authLinkClass}>Sign up</Link></>}
     >
       {signedOutIdle && (
-        <p role="status" className="mb-4 flex items-start gap-3 rounded-2xl bg-saffron/15 px-4 py-3.5 text-sm text-olive">
-          <Clock aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-saffron-deep" />
+        <p role="status" className="mb-4 flex items-start gap-3 rounded-lg bg-accent/15 px-4 py-3.5 text-[15px] text-ink">
+          <Clock aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-accent-ink" />
           You were signed out after 60 minutes of inactivity.
         </p>
       )}

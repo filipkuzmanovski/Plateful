@@ -34,7 +34,7 @@ const digits = (raw: string, max: number) => raw.replace(/\D/g, '').slice(0, max
 /* One shared grid so the small labels sit exactly above their segments. */
 const GRID = 'grid grid-cols-[4.25rem_minmax(0,1fr)_5.5rem]';
 const SEGMENT =
-  'min-w-0 bg-transparent px-3.5 py-2.5 text-sm leading-5 text-olive transition-colors focus:bg-cream focus:outline-none';
+  'min-w-0 bg-transparent px-3.5 py-2.5 text-base leading-5 text-ink transition-colors focus:bg-tint focus:outline-none sm:text-[15px]';
 
 /**
  * A date of birth as three parts in one rounded control: Day, Month (a dropdown) and Year.
@@ -95,17 +95,17 @@ export function BirthDateField({
 
   return (
     <div role="group" aria-labelledby={groupLabelId} aria-describedby={describedBy}>
-      <span id={groupLabelId} className="mb-1.5 block text-[13px] font-semibold text-olive">
+      <span id={groupLabelId} className="mb-1.5 block text-[15px] font-semibold text-ink">
         Date of birth
       </span>
-      <div className={`${GRID} px-px text-xs font-medium text-olive/70`}>
+      <div className={`${GRID} px-px text-[13px] font-medium text-ink-soft`}>
         <span id={dayLabelId} className="mb-1 pl-3.5">Day</span>
         <span id={monthLabelId} className="mb-1 pl-3.5">Month</span>
         <span id={yearLabelId} className="mb-1 pl-3.5">Year</span>
       </div>
       <div
-        className={`${GRID} divide-x divide-sand overflow-hidden rounded-xl border bg-paper shadow-[inset_0_1px_2px_rgb(47_58_43/0.04)] transition focus-within:ring-4 focus-within:ring-saffron/20 ${
-          error ? 'border-danger' : 'border-sand focus-within:border-olive/60 hover:border-olive/30'
+        className={`${GRID} divide-x divide-field overflow-hidden rounded-lg border bg-surface transition focus-within:ring-4 focus-within:ring-ink/15 ${
+          error ? 'border-danger' : 'border-field focus-within:border-ink hover:border-ink-soft'
         }`}
       >
         <input
@@ -118,7 +118,7 @@ export function BirthDateField({
           aria-invalid={invalid}
           value={parts.day}
           onChange={(e) => onDay(e.target.value)}
-          className={`${SEGMENT} placeholder:text-olive/70`}
+          className={`${SEGMENT} placeholder:text-ink-soft`}
         />
         <Select.Root
           value={parts.month}
@@ -135,12 +135,12 @@ export function BirthDateField({
             className={`${SEGMENT} group flex items-center justify-between gap-1.5 text-left`}
           >
             <span className="truncate">
-              <Select.Value placeholder={<span className="text-olive/70">Select</span>} />
+              <Select.Value placeholder={<span className="text-ink-soft">Select</span>} />
             </span>
             <Select.Icon asChild>
               <ChevronDown
                 aria-hidden="true"
-                className="size-4 shrink-0 text-olive/70 transition-transform duration-200 group-data-[state=open]:rotate-180"
+                className="size-4 shrink-0 text-ink-soft transition-transform duration-200 group-data-[state=open]:rotate-180"
                 strokeWidth={2.25}
               />
             </Select.Icon>
@@ -178,11 +178,11 @@ export function BirthDateField({
           value={parts.year}
           onChange={(e) => onYear(e.target.value)}
           onKeyDown={(e) => backspaceGoesBack(e, parts.year === '', monthRef.current)}
-          className={`${SEGMENT} tabular-nums placeholder:text-olive/70`}
+          className={`${SEGMENT} tabular-nums placeholder:text-ink-soft`}
         />
       </div>
       {error && (
-        <p id={errorId} role="alert" className="mt-1.5 text-xs font-medium text-danger">
+        <p id={errorId} role="alert" className="mt-1.5 text-[13px] font-medium text-danger">
           {error}
         </p>
       )}

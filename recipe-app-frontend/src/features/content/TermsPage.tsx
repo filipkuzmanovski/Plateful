@@ -79,7 +79,7 @@ export default function TermsPage() {
           id: 'food-safety',
           title: 'Food safety disclaimer',
           body: (
-            <div className="rounded-2xl border border-terracotta-deep/25 bg-terracotta/10 p-5 text-olive">
+            <div className="rounded-card bg-accent/15 p-5 text-ink">
               <p className="font-semibold">Check before you cook.</p>
               <p className="mt-2">
                 Recipes, nutrition information, diet labels (such as vegan or gluten-free) and cooking times come from

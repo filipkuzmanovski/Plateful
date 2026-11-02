@@ -108,7 +108,7 @@ export default function VerifyTwoFactorPage() {
       )}
       {loaded.kind === 'none' && (
         <div className="space-y-4">
-          <p className="text-sm text-olive/70">No authenticator found for this account.</p>
+          <p className="text-[15px] text-ink-soft">No authenticator found for this account.</p>
           {signOutButton}
         </div>
       )}
@@ -116,16 +116,16 @@ export default function VerifyTwoFactorPage() {
         <form onSubmit={onSubmit} className="space-y-4">
           {loaded.factors.length > 1 && (
             <fieldset className="space-y-2">
-              <legend className="mb-1.5 text-[13px] font-semibold text-olive">Which device?</legend>
+              <legend className="mb-1.5 text-[15px] font-semibold text-ink">Which device?</legend>
               {loaded.factors.map((f) => (
-                <label key={f.id} className="flex items-center gap-2.5 text-sm text-olive">
+                <label key={f.id} className="flex min-h-10 items-center gap-2.5 text-[15px] text-ink">
                   <input
                     type="radio"
                     name="factor"
                     value={f.id}
                     checked={factorId === f.id}
                     onChange={() => setFactorId(f.id)}
-                    className="size-4 accent-olive"
+                    className="size-5 accent-ink"
                   />
                   {f.friendly_name || 'Authenticator'}
                 </label>
