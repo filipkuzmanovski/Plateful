@@ -2,43 +2,76 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react
 import { useEffect, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, LogOut, Plus, UserRound } from 'lucide-react';
+import { ChevronDown, ClipboardCheck, LogOut, Plus, UserRound } from 'lucide-react';
 import { getPendingCount } from '@/api/admin';
 import { useAuth } from '@/auth/AuthProvider';
 import { IdleSessionGuard } from '@/auth/IdleSessionGuard';
 import { OnboardingRedirect } from '@/auth/OnboardingRedirect';
 import { ErrorBoundary } from './ErrorBoundary';
 import SiteFooter from './SiteFooter';
+import ThemeMenu from './ThemeMenu';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
-  `relative rounded-full px-2.5 py-1.5 sm:px-3 transition-colors ${
-    isActive ? 'bg-sand/60 text-olive' : 'text-olive/75 hover:bg-sand/40 hover:text-olive'
+  `inline-flex min-h-10 items-center border-b-2 px-2.5 transition-colors sm:px-3 ${
+    isActive ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
   }`;
 
+/** Links that only fit once there is room; below `sm` they live in the user menu. */
+const wideOnly = (state: { isActive: boolean }) => `${navLink(state)} hidden sm:inline-flex`;
+
 const pillLink =
-  'inline-flex items-center rounded-full px-4 py-1.5 font-semibold whitespace-nowrap transition duration-200';
+  'inline-flex min-h-11 items-center rounded-full px-4 font-semibold whitespace-nowrap transition-colors';
+
+const menuItem =
+  'flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[15px] text-ink transition-colors hover:bg-tint';
+
+/** The number of recipes waiting for review. No retries: an admin without two-factor gets a 403 here, and the link works fine without a badge. */
+function usePendingCount() {
+  const { data: count = 0 } = useQuery({ queryKey: ['admin', 'pendingCount'], queryFn: getPendingCount, retry: false });
+  return count;
+}
+
+function CountBadge({ count }: { count: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="rounded-full bg-accent px-1.5 text-[12px] leading-[1.125rem] font-bold text-on-accent tabular-nums"
+    >
+      {count}
+    </span>
+  );
+}
 
 /** The admin's way into the queue, with the number of recipes waiting once there are any. */
 function ReviewQueueLink() {
-  // No retries: an admin without two-factor gets a 403 here, and the link works fine without a badge.
-  const { data: count = 0 } = useQuery({ queryKey: ['admin', 'pendingCount'], queryFn: getPendingCount, retry: false });
+  const count = usePendingCount();
   return (
     <NavLink
       to="/admin/review"
       aria-label={count > 0 ? `Review queue, ${count} pending` : undefined}
-      className={(s) => `${navLink(s)} inline-flex items-center gap-1.5`}
+      className={(s) => `${wideOnly(s)} gap-1.5`}
     >
       Review queue
-      {count > 0 && (
-        <span
-          aria-hidden="true"
-          className="rounded-full bg-saffron px-1.5 text-[11px] leading-[1.125rem] font-semibold text-olive tabular-nums"
-        >
-          {count}
-        </span>
-      )}
+      {count > 0 && <CountBadge count={count} />}
     </NavLink>
+  );
+}
+
+/** The same link inside the user menu, for phones. */
+function ReviewQueueMenuItem({ onNavigate }: { onNavigate: () => void }) {
+  const count = usePendingCount();
+  return (
+    <Link
+      to="/admin/review"
+      onClick={onNavigate}
+      aria-label={count > 0 ? `Review queue, ${count} pending` : undefined}
+      className={`${menuItem} sm:hidden`}
+    >
+      <ClipboardCheck aria-hidden="true" className="size-4 text-ink-soft" />
+      <span className="flex-1">Review queue</span>
+      {count > 0 && <CountBadge count={count} />}
+    </Link>
   );
 }
 
@@ -67,122 +100,130 @@ export default function AppShell() {
 
   return (
     <ThemeProvider>
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-30 border-b border-sand/80 bg-paper/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link
-            to="/"
-            className="rounded-lg font-serif text-2xl leading-none sm:text-[1.65rem] font-bold tracking-tight text-olive"
-          >
-            Plateful<span className="text-saffron">.</span>
-          </Link>
-          <nav className="flex items-center gap-1 text-sm sm:gap-2">
-            <NavLink to="/" end className={navLink}>Browse</NavLink>
-            {status === 'ready' && <NavLink to="/cook" className={navLink}>Cook</NavLink>}
-            {status === 'ready' && (
-              <NavLink to="/recipes/new" className={(s) => `${navLink(s)} inline-flex items-center gap-1`}>
-                <Plus aria-hidden="true" className="hidden size-4 sm:block" />
-                New Recipe
-              </NavLink>
-            )}
-            {status === 'ready' && profile?.isAdmin && <ReviewQueueLink />}
-            {status === 'ready' && profile ? (
-              <div ref={menuRef} className="relative ml-1">
-                <button
-                  onClick={() => setMenuOpen((v) => !v)}
-                  aria-expanded={menuOpen}
-                  className="inline-flex items-center gap-2 rounded-full border border-sand bg-paper py-1 pr-1.5 pl-1 font-semibold sm:pr-2.5 text-olive transition hover:border-olive/30 hover:shadow-card"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-7 items-center justify-center rounded-full bg-olive font-serif text-[13px] text-cream"
+      <div className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-30 border-b border-rule bg-page/95">
+          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+            <Link
+              to="/"
+              className="rounded-lg font-serif text-2xl leading-none font-semibold tracking-tight text-ink sm:text-[1.65rem]"
+            >
+              Plateful<span className="text-accent">.</span>
+            </Link>
+            <nav className="flex items-center gap-1 text-[15px] sm:gap-2">
+              {/* Signed in, Browse is the wordmark's job on phones; signed out it stays. */}
+              <NavLink to="/" end className={status === 'ready' ? wideOnly : navLink}>Browse</NavLink>
+              {status === 'ready' && <NavLink to="/cook" className={navLink}>Cook</NavLink>}
+              {status === 'ready' && (
+                <NavLink to="/recipes/new" className={(s) => `${wideOnly(s)} gap-1`}>
+                  <Plus aria-hidden="true" className="size-4" />
+                  New recipe
+                </NavLink>
+              )}
+              {status === 'ready' && profile?.isAdmin && <ReviewQueueLink />}
+              <ThemeMenu />
+              {status === 'ready' && profile ? (
+                <div ref={menuRef} className="relative ml-1">
+                  <button
+                    onClick={() => setMenuOpen((v) => !v)}
+                    aria-expanded={menuOpen}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-rule bg-surface py-1 pr-1.5 pl-1 font-semibold text-ink transition-colors hover:border-ink-soft sm:pr-2.5"
                   >
-                    {profile.firstName.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="sr-only sm:not-sr-only">{profile.firstName}</span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className={`size-4 text-olive/60 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                {menuOpen && (
-                  <div className="absolute right-0 z-40 mt-2 w-48 origin-top-right rounded-2xl border border-sand bg-paper p-1.5 text-left shadow-lift">
-                    <Link
-                      to="/me"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-olive transition-colors hover:bg-cream"
+                    <span
+                      aria-hidden="true"
+                      className="flex size-7 items-center justify-center rounded-full bg-ink font-serif text-[13px] text-on-ink"
                     >
-                      <UserRound aria-hidden="true" className="size-4 text-olive/60" />
-                      My profile
-                    </Link>
-                    <button
-                      onClick={handleSignOut}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-olive transition-colors hover:bg-cream"
+                      {profile.firstName.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="sr-only sm:not-sr-only">{profile.firstName}</span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`size-4 text-ink-soft transition-transform ${menuOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {menuOpen && (
+                    <div
+                      data-testid="user-menu"
+                      className="absolute right-0 z-40 mt-2 w-56 origin-top-right rounded-card border border-rule bg-surface p-1.5 text-left shadow-float"
                     >
-                      <LogOut aria-hidden="true" className="size-4 text-olive/60" />
-                      Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : status === 'needs-profile' || status === 'needs-preferences' ? (
-              <button
-                onClick={handleSignOut}
-                className={`${pillLink} ml-1 border border-olive/25 text-olive hover:border-olive/60 hover:bg-cream`}
-              >
-                Sign out
-              </button>
-            ) : status === 'needs-mfa' ? (
-              <>
-                <Link
-                  to="/verify-2fa"
-                  className={`${pillLink} ml-1 bg-olive text-cream shadow-button hover:-translate-y-px hover:bg-olive/90`}
-                >
-                  Finish signing in
-                </Link>
+                      <Link
+                        to="/recipes/new"
+                        onClick={() => setMenuOpen(false)}
+                        className={`${menuItem} sm:hidden`}
+                      >
+                        <Plus aria-hidden="true" className="size-4 text-ink-soft" />
+                        New recipe
+                      </Link>
+                      {profile.isAdmin && <ReviewQueueMenuItem onNavigate={() => setMenuOpen(false)} />}
+                      <Link to="/me" onClick={() => setMenuOpen(false)} className={menuItem}>
+                        <UserRound aria-hidden="true" className="size-4 text-ink-soft" />
+                        My profile
+                      </Link>
+                      <button onClick={handleSignOut} className={menuItem}>
+                        <LogOut aria-hidden="true" className="size-4 text-ink-soft" />
+                        Sign out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : status === 'needs-profile' || status === 'needs-preferences' ? (
                 <button
                   onClick={handleSignOut}
-                  className={`${pillLink} border border-olive/25 text-olive hover:border-olive/60 hover:bg-cream`}
+                  className={`${pillLink} ml-1 border border-field bg-surface text-ink hover:bg-tint`}
                 >
                   Sign out
                 </button>
-              </>
-            ) : status !== 'loading' ? (
-              <Link
-                to="/login"
-                className={`${pillLink} ml-1 bg-olive text-cream shadow-button hover:-translate-y-px hover:bg-olive/90`}
-              >
-                Sign in
-              </Link>
-            ) : null}
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
-        <OnboardingRedirect />
-        <ErrorBoundary key={location.pathname}>
-          {status === 'needs-profile' && location.pathname !== '/complete-profile' ? (
-            <Navigate to="/complete-profile" replace />
-          ) : (
-            <Outlet />
-          )}
-        </ErrorBoundary>
-      </main>
-      <SiteFooter />
-      <IdleSessionGuard />
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: 'var(--color-paper)',
-            color: 'var(--color-olive)',
-            border: '1px solid var(--color-sand)',
-            borderRadius: '1rem',
-            fontFamily: 'var(--font-sans)',
-          },
-        }}
-      />
-    </div>
+              ) : status === 'needs-mfa' ? (
+                <>
+                  <Link
+                    to="/verify-2fa"
+                    className={`${pillLink} ml-1 bg-ink text-on-ink hover:bg-ink/90`}
+                  >
+                    Finish signing in
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className={`${pillLink} border border-field bg-surface text-ink hover:bg-tint`}
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : status !== 'loading' ? (
+                <Link
+                  to="/login"
+                  className={`${pillLink} ml-1 bg-ink text-on-ink hover:bg-ink/90`}
+                >
+                  Sign in
+                </Link>
+              ) : null}
+            </nav>
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+          <OnboardingRedirect />
+          <ErrorBoundary key={location.pathname}>
+            {status === 'needs-profile' && location.pathname !== '/complete-profile' ? (
+              <Navigate to="/complete-profile" replace />
+            ) : (
+              <Outlet />
+            )}
+          </ErrorBoundary>
+        </main>
+        <SiteFooter />
+        <IdleSessionGuard />
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: 'var(--color-surface)',
+              color: 'var(--color-ink)',
+              border: '1px solid var(--color-rule)',
+              borderRadius: 'var(--radius-card)',
+              boxShadow: 'var(--shadow-float)',
+              fontFamily: 'var(--font-sans)',
+            },
+          }}
+        />
+      </div>
     </ThemeProvider>
   );
 }
