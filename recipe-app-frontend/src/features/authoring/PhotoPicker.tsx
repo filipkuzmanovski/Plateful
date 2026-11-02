@@ -172,7 +172,7 @@ export function PhotoPicker({
               <img src={publicPhotoUrl(path)} alt={`Photo ${i + 1}`} className="size-full object-cover" />
               {i === 0 && (
                 <span className="absolute top-1.5 left-1.5">
-                  <Pill tone="tint" className="bg-surface/90 text-ink">
+                  <Pill tone="tint">
                     Cover
                   </Pill>
                 </span>
@@ -211,7 +211,10 @@ export function PhotoPicker({
           {tiles.map((tile, i) => {
             const n = value.length + i + 1;
             return (
-              <li key={tile.id} className="relative aspect-square overflow-hidden rounded-md bg-tint">
+              <li
+                key={tile.id}
+                className={`relative overflow-hidden rounded-md bg-tint ${tile.status === 'pending' ? 'aspect-square' : ''}`}
+              >
                 {tile.status === 'pending' ? (
                   <>
                     {tile.previewUrl && (
@@ -234,15 +237,15 @@ export function PhotoPicker({
                     </button>
                   </>
                 ) : (
-                  <div className="flex size-full flex-col items-center justify-center gap-1.5 overflow-auto rounded-md border border-dashed border-field bg-surface p-1.5 text-center">
-                    <p role="alert" className="line-clamp-3 text-[13px] leading-tight font-medium text-danger">
+                  <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-field bg-surface p-3 text-center">
+                    <p role="alert" className="text-[13px] leading-snug font-medium text-danger">
                       {tile.message}
                     </p>
-                    <div className="flex flex-wrap justify-center gap-1">
-                      <Button type="button" variant="outline" className="!min-h-10 !px-2.5 !py-0.5 !text-[13px]" onClick={() => retry(tile)}>
+                    <div className="flex w-full flex-col gap-1.5">
+                      <Button type="button" variant="outline" onClick={() => retry(tile)}>
                         Retry
                       </Button>
-                      <Button type="button" variant="ghost" className="!min-h-10 !px-2.5 !py-0.5 !text-[13px]" onClick={() => removePending(tile)}>
+                      <Button type="button" variant="ghost" onClick={() => removePending(tile)}>
                         Remove
                       </Button>
                     </div>
