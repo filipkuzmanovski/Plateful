@@ -5274,3 +5274,145 @@ Status
 ------
 All code and tests are done on the branch and reviewed task by task. Merge
 it, restart the backend, then run the DbTest and do the manual checks above.
+
+
+
+
+################################################################################
+################################################################################
+ PART 21 — THE COOKBOOK REFRESH
+ Branch: claude/frontend-refresh-efb70a
+################################################################################
+################################################################################
+
+Why this exists
+---------------
+A review of the live site (at 1024px and at phone width) found problems that
+a new coat of paint alone would not fix, so the whole frontend got one
+consistent pass. Nothing in the backend changed, and the behaviour, routes
+and data are the same. Spec: docs/superpowers/specs/
+2026-11-02-frontend-refresh-design.md (section 3 lists the findings).
+  - Small grey text was too faint to read comfortably (contrast below the
+    4.5:1 the web accessibility rules ask for), for example the "Generated
+    by AI" line in Today's meals.
+  - More than 50 places used 10, 11 or 12px text.
+  - Inputs used 14px text, which makes iPhone Safari zoom the page when you
+    tap a field.
+  - Recipe photos were small files stretched on phones, so they looked
+    blurry.
+  - Every part of the app used the same rounded card with a shadow, so
+    nothing stood out, and small all-caps labels were everywhere.
+  - Phones showed one recipe per row, and the signed-in header squeezed five
+    items into one line.
+
+What changed (the "Cookbook" direction)
+---------------------------------------
+  - The page now looks like a book page: soft paper background, dark olive
+    "ink" for text, and saffron used only as a marker (the dot in the logo,
+    list dots, stars, badges). Saffron is never used for small text.
+  - Fonts: Newsreader (a serif) for headings and Hanken Grotesk for
+    everything else.
+  - Recipes sit on the page without boxes. Only things that float (menus,
+    dialogs, the filter drawer, toasts) have a shadow.
+  - Today's meals is set like a printed menu, and now has photos.
+  - A recipe page shows the ingredients in a tinted panel, and the steps
+    have large numbers hanging in the margin.
+  - /cook and the profile page use simple underline tabs.
+  - The sign-in pages no longer show the chef hat.
+  - The About page now lists the AI features (Cook with what I have, photo
+    to recipe, recipe from an Instagram post, Today's meals).
+  - No more all-caps labels, no single italic word in headings, no cards
+    that lift or zoom when you hover. Text is at least 13px, inputs are
+    16px on phones, and buttons and icons are at least 40 to 44px to tap.
+
+Colour tokens, by role
+----------------------
+The colours are now named by what they do, not by what they look like, so
+the names stay true in dark mode (they live in src/index.css):
+  page            the page background
+  surface         inputs, dialogs, menus
+  tint            ingredient panel, tags, hover, footer
+  ink             main text, primary buttons, focus ring
+  ink-soft        secondary text and icons
+  rule            dividers and borders of containers
+  field           borders of inputs, checkboxes and chips
+  accent          the saffron marker (decoration only)
+  accent-strong   the large step numbers
+  accent-ink      small text that needs a saffron colour
+  on-accent       text on top of accent
+  on-ink          text on top of ink (primary buttons)
+  danger          errors and destructive actions
+  on-danger       text on top of danger
+  scrim           the dark overlay behind dialogs and the drawer
+Contrast rules (checked in both modes):
+  - ink is 11.6 or better, ink-soft 5.8 or better, accent-ink 6.0 or
+    better, danger 5.3 or better: all above the 4.5:1 minimum for text.
+  - field borders are at least 3.6:1 so inputs are easy to see.
+  - accent is only 2.3:1 on the light page, so it is never used for text or
+    as the only edge of a control. Anything small and saffron uses
+    accent-ink instead.
+The old names (olive, cream, paper, sand, saffron, terracotta, muted) and
+the old card shadows are deleted. Nothing in src uses them any more, and
+the built CSS no longer contains them.
+
+Dark mode
+---------
+  - The sun/moon menu in the header has three choices: Match my device (the
+    default), Light and Dark.
+  - Your choice is remembered per browser under the key plateful.theme.
+  - A tiny script in index.html sets the mode before the page paints, so a
+    reload in dark mode does not flash white first.
+  - Dark has its own values for every colour above (spec section 4.1).
+  - The photo and video viewer stays black, and the two-factor QR code stays
+    on a white square so that it still scans.
+
+Phone header
+------------
+  - On a phone the header shows the logo, Cook, the theme menu and your
+    avatar.
+  - New recipe and Review queue (admins) moved into the avatar menu, next to
+    My profile and Sign out.
+  - The recipe grid shows two cards per row on phones.
+
+Sharper photos
+--------------
+Spoonacular images are now loaded at 312, 480 or 636 pixels wide through
+srcset, so the browser picks the sharpest size for the screen. Cards and the
+recipe page tell the browser how wide the picture will be (CARD_IMAGE_SIZES
+and DETAIL_IMAGE_SIZES in src/lib/recipeImage.ts). Photos you upload
+yourself are unchanged.
+
+Two lessons worth keeping
+-------------------------
+  1. Tailwind v4 settles two conflicting plain classes on one element (such
+     as "hidden" and "inline-flex") by the order they appear in the
+     stylesheet, not by the order in the class list. This broke the phone
+     header. Put the responsive part on one side only: "hidden
+     sm:inline-flex".
+  2. A negative margin inside a tab bar that scrolls sideways gets clipped.
+     The tab underline overlap is therefore "sm:-mb-px" (wide screens only).
+
+Tests
+-----
+  - Frontend: npx vitest run, 64 files, 752 tests passing (the refresh
+    started at 58 files and 708 tests). npm run build succeeded.
+  - The behaviour tests were not weakened. Only class names that named old
+    colours were updated to the new names.
+
+Your manual steps
+-----------------
+No merge steps beyond the usual. The browser is only checked by you:
+  1. On your phone, in light AND dark, look at: the home page, a recipe,
+     /cook (both tabs), New recipe, your profile (both tabs), the admin
+     review queue, and the sign-in pages. Check that text is readable, that
+     nothing scrolls sideways, and that long titles wrap in the
+     two-column grid.
+  2. Open the sun/moon menu and try Match my device, Light and Dark. Reload
+     while in dark: there must be no white flash.
+  3. In dark mode, open the two-factor setup and check that the QR code
+     still scans.
+
+Status
+------
+All code and tests are done on the branch and reviewed task by task. Merge
+it, then do the manual checks above.

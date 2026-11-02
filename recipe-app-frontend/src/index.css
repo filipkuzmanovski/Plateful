@@ -28,24 +28,8 @@
   --color-on-danger: #fbfbf7;
   --color-scrim: rgb(38 48 34 / 0.4);
 
-  /* Temporary aliases so unrefactored components keep working in both modes. Deleted in Task 10. */
-  --color-olive: var(--color-ink);
-  --color-cream: var(--color-page);
-  --color-paper: var(--color-surface);
-  --color-sand: var(--color-tint);
-  --color-muted: var(--color-ink-soft);
-  --color-saffron: var(--color-accent);
-  --color-saffron-deep: var(--color-accent-ink);
-  --color-terracotta: var(--color-accent-ink);
-  --color-terracotta-deep: var(--color-accent-ink);
-  --color-sand-deep: var(--color-field);
-
   /* Only things that float get a shadow (menus, dialogs, the drawer, toasts). */
   --shadow-float: 0 1px 2px rgb(0 0 0 / 0.06), 0 12px 32px -8px rgb(0 0 0 / 0.22);
-  /* Old shadows, used by unrefactored components. Deleted in Task 10. */
-  --shadow-card: 0 1px 2px rgb(47 58 43 / 0.05), 0 4px 16px -4px rgb(47 58 43 / 0.1);
-  --shadow-lift: 0 2px 4px rgb(47 58 43 / 0.05), 0 18px 36px -12px rgb(47 58 43 / 0.24);
-  --shadow-button: 0 1px 2px rgb(47 58 43 / 0.16), 0 4px 12px -4px rgb(47 58 43 / 0.35);
 
   --radius-card: 0.75rem;
 
