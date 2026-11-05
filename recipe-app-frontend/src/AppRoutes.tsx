@@ -13,6 +13,7 @@ import RecipeDetailPage from '@/features/recipe/RecipeDetailPage';
 import AiRecipePage from '@/features/ai/AiRecipePage';
 import CookPage from '@/features/ai/CookPage';
 import RecipeFormPage from '@/features/authoring/RecipeFormPage';
+import CookbookPage from '@/features/cookbooks/CookbookPage';
 import NewCookbookPage from '@/features/cookbooks/NewCookbookPage';
 import MyProfilePage from '@/features/profile/MyProfilePage';
 import PublicProfilePage from '@/features/profile/PublicProfilePage';
@@ -36,6 +37,7 @@ export default function AppRoutes() {
         <Route path="/cook" element={<ProtectedRoute key="cook"><CookPage /></ProtectedRoute>} />
         <Route path="/users/:id" element={<PublicProfilePage />} />
         <Route path="/cookbooks/new" element={<ProtectedRoute key="cookbook-new"><NewCookbookPage /></ProtectedRoute>} />
+        <Route path="/cookbooks/:id" element={<ProtectedRoute key="cookbook"><CookbookPage /></ProtectedRoute>} />
         <Route path="/me" element={<ProtectedRoute><MyProfilePage /></ProtectedRoute>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />

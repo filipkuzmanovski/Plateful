@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
-import { Check, Clock, ExternalLink, Flame, Leaf, Users, type LucideIcon } from 'lucide-react';
+import { Check, Clock, Flame, Leaf, Users, type LucideIcon } from 'lucide-react';
 import { StarDisplay } from '@/components/StarDisplay';
 import { Pill, SectionHeading } from '@/components/ui';
 import type { RecipeDisplay } from '@/lib/types';
 import { ingredientLine } from '@/lib/ingredientLine';
 import { PhotoCollage } from './PhotoCollage';
+import { RecipeCredit } from './RecipeCredit';
+import { RecipeInstructions } from './RecipeInstructions';
 
 /** One time/servings fact: a small icon, a value in the serif and a label. */
 function Fact({ icon: Icon, value, label }: { icon: LucideIcon; value: ReactNode; label: string }) {
@@ -113,28 +114,7 @@ export function RecipeBody({
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           <StarDisplay average={recipe.averageRating} count={recipe.ratingCount} />
-          {recipe.user ? (
-            <Link
-              to={`/users/${recipe.user.id}`}
-              className="text-[15px] text-ink underline decoration-rule underline-offset-4 transition hover:decoration-ink"
-            >
-              by {recipe.user.firstName} {recipe.user.lastName}
-            </Link>
-          ) : recipe.sourceName ? (
-            recipe.sourceUrl ? (
-              <a
-                href={recipe.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[15px] text-ink underline decoration-rule underline-offset-4 transition hover:decoration-ink"
-              >
-                From {recipe.sourceName}
-                <ExternalLink aria-hidden="true" className="size-3.5 text-ink-soft" />
-              </a>
-            ) : (
-              <span className="text-[15px] text-ink-soft">From {recipe.sourceName}</span>
-            )
-          ) : null}
+          <RecipeCredit recipe={recipe} />
         </div>
         {actions && <div className="mt-5 flex flex-wrap gap-2">{actions}</div>}
 
@@ -167,24 +147,7 @@ export function RecipeBody({
         </ul>
 
         <SectionHeading>Instructions</SectionHeading>
-        {recipe.instructionsSteps.length > 0 ? (
-          <ol className="space-y-6">
-            {recipe.instructionsSteps.map((step) => (
-              <li key={step.number} className="flex gap-4 sm:gap-5">
-                <span className="w-10 shrink-0 font-serif text-4xl leading-none font-medium text-accent-strong tabular-nums">
-                  {step.number}
-                </span>
-                <span className="max-w-prose pt-1 text-base leading-relaxed text-ink">{step.step}</span>
-              </li>
-            ))}
-          </ol>
-        ) : recipe.instructions ? (
-          <p className="max-w-prose text-base leading-relaxed whitespace-pre-line text-ink">
-            {recipe.instructions.replace(/<[^>]+>/g, ' ').replace(/\s+\n/g, '\n').trim()}
-          </p>
-        ) : (
-          <p className="text-[15px] text-ink-soft italic">No instructions provided.</p>
-        )}
+        <RecipeInstructions recipe={recipe} />
 
         {after}
       </article>
