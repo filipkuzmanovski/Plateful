@@ -78,7 +78,7 @@ ALTER TABLE cookbook_recipes ENABLE ROW LEVEL SECURITY;
 
 **Liking**
 - `like(userId, recipeId)` is idempotent. The recipe must exist and be visible to the user under `RecipeVisibility`, or the existing visibility errors apply.
-- A recipe the user can see but that is not approved (their own pending recipe, for example) gets `409`, "Only published recipes can be liked."
+- A recipe the user can see but that is not approved (their own pending recipe, for example) gets the same `409` as ratings and comments, through `RecipeVisibility.requireApprovedForInteraction`. The frontend hides the heart there, so people do not meet this message.
 - A recipe deleted while the like is in flight gets `404`, not `500`. The insert selects from `recipes`, so a missing recipe inserts nothing.
 - `unlike` is idempotent and always allowed.
 - A recipe's likes are kept while it is under review, and they count again when it returns to approved.
@@ -127,7 +127,7 @@ The existing MFA filter already guards every path with a `me` segment, and nothi
 ## 5. Frontend: likes
 
 - `src/api/likes.ts` and `useLikedIds`, following `useSavedIds`, with query key `['likedIds', userId]`.
-- **On cards:** a `LikeButton` is a sibling of the card link, never inside it, placed over the photo at top left, opposite the bookmark. It is a heart plus the count, at least 40 px tall. Its accessible name is "Like {title}" or "Remove like from {title}", and the count is announced with it, such as "12 likes".
+- **On cards:** a `LikeButton` is a sibling of the card link, never inside it, placed over the photo at top left, opposite the bookmark. The Video badge moves to the bottom left of the photo to make room. It is a heart plus the count, at least 40 px tall. Its accessible name is "Like {title}" or "Remove like from {title}", and the count is announced with it, such as "12 likes".
 - **On the recipe page:** a larger heart and count beside Save.
 - The heart appears only on approved recipes. Stub cards have none.
 - **Signed out:** a click goes to sign-in, the same as the bookmark.
