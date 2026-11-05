@@ -104,6 +104,42 @@ class AiConfigTest {
     }
 
     @Test
+    void nutritionProviders_areGroqOnlyWithTheTextModel() {
+        AiProperties properties = new AiProperties(
+                new AiProperties.Provider("groq-key", "openai/gpt-oss-120b"),
+                new AiProperties.Provider("gemini-key", "gemini-3.8-flash"),
+                null, 0, 0);
+
+        List<NamedRecipeAi> providers = AiConfig.activeNutritionProviders(properties, RestClient.builder());
+
+        assertThat(providers).extracting(NamedRecipeAi::name).containsExactly("groq");
+        assertThat(providers).extracting(NamedRecipeAi::model).containsExactly("openai/gpt-oss-120b");
+    }
+
+    @Test
+    void nutritionProviders_noGroqKey_isEmpty() {
+        AiProperties properties = new AiProperties(
+                new AiProperties.Provider("", "openai/gpt-oss-120b"),
+                new AiProperties.Provider("gemini-key", "gemini-3.8-flash"),
+                null, 0, 0);
+
+        assertThat(AiConfig.activeNutritionProviders(properties, RestClient.builder())).isEmpty();
+    }
+
+    @Test
+    void nutritionChain_isItsOwnInstance() {
+        AiProperties properties = new AiProperties(null, null, null, 0, 0);
+        AiConfig config = new AiConfig();
+        ObjectProvider<RestClient.Builder> builders =
+                new DefaultListableBeanFactory().getBeanProvider(RestClient.Builder.class);
+
+        assertThat(config.nutritionAi(properties, builders))
+                .isNotSameAs(config.recipeAi(properties, builders))
+                .isNotSameAs(config.visionAi(properties, builders))
+                .isNotSameAs(config.postAi(properties, builders));
+    }
+
+    @Test
     void postChain_cooldownIsSeparate() {
         Clock clock = Clock.fixed(Instant.parse("2026-11-01T10:00:00Z"), ZoneOffset.UTC);
         AtomicInteger calls = new AtomicInteger();

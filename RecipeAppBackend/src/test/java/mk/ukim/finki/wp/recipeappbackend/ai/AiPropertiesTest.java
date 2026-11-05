@@ -82,6 +82,23 @@ class AiPropertiesTest {
     }
 
     @Test
+    void nutritionDefaults() {
+        AiProperties p = new AiProperties(null, null, null, 0, 0);
+
+        assertThat(p.nutritionOrder()).containsExactly("groq");
+        assertThat(p.nutritionDailyLimit()).isEqualTo(40);
+    }
+
+    @Test
+    void nutritionSettingsBind() {
+        AiProperties p = bind(Map.of("plateful.ai.nutrition-order", "groq,gemini",
+                "plateful.ai.nutrition-daily-limit", "25"));
+
+        assertThat(p.nutritionOrder()).containsExactly("groq", "gemini");
+        assertThat(p.nutritionDailyLimit()).isEqualTo(25);
+    }
+
+    @Test
     void providerToString_neverPrintsTheKey() {
         AiProperties.Provider provider = new AiProperties.Provider("test-key-123", "m", "v");
 

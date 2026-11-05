@@ -59,6 +59,18 @@ public class AiConfig {
         return new FallbackRecipeAi(active, Clock.systemUTC());
     }
 
+    /**
+     * The calorie estimate chain: Groq only, with the text model. Its own {@link FallbackRecipeAi}, so its
+     * cooldowns never touch the other chains. Injected with {@code @Qualifier("nutritionAi")}.
+     */
+    @Bean("nutritionAi")
+    public RecipeAi nutritionAi(AiProperties properties, ObjectProvider<RestClient.Builder> builders) {
+        List<NamedRecipeAi> active =
+                activeNutritionProviders(properties, builders.getIfAvailable(RestClient::builder));
+        log.info("ai nutrition providers active={}", active.stream().map(NamedRecipeAi::name).toList());
+        return new FallbackRecipeAi(active, Clock.systemUTC());
+    }
+
     /** Active providers in configured order. Unknown names are ignored with a warning. */
     static List<NamedRecipeAi> activeProviders(AiProperties properties, RestClient.Builder builder) {
         return build(properties.order(), "plateful.ai.order", properties, builder, AiProperties.Provider::model);
@@ -73,6 +85,12 @@ public class AiConfig {
     /** Active providers in {@code plateful.ai.post-order}, each named with its text model. */
     static List<NamedRecipeAi> activePostProviders(AiProperties properties, RestClient.Builder builder) {
         return build(properties.postOrder(), "plateful.ai.post-order", properties, builder,
+                AiProperties.Provider::model);
+    }
+
+    /** Active providers in {@code plateful.ai.nutrition-order}, each named with its text model. */
+    static List<NamedRecipeAi> activeNutritionProviders(AiProperties properties, RestClient.Builder builder) {
+        return build(properties.nutritionOrder(), "plateful.ai.nutrition-order", properties, builder,
                 AiProperties.Provider::model);
     }
 
