@@ -6,8 +6,10 @@ import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
+import mk.ukim.finki.wp.recipeappbackend.model.projection.RecipeLikeCount;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipeVideoPaths;
+import mk.ukim.finki.wp.recipeappbackend.repository.RecipeLikeRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
@@ -40,12 +42,14 @@ class RecipeServiceBrowseTest {
     private RecipeRepository recipeRepository;
     private RecipeService service;
     private RecipeVisibility visibility;
+    private RecipeLikeRepository likeRepository;
     private final Pageable pageable = PageRequest.of(0, 12);
 
     @BeforeEach
     void setUp() {
         recipeRepository = mock(RecipeRepository.class);
         visibility = mock(RecipeVisibility.class);
+        likeRepository = mock(RecipeLikeRepository.class);
         service = new RecipeService(
                 recipeRepository,
                 mock(RecipeIngredientRepository.class),
@@ -56,7 +60,8 @@ class RecipeServiceBrowseTest {
                 mock(RecipePhotoRepository.class),
                 new RecipePhotoPaths("https://x/recipe-photos"),
                 new RecipeVideoPaths("https://x/recipe-videos"),
-                visibility);
+                visibility,
+                likeRepository);
     }
 
     private static RecipeFilter cuisineFilter(String... cuisines) {
@@ -150,5 +155,18 @@ class RecipeServiceBrowseTest {
         verify(recipeRepository, times(2))
                 .findByUserIdAndStatus(eq(authorId), eq(RecipeStatus.APPROVED), eq(pageable));
         verify(recipeRepository, times(2)).findByUserId(authorId, pageable);
+    }
+
+    @Test
+    void toDisplayPage_fillsLikeCountsInOneQuery() {
+        Recipe liked = Recipe.builder().id(UUID.randomUUID()).title("Liked").build();
+        Recipe unliked = Recipe.builder().id(UUID.randomUUID()).title("Unliked").build();
+        when(likeRepository.findLikeCounts(any())).thenReturn(List.of(new RecipeLikeCount(liked.getId(), 3L)));
+
+        List<RecipeDisplayDto> page = service.toDisplayPage(new PageImpl<>(List.of(liked, unliked))).getContent();
+
+        assertThat(page.get(0).likeCount()).isEqualTo(3L);
+        assertThat(page.get(1).likeCount()).isEqualTo(0L);
+        verify(likeRepository, times(1)).findLikeCounts(any());
     }
 }

@@ -17,8 +17,10 @@ import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeIngredient;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipePhoto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.RecipeCommentCount;
+import mk.ukim.finki.wp.recipeappbackend.model.projection.RecipeLikeCount;
 import mk.ukim.finki.wp.recipeappbackend.model.projection.RecipeRatingSummary;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
+import mk.ukim.finki.wp.recipeappbackend.repository.RecipeLikeRepository;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipeVideoPaths;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
@@ -67,6 +69,7 @@ public class RecipeService {
     private final RecipePhotoPaths photoPaths;
     private final RecipeVideoPaths videoPaths;
     private final RecipeVisibility visibility;
+    private final RecipeLikeRepository likeRepository;
 
     public RecipeService(RecipeRepository recipeRepository,
                          RecipeIngredientRepository ingredientRepository,
@@ -77,7 +80,8 @@ public class RecipeService {
                          RecipePhotoRepository photoRepository,
                          RecipePhotoPaths photoPaths,
                          RecipeVideoPaths videoPaths,
-                         RecipeVisibility visibility) {
+                         RecipeVisibility visibility,
+                         RecipeLikeRepository likeRepository) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.ratingRepository = ratingRepository;
@@ -88,6 +92,7 @@ public class RecipeService {
         this.photoPaths = photoPaths;
         this.videoPaths = videoPaths;
         this.visibility = visibility;
+        this.likeRepository = likeRepository;
     }
 
     /**
@@ -338,6 +343,7 @@ public class RecipeService {
                 ratingRepository.findAverageRatingByRecipeId(recipe.getId()),
                 ratingRepository.countByRecipeId(recipe.getId()),
                 commentRepository.countByRecipeId(recipe.getId()),
+                likeRepository.countByIdRecipeId(recipe.getId()),
                 videoPaths.toDisplay(recipe)
         );
     }
@@ -416,7 +422,7 @@ public class RecipeService {
             userRepository.findAllById(authorIds);
         }
 
-        // One query each: ingredients, photos, rating summaries, comment counts.
+        // One query each: ingredients, photos, rating summaries, comment counts, like counts.
         Map<UUID, List<RecipeIngredient>> ingredientsByRecipe =
                 ingredientRepository.findByRecipeIdInOrderBySortOrderAsc(ids).stream()
                         .collect(Collectors.groupingBy(i -> i.getRecipe().getId()));
@@ -429,6 +435,9 @@ public class RecipeService {
         Map<UUID, Long> commentCounts =
                 commentRepository.findCommentCounts(ids).stream()
                         .collect(Collectors.toMap(RecipeCommentCount::recipeId, RecipeCommentCount::commentCount));
+        Map<UUID, Long> likeCounts =
+                likeRepository.findLikeCounts(ids).stream()
+                        .collect(Collectors.toMap(RecipeLikeCount::recipeId, RecipeLikeCount::likeCount));
 
         return page.map(recipe -> {
             RecipeRatingSummary summary = ratingsByRecipe.get(recipe.getId());
@@ -441,6 +450,7 @@ public class RecipeService {
                     summary != null ? summary.averageRating() : null,
                     summary != null ? summary.ratingCount() : 0L,
                     commentCounts.getOrDefault(recipe.getId(), 0L),
+                    likeCounts.getOrDefault(recipe.getId(), 0L),
                     videoPaths.toDisplay(recipe)
             );
             return withReview ? dto.withReview(RecipeReviewDto.of(recipe)) : dto;

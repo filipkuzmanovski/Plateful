@@ -11,6 +11,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.entities.User;
 import mk.ukim.finki.wp.recipeappbackend.photo.InvalidPhotoException;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipePhotoPaths;
 import mk.ukim.finki.wp.recipeappbackend.photo.RecipeVideoPaths;
+import mk.ukim.finki.wp.recipeappbackend.repository.RecipeLikeRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeCommentRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipeIngredientRepository;
 import mk.ukim.finki.wp.recipeappbackend.repository.RecipePhotoRepository;
@@ -72,7 +73,8 @@ class RecipeServicePhotosTest {
                 photoRepository,
                 paths,
                 new RecipeVideoPaths("https://x/recipe-videos"),
-                mock(RecipeVisibility.class));
+                mock(RecipeVisibility.class),
+                mock(RecipeLikeRepository.class));
         owner = User.builder().id(userId).build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(owner));
         when(recipeRepository.save(any(Recipe.class))).thenAnswer(inv -> inv.getArgument(0));
