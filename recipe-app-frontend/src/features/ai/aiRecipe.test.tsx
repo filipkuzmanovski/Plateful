@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
-import { renderApp } from '@/test/utils';
+import { renderApp, newTestQueryClient } from '@/test/utils';
 import { profileFixture } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
 import { ApiError } from '@/api/client';
@@ -117,6 +117,36 @@ describe('AI recipe page', () => {
     renderApp('/ai-recipes/a-1');
     expect(await screen.findByText('Page not found.')).toBeInTheDocument();
     expectNoEmoji();
+  });
+
+  describe('a poll for a pending estimate', () => {
+    const pending = { status: 'pending' as const, calories: null, proteinGrams: null, fatGrams: null, carbsGrams: null };
+    const url = `${BASE}/api/users/me/ai-recipes/a-1`;
+
+    async function openPending() {
+      signedIn();
+      server.use(http.get(url, () => HttpResponse.json(recipeFor({ estimate: pending }))));
+      const queryClient = newTestQueryClient();
+      renderApp('/ai-recipes/a-1', queryClient);
+      await screen.findByText('Working out calories...');
+      return queryClient;
+    }
+
+    it('answered with 500 keeps the recipe on screen', async () => {
+      const queryClient = await openPending();
+      server.use(http.get(url, () => HttpResponse.json({ detail: 'boom' }, { status: 500 })));
+      await queryClient.invalidateQueries({ queryKey: ['aiRecipe', 'a-1'] });
+      await waitFor(() => expect(queryClient.getQueryState(['aiRecipe', 'a-1'])?.status).toBe('error'));
+      expect(screen.getByRole('heading', { name: 'Tomato Egg Skillet' })).toBeInTheDocument();
+      expect(screen.queryByText("Couldn't load this recipe.")).toBeNull();
+    });
+
+    it('answered with 404 moves to the not-found page', async () => {
+      const queryClient = await openPending();
+      server.use(http.get(url, () => HttpResponse.json({ detail: 'Not found' }, { status: 404 })));
+      await queryClient.invalidateQueries({ queryKey: ['aiRecipe', 'a-1'] });
+      expect(await screen.findByText('Page not found.')).toBeInTheDocument();
+    });
   });
 
   it('saves with PUT then shows Saved, and clicking Saved sends DELETE', async () => {

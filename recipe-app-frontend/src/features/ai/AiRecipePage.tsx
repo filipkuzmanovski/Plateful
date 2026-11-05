@@ -12,8 +12,9 @@ export default function AiRecipePage() {
   const query = useQuery({ queryKey: aiRecipeQueryKey(id!), queryFn: () => getAiRecipe(id!), retry: false });
 
   if (query.isPending) return <Spinner />;
-  if (query.isError) {
-    const notFound = query.error instanceof ApiError && query.error.status === 404;
+  const notFound = query.isError && query.error instanceof ApiError && query.error.status === 404;
+  // A failed background refetch (the estimate poll) keeps the recipe on screen; only a missing one leaves the page.
+  if (query.isError && (query.data === undefined || notFound)) {
     return (
       <EmptyState
         icon={notFound ? SearchX : CircleAlert}
@@ -29,6 +30,6 @@ export default function AiRecipePage() {
       </EmptyState>
     );
   }
-  const recipe = query.data;
+  const recipe = query.data!;
   return <AiRecipeView recipe={recipe} actions={<SaveAiRecipeButton id={recipe.id} saved={recipe.saved} />} />;
 }

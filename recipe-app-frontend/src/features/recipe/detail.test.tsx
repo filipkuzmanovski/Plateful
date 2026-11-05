@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
 import { renderApp, newTestQueryClient } from '@/test/utils';
@@ -280,4 +280,33 @@ test('a failed recipe delete leaves its video alone', async () => {
   await userEvent.click(await screen.findByRole('button', { name: /confirm/i }));
   expect(await screen.findByText('boom')).toBeInTheDocument();
   expect(deleteVideoFiles).not.toHaveBeenCalled();
+});
+
+describe('a poll for a pending estimate', () => {
+  const pending = { status: 'pending' as const, calories: null, proteinGrams: null, fatGrams: null, carbsGrams: null };
+
+  async function openPending() {
+    stubDetail();
+    server.use(http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json(recipeFixture({ calories: null, estimate: pending }))));
+    const queryClient = newTestQueryClient();
+    renderApp('/recipes/r-1', queryClient);
+    await screen.findByText('Working out calories...');
+    return queryClient;
+  }
+
+  test('answered with 500 keeps the recipe on screen', async () => {
+    const queryClient = await openPending();
+    server.use(http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json({ status: 500, detail: 'boom' }, { status: 500 })));
+    await queryClient.invalidateQueries({ queryKey: ['recipe', 'r-1'] });
+    await waitFor(() => expect(queryClient.getQueryState(['recipe', 'r-1'])?.status).toBe('error'));
+    expect(screen.getByRole('heading', { name: /bruschetta pork & pasta/i })).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load this recipe.")).toBeNull();
+  });
+
+  test('answered with 404 moves to the not-found page', async () => {
+    const queryClient = await openPending();
+    server.use(http.get(`${BASE}/api/recipes/r-1`, () => HttpResponse.json({ status: 404, detail: 'gone' }, { status: 404 })));
+    await queryClient.invalidateQueries({ queryKey: ['recipe', 'r-1'] });
+    expect(await screen.findByText('Recipe not found.')).toBeInTheDocument();
+  });
 });

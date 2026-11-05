@@ -96,9 +96,10 @@ export default function RecipeDetailPage() {
   });
 
   if (query.isPending) return <Spinner />;
-  if (query.isError) {
-    const error = query.error;
-    const notFound = error instanceof ApiError && error.status === 404;
+  const error = query.error;
+  const notFound = query.isError && error instanceof ApiError && error.status === 404;
+  // A failed background refetch (the estimate poll) keeps the recipe on screen; only a missing one leaves the page.
+  if (query.isError && (query.data === undefined || notFound)) {
     // A recipe approved once but hidden now answers 404 with a code and its last approved title.
     if (notFound && (error.code === 'under_review' || error.code === 'unavailable') && error.approvedTitle) {
       return <HiddenRecipePage recipeId={id!} approvedTitle={error.approvedTitle} state={error.code} />;
@@ -116,7 +117,7 @@ export default function RecipeDetailPage() {
       </EmptyState>
     );
   }
-  const recipe = query.data;
+  const recipe = query.data!;
   const isOwner = !!profile && recipe.user?.id === profile.id;
   const canRemove = !!profile?.isAdmin && !isOwner;
   // Only an approved recipe is open to feedback; the API refuses writes on the others (409 recipe_not_approved).
