@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { RecipeCredit } from '@/features/recipe/RecipeCredit';
 import { RecipeInstructions } from '@/features/recipe/RecipeInstructions';
 import { ingredientLine } from '@/lib/ingredientLine';
+import { largestRecipeImage } from '@/lib/recipeImage';
 import type { Cookbook, HiddenState, RecipeDisplay, SavedItem } from '@/lib/types';
 import { formatMinutes } from './bookFacts';
 import { coverClasses, DEFAULT_SUBTITLE } from './constants';
@@ -24,8 +25,8 @@ function Sheet({ children }: { children: ReactNode }) {
   );
 }
 
-function Page({ children }: { children: ReactNode }) {
-  return <div className="min-w-0 p-6 sm:p-8">{children}</div>;
+function Page({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`min-w-0 p-6 sm:p-8 ${className}`}>{children}</div>;
 }
 
 const chapterTitle = (item: SavedItem) => (item.recipe ? item.recipe.title : item.stub.approvedTitle);
@@ -108,47 +109,55 @@ export function OpeningLeaf({
   );
 }
 
+/**
+ * The photo keeps a landscape shape because recipe photos are landscape: a tall frame would show only a zoomed slice
+ * of the middle. The text below it fills the rest of the left page.
+ */
 export function ChapterLeaf({ recipe, number }: { recipe: RecipeDisplay; number: number }) {
   return (
     <Sheet>
-      <div className="relative aspect-[4/3] bg-tint md:aspect-[3/4] md:self-start print:aspect-auto print:h-72">
-        {recipe.image ? (
-          <img src={recipe.image} alt="" className="absolute inset-0 size-full object-cover" />
-        ) : (
-          <div className="flex size-full items-center justify-center p-8">
-            <p className="text-center font-serif text-4xl leading-tight font-medium text-balance break-words text-ink-soft italic">
-              {recipe.title}
-            </p>
-          </div>
-        )}
-      </div>
-      <Page>
-        <p className={LABEL}>Chapter {number}</p>
-        <h2
-          data-leaf-heading
-          tabIndex={-1}
-          className={`mt-2 font-serif text-3xl leading-tight font-medium text-balance break-words text-ink ${FOCUS_HEADING}`}
-        >
-          {recipe.title}
-        </h2>
-        <div className="mt-2 print:[&_a]:no-underline print:[&_svg]:hidden">
-          <RecipeCredit recipe={recipe} />
+      <div className="min-w-0">
+        <div className="relative aspect-[3/2] bg-tint print:aspect-auto print:h-72">
+          {recipe.image ? (
+            <img src={largestRecipeImage(recipe.image)} alt="" className="absolute inset-0 size-full object-cover" />
+          ) : (
+            <div className="flex size-full items-center justify-center p-8">
+              <p className="text-center font-serif text-4xl leading-tight font-medium text-balance break-words text-ink-soft italic">
+                {recipe.title}
+              </p>
+            </div>
+          )}
         </div>
+        <Page>
+          <p className={LABEL}>Chapter {number}</p>
+          <h2
+            data-leaf-heading
+            tabIndex={-1}
+            className={`mt-2 font-serif text-3xl leading-tight font-medium text-balance break-words text-ink ${FOCUS_HEADING}`}
+          >
+            {recipe.title}
+          </h2>
+          <div className="mt-2 print:[&_a]:no-underline print:[&_svg]:hidden">
+            <RecipeCredit recipe={recipe} />
+          </div>
 
-        <h3 className={`${SMALL_HEADING} mt-6`}>Ingredients</h3>
-        <ul className="space-y-1.5">
-          {recipe.ingredients.map((ingredient, i) => {
-            const line = ingredientLine(ingredient.ingredientName, ingredient.originalText);
-            return (
-              <li key={i} className="text-base leading-relaxed text-ink">
-                {line.name && <><strong className="font-semibold">{line.name}</strong>, </>}
-                {line.text}
-              </li>
-            );
-          })}
-        </ul>
-
-        <h3 className={`${SMALL_HEADING} mt-6`}>Method</h3>
+          <h3 className={`${SMALL_HEADING} mt-6`}>Ingredients</h3>
+          <ul className="space-y-1.5">
+            {recipe.ingredients.map((ingredient, i) => {
+              const line = ingredientLine(ingredient.ingredientName, ingredient.originalText);
+              return (
+                <li key={i} className="text-base leading-relaxed text-ink">
+                  {line.name && <><strong className="font-semibold">{line.name}</strong>, </>}
+                  {line.text}
+                </li>
+              );
+            })}
+          </ul>
+        </Page>
+      </div>
+      {/* Stacked on phones and in print, the left page's bottom padding already separates the two. */}
+      <Page className="pt-0 sm:pt-0 md:pt-8 print:pt-0">
+        <h3 className={SMALL_HEADING}>Method</h3>
         <RecipeInstructions recipe={recipe} />
 
         <p className="mt-6 print:hidden">

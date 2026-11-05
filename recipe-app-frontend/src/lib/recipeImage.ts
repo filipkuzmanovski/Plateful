@@ -21,3 +21,15 @@ export function recipeImageSrcSet(url: string | null | undefined): string | unde
   const [, base, ext] = match;
   return SPOONACULAR_WIDTHS.map(([w, h]) => `${base}-${w}x${h}.${ext} ${w}w`).join(', ');
 }
+
+/**
+ * The largest Spoonacular size of a photo, for places that show it big or print it. Recipes store the small 312px
+ * file. Any other URL comes back as it was.
+ */
+export function largestRecipeImage(url: string): string {
+  const match = SPOONACULAR_SIZED.exec(url);
+  if (!match) return url;
+  const [, base, ext] = match;
+  const [w, h] = SPOONACULAR_WIDTHS[SPOONACULAR_WIDTHS.length - 1];
+  return `${base}-${w}x${h}.${ext}`;
+}

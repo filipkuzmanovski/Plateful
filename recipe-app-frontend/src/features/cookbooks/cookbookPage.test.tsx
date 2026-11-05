@@ -188,13 +188,35 @@ describe('a chapter', () => {
     expect(within(activeLeaf()).getAllByText('Plain Stew')).toHaveLength(2);
   });
 
-  test('onWideScreensThePhotoKeepsItsOwnShape_howeverLongTheRecipeIs', async () => {
+  test('thePhotoStaysLandscape_soItIsNotZoomedIntoANarrowSlice', async () => {
     fakeServer(bookOf([asItem(lemon), asItem(stew)]));
     renderBook('?page=3');
     await cover();
     const frame = activeLeaf().querySelector('img')!.parentElement!;
-    expect(frame).toHaveClass('md:self-start', 'md:aspect-[3/4]');
-    expect(frame).not.toHaveClass('md:min-h-full');
+    expect(frame).toHaveClass('aspect-[3/2]');
+    expect(frame.className).not.toMatch(/aspect-\[3\/4\]/);
+  });
+
+  test('aSpoonacularPhotoLoadsAtItsLargestSize', async () => {
+    const small = { ...lemon, image: 'https://img.spoonacular.com/recipes/42-312x231.jpg' };
+    fakeServer(bookOf([asItem(small), asItem(stew)]));
+    renderBook('?page=3');
+    await cover();
+    expect(activeLeaf().querySelector('img')).toHaveAttribute('src', 'https://img.spoonacular.com/recipes/42-636x393.jpg');
+  });
+
+  test('theLeftPageHoldsThePhotoAndIngredients_andTheRightPageTheMethod', async () => {
+    fakeServer(bookOf([asItem(lemon), asItem(stew)]));
+    renderBook('?page=3');
+    await cover();
+    const leftPage = activeLeaf().querySelector('img')!.parentElement!.parentElement!;
+    const left = within(leftPage);
+    expect(left.getByRole('heading', { level: 2, name: 'Lemon Tart' })).toBeInTheDocument();
+    expect(left.getByRole('heading', { level: 3, name: 'Ingredients' })).toBeInTheDocument();
+    expect(left.queryByRole('heading', { level: 3, name: 'Method' })).toBeNull();
+    const rightPage = within(activeLeaf()).getByRole('heading', { level: 3, name: 'Method' }).parentElement!;
+    expect(rightPage).toBe(leftPage.nextElementSibling);
+    expect(within(rightPage).getByText('Bake the tart.')).toBeInTheDocument();
   });
 
   test('aStubUnderReviewSaysSo', async () => {

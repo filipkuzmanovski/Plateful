@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD_IMAGE_SIZES, DETAIL_IMAGE_SIZES, recipeImageSrcSet } from './recipeImage';
+import { CARD_IMAGE_SIZES, DETAIL_IMAGE_SIZES, largestRecipeImage, recipeImageSrcSet } from './recipeImage';
 
 describe('recipeImageSrcSet', () => {
   it('lists the three Spoonacular sizes for a sized jpg', () => {
@@ -36,5 +36,24 @@ describe('recipeImageSrcSet', () => {
   it('exports the sizes hints', () => {
     expect(CARD_IMAGE_SIZES).toBe('(min-width: 1024px) 270px, 50vw');
     expect(DETAIL_IMAGE_SIZES).toBe('(min-width: 1024px) 460px, 100vw');
+  });
+});
+
+describe('largestRecipeImage', () => {
+  it('asks for the largest Spoonacular size, keeping the id and file extension', () => {
+    expect(largestRecipeImage('https://img.spoonacular.com/recipes/1095838-312x231.jpg')).toBe(
+      'https://img.spoonacular.com/recipes/1095838-636x393.jpg',
+    );
+    expect(largestRecipeImage('http://img.spoonacular.com/recipes/42-556x370.png')).toBe(
+      'http://img.spoonacular.com/recipes/42-636x393.png',
+    );
+  });
+
+  it('leaves uploads and unsized Spoonacular URLs as they are', () => {
+    const upload = 'https://abc.supabase.co/storage/v1/object/public/recipe-photos/a/b-640x480.jpg';
+    expect(largestRecipeImage(upload)).toBe(upload);
+    expect(largestRecipeImage('https://img.spoonacular.com/recipes/1095838.jpg')).toBe(
+      'https://img.spoonacular.com/recipes/1095838.jpg',
+    );
   });
 });

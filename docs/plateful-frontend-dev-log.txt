@@ -5541,8 +5541,8 @@ with a test that failed first:
     asked for, so a new bookmark could be missing from Saved. Now only lists
     holding the recipe are touched, and they keep their freshness.
   - On wide screens a long recipe stretched the photo into a narrow, zoomed
-    slice. The photo now keeps a 3:4 shape at the top of the left page. This
-    last layout was NOT looked at again in the browser after the fix.
+    slice. The photo then kept a 3:4 shape at the top of the left page. That
+    shape was still wrong; see "Photo fix" below.
   - A failed background reload replaced the open book with an error.
   - Printed credit links kept their underline and icon.
   - The cover's spine used a raw colour; it is now the shadow-spine token.
@@ -5558,6 +5558,24 @@ Left for later, all small:
   - The heart on the recipe page is not larger than the one on cards.
   - A like count can be off by one until the next reload in rare races.
   - Creating a book runs a few extra SELECTs while the lock is held.
+
+Photo fix
+---------
+You reported that chapter photos looked low resolution and stretched. Two
+causes, both measured on a real recipe:
+  - Recipes store Spoonacular's small 312x231 file and the book showed it as it
+    was, with none of the other sizes that cards and recipe pages can pick from.
+  - The 3:4 upright frame on a landscape photo showed only 56% of its width,
+    enlarged 3.19 times. Nothing was warped: it was a zoomed crop.
+What changed:
+  - The book now asks for the 636x393 file (largestRecipeImage). All 50 recipes
+    checked have it. Uploads and other URLs keep their own file.
+  - The frame is now 3:2, everywhere except print. At 1280 wide the photo shows
+    at 550x367, slightly smaller than the file, with 93% of its width visible.
+  - The left page now holds the photo, title and ingredients, and the right page
+    the method, so the shorter photo leaves no blank column.
+Limits: 636 wide is the largest size Spoonacular offers here, so a high density
+screen can still look a little soft. Print was not opened after this change.
 
 Your manual steps
 -----------------
