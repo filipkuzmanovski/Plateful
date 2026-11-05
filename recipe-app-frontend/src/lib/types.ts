@@ -21,6 +21,12 @@ export interface RecipeVideo { url: string; posterUrl: string; durationSeconds: 
 /** What the form sends: storage paths, not URLs. */
 export interface RecipeVideoInput { path: string; posterPath: string; durationSeconds: number; }
 
+/** The AI's per-serving estimate for a recipe; `pending` while it is being worked out. */
+export interface NutritionEstimate {
+  status: 'ready' | 'pending' | 'none';
+  calories: number | null; proteinGrams: number | null; fatGrams: number | null; carbsGrams: number | null;
+}
+
 export interface RecipeDisplay {
   id: string; source: string; user: UserDisplay | null; title: string;
   image: string | null; servings: number | null; readyInMinutes: number | null;
@@ -37,6 +43,8 @@ export interface RecipeDisplay {
   video?: RecipeVideo | null;
   /** Null for anyone but the author or an admin. */
   review?: RecipeReview | null;
+  /** Single-recipe responses only; null on list pages. */
+  estimate?: NutritionEstimate | null;
 }
 
 export interface CommentDisplay { id: string; user: UserDisplay; body: string; likeCount: number; dislikeCount: number; createdAt: string | null; }
@@ -103,6 +111,7 @@ export interface GeneratedRecipe {
   origin: 'recipe' | 'dish' | null;
   /** Ingredients replaced to fit the user's food preferences; empty when none. */
   swaps: { from: string; to: string }[];
+  estimate?: NutritionEstimate | null;
 }
 
 /** A generated recipe in a list: no ingredients or steps. `savedAt` is null when not saved. */

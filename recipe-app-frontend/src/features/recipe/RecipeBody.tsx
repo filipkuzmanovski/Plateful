@@ -4,6 +4,7 @@ import { StarDisplay } from '@/components/StarDisplay';
 import { Pill, SectionHeading } from '@/components/ui';
 import type { RecipeDisplay } from '@/lib/types';
 import { ingredientLine } from '@/lib/ingredientLine';
+import { NutritionEstimate } from '@/features/nutrition/NutritionEstimate';
 import { PhotoCollage } from './PhotoCollage';
 import { RecipeCredit } from './RecipeCredit';
 import { RecipeInstructions } from './RecipeInstructions';
@@ -84,6 +85,9 @@ export function RecipeBody({
               </dl>
             )}
             <DietBadges recipe={recipe} />
+            {recipe.calories === null && (
+              <NutritionEstimate estimate={recipe.estimate} queryKey={['recipe', recipe.id]} />
+            )}
             {recipe.calories !== null && (
               <div className="flex flex-wrap gap-1.5">
                 <Pill className="py-1 tabular-nums">

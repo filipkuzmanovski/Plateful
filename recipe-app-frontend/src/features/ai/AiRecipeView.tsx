@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChefHat, Clock, Flame, Leaf, Sparkles, Users, type LucideIcon } from 'lucide-react';
+import { aiRecipeQueryKey } from '@/api/ai';
 import { cuisinesQueryKey, getCuisines } from '@/api/cuisines';
 import { Pill, SectionHeading } from '@/components/ui';
+import { NutritionEstimate } from '@/features/nutrition/NutritionEstimate';
 import { humanizeKey } from '@/features/browse/regions';
 import type { GeneratedRecipe } from '@/lib/types';
 import { AI_NOTE, providerLine } from './aiMessages';
@@ -86,6 +88,7 @@ export function AiRecipeView({ recipe, actions }: { recipe: GeneratedRecipe; act
                   ))}
                 </div>
               )}
+              <NutritionEstimate estimate={recipe.estimate} queryKey={aiRecipeQueryKey(recipe.id)} />
             </div>
           </div>
         </aside>
