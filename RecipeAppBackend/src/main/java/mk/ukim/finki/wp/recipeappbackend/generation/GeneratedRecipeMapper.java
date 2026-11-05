@@ -10,6 +10,7 @@ import mk.ukim.finki.wp.recipeappbackend.food.FoodRules;
 import mk.ukim.finki.wp.recipeappbackend.food.IngredientNames;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GeneratedRecipeDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GeneratedRecipeSummaryDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.NutritionEstimateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.GeneratedRecipe;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -107,7 +108,12 @@ public class GeneratedRecipeMapper {
         return MAPPER.convertValue(row.getRecipe(), StoredRecipe.class);
     }
 
+    /** A recipe just made: its estimate is on the way. */
     public GeneratedRecipeDto toDto(GeneratedRecipe row) {
+        return toDto(row, NutritionEstimateDto.pending());
+    }
+
+    public GeneratedRecipeDto toDto(GeneratedRecipe row, NutritionEstimateDto estimate) {
         StoredRecipe s = read(row);
         List<Allergen> allergens = new ArrayList<>();
         for (String key : s.allergens() == null ? List.<String>of() : s.allergens()) {
@@ -118,7 +124,8 @@ public class GeneratedRecipeMapper {
                 s.ingredients(), s.steps(), s.diets(), List.copyOf(allergens),
                 row.getSavedAt() != null, row.getCreatedAt(), row.getProvider(),
                 s.post() == null ? null : s.post().origin(),
-                s.post() == null || s.post().swaps() == null ? List.of() : List.copyOf(s.post().swaps()));
+                s.post() == null || s.post().swaps() == null ? List.of() : List.copyOf(s.post().swaps()),
+                estimate);
     }
 
     /** A copy of the recipe with its post note set, for a recipe made from an Instagram post. */

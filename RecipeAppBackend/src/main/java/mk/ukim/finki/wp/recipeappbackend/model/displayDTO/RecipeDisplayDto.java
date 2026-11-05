@@ -61,7 +61,9 @@ public record RecipeDisplayDto(
         // Null when the recipe has no video.
         RecipeVideoDto video,
         // Present only when the viewer is the author or an admin; null for everyone else.
-        RecipeReviewDto review
+        RecipeReviewDto review,
+        // Per serving, set only on single-recipe responses; null on list pages.
+        NutritionEstimateDto estimate
 ) {
     public static RecipeDisplayDto fromEntity(
             Recipe recipe,
@@ -105,6 +107,7 @@ public record RecipeDisplayDto(
                 likeCount,
                 recipe.getCreatedAt(),
                 video,
+                null,
                 null
         );
     }
@@ -114,6 +117,14 @@ public record RecipeDisplayDto(
                 cookingMinutes, preparationMinutes, sourceName, sourceUrl, instructions, instructionsSteps,
                 dairyFree, glutenFree, vegan, vegetarian, cuisines, calories, proteinGrams, fatGrams,
                 carbsGrams, nutrition, ingredients, averageRating, ratingCount, commentCount, likeCount, createdAt, video,
-                review);
+                review, estimate);
+    }
+
+    public RecipeDisplayDto withEstimate(NutritionEstimateDto estimate) {
+        return new RecipeDisplayDto(id, source, user, title, image, photos, servings, readyInMinutes,
+                cookingMinutes, preparationMinutes, sourceName, sourceUrl, instructions, instructionsSteps,
+                dairyFree, glutenFree, vegan, vegetarian, cuisines, calories, proteinGrams, fatGrams,
+                carbsGrams, nutrition, ingredients, averageRating, ratingCount, commentCount, likeCount, createdAt, video,
+                review, estimate);
     }
 }

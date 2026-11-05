@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
@@ -77,7 +78,8 @@ class RecipeServiceVideoTest {
                 photoPaths,
                 videoPaths,
                 visibility,
-                mock(RecipeLikeRepository.class));
+                mock(RecipeLikeRepository.class),
+                mock(NutritionEstimates.class));
         owner = User.builder().id(userId).build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(owner));
         when(recipeRepository.save(any(Recipe.class))).thenAnswer(inv -> inv.getArgument(0));

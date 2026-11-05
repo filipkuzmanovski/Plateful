@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.exception.InvalidReviewReasonException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
@@ -70,7 +71,8 @@ class AdminReviewServiceTest {
                 new RecipePhotoPaths("https://x/recipe-photos"),
                 new RecipeVideoPaths("https://x/recipe-videos"),
                 visibility,
-                mock(RecipeLikeRepository.class));
+                mock(RecipeLikeRepository.class),
+                mock(NutritionEstimates.class));
         service = new AdminReviewService(recipeRepository, userRepository, recipeService, publisher);
 
         admin = User.builder().id(adminId).firstName("Ada").lastName("Admin").email("ada@example.test").build();

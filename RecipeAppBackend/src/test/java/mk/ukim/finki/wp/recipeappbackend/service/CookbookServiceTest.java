@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.exception.CookbookConflictException;
 import mk.ukim.finki.wp.recipeappbackend.exception.InvalidCookbookException;
@@ -76,7 +77,8 @@ class CookbookServiceTest {
                 new RecipePhotoPaths("https://x/recipe-photos"),
                 new RecipeVideoPaths("https://x/recipe-videos"),
                 visibility,
-                likes);
+                likes,
+                mock(NutritionEstimates.class));
         SavedRecipeService saved = new SavedRecipeService(mock(SavedRecipeRepository.class), recipes, recipeService,
                 visibility);
         service = new CookbookService(cookbooks, chapters, likes, recipes, users, saved);

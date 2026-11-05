@@ -29,6 +29,7 @@ public record GeneratedRecipeDto(
         OffsetDateTime createdAt,
         String provider,
         String origin,
-        List<StoredRecipe.Swap> swaps
+        List<StoredRecipe.Swap> swaps,
+        NutritionEstimateDto estimate
 ) {
 }

@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.exception.RecipeHiddenException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
@@ -63,7 +64,8 @@ class SavedRecipeServiceTest {
                 new RecipePhotoPaths("https://x/recipe-photos"),
                 new RecipeVideoPaths("https://x/recipe-videos"),
                 visibility,
-                mock(RecipeLikeRepository.class));
+                mock(RecipeLikeRepository.class),
+                mock(NutritionEstimates.class));
         service = new SavedRecipeService(savedRepository, recipeRepository, recipeService, visibility);
     }
 

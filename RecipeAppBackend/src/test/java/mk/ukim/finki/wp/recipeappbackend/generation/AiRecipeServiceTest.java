@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.NutritionEstimateDto;
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GeneratedRecipeDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GeneratedRecipeSummaryDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.GeneratedRecipe;
@@ -37,8 +39,9 @@ class AiRecipeServiceTest {
 
     private final GeneratedRecipeRepository repository = mock(GeneratedRecipeRepository.class);
     private final GeneratedRecipeMapper mapper = mock(GeneratedRecipeMapper.class);
+    private final NutritionEstimates estimates = mock(NutritionEstimates.class);
     private final MutableClock clock = new MutableClock(Instant.parse("2026-10-31T10:00:00Z"));
-    private final AiRecipeService service = new AiRecipeService(repository, mapper, clock);
+    private final AiRecipeService service = new AiRecipeService(repository, mapper, estimates, clock);
 
     private static GeneratedRecipe row(OffsetDateTime savedAt) {
         return GeneratedRecipe.builder().id(ID).kind("cook").title("Egg fried rice").savedAt(savedAt).build();
@@ -53,11 +56,16 @@ class AiRecipeServiceTest {
     }
 
     @Test
-    void get_owner_returnsTheMappedRecipe() {
+    void get_carriesTheEstimateFromTheLookup() {
         GeneratedRecipe row = row(null);
         GeneratedRecipeDto dto = mock(GeneratedRecipeDto.class);
+        StoredRecipe stored = new StoredRecipe("Egg fried rice", "", 4, 5, 10, "chinese", List.of(), List.of(),
+                null, List.of(), null);
+        NutritionEstimateDto estimate = new NutritionEstimateDto("ready", 450, 28, 18, 42);
         when(repository.findByIdAndUserId(ID, USER)).thenReturn(Optional.of(row));
-        when(mapper.toDto(row)).thenReturn(dto);
+        when(mapper.read(row)).thenReturn(stored);
+        when(estimates.forGenerated(row, 4)).thenReturn(estimate);
+        when(mapper.toDto(row, estimate)).thenReturn(dto);
 
         assertThat(service.get(USER, ID)).isSameAs(dto);
     }

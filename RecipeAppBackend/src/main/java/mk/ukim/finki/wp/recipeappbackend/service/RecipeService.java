@@ -6,6 +6,7 @@ import mk.ukim.finki.wp.recipeappbackend.exception.ForbiddenOperationException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.RecipeVideoCreateDto;
@@ -70,6 +71,7 @@ public class RecipeService {
     private final RecipeVideoPaths videoPaths;
     private final RecipeVisibility visibility;
     private final RecipeLikeRepository likeRepository;
+    private final NutritionEstimates estimates;
 
     public RecipeService(RecipeRepository recipeRepository,
                          RecipeIngredientRepository ingredientRepository,
@@ -81,7 +83,8 @@ public class RecipeService {
                          RecipePhotoPaths photoPaths,
                          RecipeVideoPaths videoPaths,
                          RecipeVisibility visibility,
-                         RecipeLikeRepository likeRepository) {
+                         RecipeLikeRepository likeRepository,
+                         NutritionEstimates estimates) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.ratingRepository = ratingRepository;
@@ -93,6 +96,7 @@ public class RecipeService {
         this.videoPaths = videoPaths;
         this.visibility = visibility;
         this.likeRepository = likeRepository;
+        this.estimates = estimates;
     }
 
     /**
@@ -248,6 +252,7 @@ public class RecipeService {
         ingredientRepository.deleteByRecipeId(recipeId);
         List<RecipeIngredient> ingredients =
                 ingredientRepository.saveAll(dto.toIngredientEntities(recipe));
+        estimates.removeIfIngredientsChanged(recipeId, ingredients);
 
         List<RecipePhoto> savedPhotos;
         if (photos.isEmpty() && !photoRepository.existsByRecipeId(recipeId)) {
@@ -345,7 +350,7 @@ public class RecipeService {
                 commentRepository.countByRecipeId(recipe.getId()),
                 likeRepository.countByIdRecipeId(recipe.getId()),
                 videoPaths.toDisplay(recipe)
-        );
+        ).withEstimate(estimates.forRecipe(recipe));
     }
 
     /**

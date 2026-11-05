@@ -7,6 +7,7 @@ import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GeneratedRecipeDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.GeneratedRecipeSummaryDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.GeneratedRecipe;
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.repository.GeneratedRecipeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -26,23 +27,28 @@ public class AiRecipeService {
 
     private final GeneratedRecipeRepository recipes;
     private final GeneratedRecipeMapper mapper;
+    private final NutritionEstimates estimates;
     private final Clock clock;
 
     @Autowired
-    public AiRecipeService(GeneratedRecipeRepository recipes, GeneratedRecipeMapper mapper) {
-        this(recipes, mapper, Clock.systemUTC());
+    public AiRecipeService(GeneratedRecipeRepository recipes, GeneratedRecipeMapper mapper,
+                           NutritionEstimates estimates) {
+        this(recipes, mapper, estimates, Clock.systemUTC());
     }
 
-    AiRecipeService(GeneratedRecipeRepository recipes, GeneratedRecipeMapper mapper, Clock clock) {
+    AiRecipeService(GeneratedRecipeRepository recipes, GeneratedRecipeMapper mapper, NutritionEstimates estimates,
+                       Clock clock) {
         this.recipes = recipes;
         this.mapper = mapper;
+        this.estimates = estimates;
         this.clock = clock;
     }
 
     /** One of the user's AI recipes, saved or not. */
     @Transactional(readOnly = true)
     public GeneratedRecipeDto get(UUID userId, UUID id) {
-        return mapper.toDto(owned(userId, id));
+        GeneratedRecipe row = owned(userId, id);
+        return mapper.toDto(row, estimates.forGenerated(row, mapper.read(row).servings()));
     }
 
     /** The user's saved recipes, newest saved first whatever sort the client sent. */

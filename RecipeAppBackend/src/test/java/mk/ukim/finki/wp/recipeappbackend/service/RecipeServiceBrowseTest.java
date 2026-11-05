@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeFilter;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeSort;
@@ -61,7 +62,8 @@ class RecipeServiceBrowseTest {
                 new RecipePhotoPaths("https://x/recipe-photos"),
                 new RecipeVideoPaths("https://x/recipe-videos"),
                 visibility,
-                likeRepository);
+                likeRepository,
+                mock(NutritionEstimates.class));
     }
 
     private static RecipeFilter cuisineFilter(String... cuisines) {

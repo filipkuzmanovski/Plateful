@@ -1,8 +1,10 @@
 package mk.ukim.finki.wp.recipeappbackend.model.createDTO;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import mk.ukim.finki.wp.recipeappbackend.model.InstructionStep;
@@ -46,7 +48,7 @@ import java.util.List;
  */
 public record RecipeCreateDto(
         @NotBlank @Size(max = 255) String title,
-        @PositiveOrZero Integer servings,
+        @NotNull(message = "Enter 1 or more servings") @Min(value = 1, message = "Enter 1 or more servings") Integer servings,
         @PositiveOrZero Integer readyInMinutes,
         @PositiveOrZero Integer cookingMinutes,
         @PositiveOrZero Integer preparationMinutes,

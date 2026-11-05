@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
+import mk.ukim.finki.wp.recipeappbackend.nutrition.NutritionEstimates;
 import mk.ukim.finki.wp.recipeappbackend.cuisine.CuisineCatalog;
 import mk.ukim.finki.wp.recipeappbackend.exception.RecipeHiddenException;
 import mk.ukim.finki.wp.recipeappbackend.exception.RecipeNotApprovedException;
@@ -64,7 +65,8 @@ class LikeServiceTest {
                 new RecipePhotoPaths("https://x/recipe-photos"),
                 new RecipeVideoPaths("https://x/recipe-videos"),
                 visibility,
-                likeRepository);
+                likeRepository,
+                mock(NutritionEstimates.class));
         SavedRecipeService saved = new SavedRecipeService(mock(SavedRecipeRepository.class), recipeRepository,
                 recipeService, visibility);
         service = new LikeService(likeRepository, recipeRepository, visibility, saved);

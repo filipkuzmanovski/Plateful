@@ -66,7 +66,7 @@ class RecipeControllerTest {
 
     /** Minimal valid recipe payload: title + one ingredient. */
     private static final String VALID_RECIPE_JSON = """
-            {"title":"Pancakes",
+            {"title":"Pancakes","servings":4,
              "ingredients":[{"ingredientName":"Flour","originalText":"2 cups flour"}]}
             """;
 
@@ -74,7 +74,7 @@ class RecipeControllerTest {
     private static RecipeDisplayDto sampleRecipe(UUID id) {
         return new RecipeDisplayDto(id, "user", null, "Pancakes", null, List.of("https://x/recipe-photos/u/p.webp"), null, null, null, null,
                 null, null, null, List.of(), false, false, false, false, List.of(),
-                null, null, null, null, null, List.of(), null, 0L, 0L, 0L, null, null, null);
+                null, null, null, null, null, List.of(), null, 0L, 0L, 0L, null, null, null, null);
     }
 
     @Test

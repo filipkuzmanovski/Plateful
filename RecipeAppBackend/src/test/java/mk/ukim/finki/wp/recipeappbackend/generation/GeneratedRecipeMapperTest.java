@@ -159,4 +159,11 @@ class GeneratedRecipeMapperTest {
         assertThat(back.ingredients()).containsExactly(new RecipeDraft.Ingredient("", ""));
         assertThat(back.steps()).containsExactly("Mix.", "");
     }
+
+    @Test
+    void toDto_ofAFreshRecipeIsPending() {
+        StoredRecipe stored = mapper.fromDraft(draft("rice", "lime"), Set.of());
+
+        assertThat(mapper.toDto(rowOf(stored, "cook")).estimate().status()).isEqualTo("pending");
+    }
 }
