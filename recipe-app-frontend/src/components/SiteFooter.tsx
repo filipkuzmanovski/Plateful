@@ -26,7 +26,7 @@ function FooterColumn({ label, links }: { label: string; links: { to: string; te
 /** The site footer: wordmark and tagline, Explore and Legal links, and the credit line. */
 export default function SiteFooter() {
   return (
-    <footer className="mt-8 border-t border-rule bg-tint">
+    <footer className="print:hidden mt-8 border-t border-rule bg-tint">
       <div className="mx-auto max-w-6xl px-4 pt-12 pb-8 sm:px-6">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_1fr_1fr] lg:gap-16">
           <div>

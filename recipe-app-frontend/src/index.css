@@ -135,6 +135,29 @@
     --color-scrim: rgb(0 0 0 / 0.6);
   }
 
+  /* Paper is always light: printing uses the light values, even in dark mode. */
+  @media print {
+    :root,
+    :root[data-theme='dark'] {
+      color-scheme: light;
+      --color-page: #fbfbf7;
+      --color-surface: #ffffff;
+      --color-tint: #eaede2;
+      --color-ink: #263022;
+      --color-ink-soft: #535d4c;
+      --color-rule: #d6dacc;
+      --color-field: #7d8873;
+      --color-accent: #e2992e;
+      --color-accent-strong: #b06f12;
+      --color-accent-ink: #7a4f16;
+      --color-on-accent: #263022;
+      --color-on-ink: #fbfbf7;
+      --color-danger: #a63d2a;
+      --color-on-danger: #fbfbf7;
+      --color-scrim: rgb(38 48 34 / 0.4);
+    }
+  }
+
   html {
     background-color: var(--color-page);
   }

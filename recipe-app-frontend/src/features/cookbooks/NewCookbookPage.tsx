@@ -95,8 +95,8 @@ export default function NewCookbookPage() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        {backLink}
+      <header className="space-y-3">
+        <p>{backLink}</p>
         <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-balance text-ink">
           Create a cookbook
         </h1>

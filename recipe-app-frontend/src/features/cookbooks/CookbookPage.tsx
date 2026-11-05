@@ -109,7 +109,7 @@ export default function CookbookPage() {
   const leafProps = (number: number) => ({
     'data-leaf': number,
     'data-active': number === leaf,
-    className: number === leaf ? 'block motion-safe:animate-view-in' : 'hidden print:block',
+    className: `${number === leaf ? 'block motion-safe:animate-view-in' : 'hidden print:block'} ${number > 1 ? 'print:break-before-page' : ''}`,
   });
 
   return (
@@ -122,6 +122,9 @@ export default function CookbookPage() {
           Back to your cookbooks
         </Link>
         <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => window.print()}>
+            Print
+          </Button>
           <Button type="button" variant="outline" onClick={() => setDeleting(true)}>
             Delete
           </Button>

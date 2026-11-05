@@ -105,7 +105,7 @@ export default function AppShell() {
   return (
     <ThemeProvider>
       <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-30 border-b border-rule bg-page/95">
+        <header className="sticky top-0 z-30 border-b border-rule bg-page/95 print:hidden">
           <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
             <Link
               to="/"
@@ -205,7 +205,7 @@ export default function AppShell() {
             </nav>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10 print:max-w-none print:p-0">
           <OnboardingRedirect />
           <ErrorBoundary key={location.pathname}>
             {status === 'needs-profile' && location.pathname !== '/complete-profile' ? (

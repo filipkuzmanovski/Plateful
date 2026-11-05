@@ -344,6 +344,62 @@ describe('deleting', () => {
   });
 });
 
+describe('printing', () => {
+  test('thePrintButtonOpensThePrintDialog', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    fakeServer(bookOf([asItem(lemon)]));
+    renderBook();
+    await cover();
+    const button = screen.getByRole('button', { name: 'Print' });
+    expect(button).toHaveAttribute('type', 'button');
+    await userEvent.click(button);
+    expect(print).toHaveBeenCalledTimes(1);
+    print.mockRestore();
+  });
+
+  test('theControlsDoNotPrint', async () => {
+    fakeServer(bookOf([asItem(lemon)]));
+    renderBook();
+    await cover();
+    expect(screen.getByRole('button', { name: 'Print' }).closest('.print\\:hidden')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Delete' }).closest('.print\\:hidden')).not.toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Pages of this book' })).toHaveClass('print:hidden');
+  });
+
+  test('everyLeafAfterTheFirstStartsANewPrintedPage', async () => {
+    fakeServer(bookOf([asItem(lemon), reviewStub]));
+    renderBook('?page=3');
+    await cover();
+    const leaves = [...document.querySelectorAll('[data-leaf]')];
+    expect(leaves.map((l) => l.classList.contains('print:break-before-page'))).toEqual([false, true, true, true]);
+  });
+
+  test('theCoverKeepsItsColourOnPaper', async () => {
+    fakeServer(bookOf([asItem(lemon)]));
+    renderBook();
+    await cover();
+    const heading = within(activeLeaf()).getByRole('heading', { level: 1 });
+    expect(heading.parentElement).toHaveClass('[print-color-adjust:exact]');
+  });
+
+  test('aPrintedPhotoFillsTheWidthAtAFixedHeight', async () => {
+    fakeServer(bookOf([asItem(lemon)]));
+    renderBook('?page=3');
+    await cover();
+    const frame = activeLeaf().querySelector('img')!.parentElement!;
+    expect(frame).toHaveClass('print:aspect-auto', 'print:h-72');
+    expect(frame).not.toHaveClass('print:max-h-72');
+  });
+
+  test('theRecipePageLinkDoesNotPrint', async () => {
+    fakeServer(bookOf([asItem(lemon)]));
+    renderBook('?page=3');
+    await cover();
+    const link = within(activeLeaf()).getByRole('link', { name: /open the recipe page/i });
+    expect(link.closest('.print\\:hidden')).not.toBeNull();
+  });
+});
+
 test('aMissingBookShowsNotFound', async () => {
   fakeServer(null);
   renderBook();

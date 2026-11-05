@@ -5433,3 +5433,105 @@ Status
 ------
 All code and tests are done on the branch and reviewed task by task. Merge
 it, then do the manual checks above.
+
+
+################################################################################
+################################################################################
+ PART 22 — LIKES AND LIKED COOKBOOKS
+ Branch: claude/busy-joliot-f6b190
+################################################################################
+################################################################################
+
+Why this exists
+---------------
+People can now like recipes in public, then turn the recipes they liked into a
+small book of their own. This is sub-project 1 of 3. Calorie estimates and the
+preference cookbook come next, each with its own spec and plan. No AI is
+involved here, so nothing in this part spends tokens.
+Spec: docs/superpowers/specs/2026-11-05-likes-and-cookbooks-design.md
+Plan: docs/superpowers/plans/2026-11-05-likes-and-cookbooks.md
+
+The decisions you made
+----------------------
+  - Likes are separate from Saved. A like is public and means "I enjoyed this".
+    Saved stays a private list for later.
+  - Only the count is public for now. Likes are stored per person, so a later
+    social feature can show who liked what. The Privacy page already says so.
+  - Only published recipes can be liked. AI recipes are private and have none.
+  - A cookbook is never made automatically. You press Create a cookbook, which
+    becomes available at 5 likes, and tick 5 to 10 recipes. The order you tick
+    them in is the order of the chapters.
+  - The cover title is your name: "The cookbook of Ana Petrovska". A book also
+    has a volume number and an optional subtitle. An empty subtitle shows as
+    "Recipes I loved".
+  - You chose the keepsake book from three mockups.
+  - A cookbook points at recipes and does not copy them, so authors and admins
+    stay in control. An edit shows up in the book, and a deleted recipe drops
+    out. A hidden one shows a short note in its chapter.
+  - Unliking a recipe later does not take it out of a book.
+  - Cookbooks are private to you for now, with a limit of 20.
+
+What was built
+--------------
+Backend:
+  - V12 adds recipe_likes, cookbooks and cookbook_recipes, with row level
+    security on. cookbooks has a kind column, so the preference cookbook and a
+    cookbook from other people's likes can reuse the tables later.
+  - /api/users/me/likes: like, unlike, list and ids.
+  - /api/users/me/cookbooks: list, create, read and delete.
+  - Every recipe now carries likeCount, fetched in one batch for lists.
+  - Creating a cookbook locks your user row, so two creates at once cannot
+    break the limit or share a volume number. Deleting the newest volume frees
+    its number. A gap in the middle stays.
+  - SavedRecipeService.assembleItems is now shared, so Saved, Likes and
+    cookbook chapters build their cards and hidden-recipe notes the same way.
+
+Frontend:
+  - A heart and count on recipe cards and recipe pages. The Video badge moved
+    to the bottom left of the photo to make room. The count changes at once and
+    goes back with a toast if the request fails.
+  - useOptimisticIds holds the toggle logic that used to live in useSavedIds,
+    and both Saved and likes now use it.
+  - A Cookbooks tab on your profile: covers, the Create button with progress
+    such as "3 of 5 likes to make your first cookbook", and your liked recipes.
+    Unliking from that list leaves the card in place until the list next loads,
+    so keyboard users keep their place and a mistake is easy to undo.
+  - /cookbooks/new: the pick page.
+  - /cookbooks/:id: the book. Cover, then an opening page with "Collected by",
+    the cuisines, the total time and the contents, then one chapter per recipe.
+    Photo on the left and recipe on the right on wide screens, stacked on
+    phones. The current page is in the link. Previous, Next and the arrow keys
+    turn pages, and focus moves to the new page's heading.
+  - Print: every page prints on its own sheet in light colours, even in dark
+    mode, and the cover keeps its colour on paper.
+
+Test results
+------------
+  - Backend without the database: 1071 tests pass.
+  - Frontend: 848 tests pass in 70 files. The build and lint are clean for the
+    new code.
+  - RecipeLikeRepositoryDbTest and CookbookRepositoryDbTest are written but NOT
+    run. They need V12 on the live database, which happens when you restart the
+    backend.
+
+Browser check
+-------------
+The backend was not running, and it needs V12 first. So the real app ran in the
+browser pane against a throwaway fake session and fake API, which were removed
+afterwards and never committed.
+  - Checked at 375px and desktop, in light and dark: the hearts, the Cookbooks
+    tab, the pick page, the cover, the opening, a chapter, arrow key turning and
+    no sideways scrolling.
+  - Print was checked by applying the print styles on screen, which found and
+    fixed a photo that did not fill the page width. The cover colour fix is
+    covered by a test.
+  - NOT checked: a real print preview, and anything against the real backend
+    and database.
+
+Your manual steps
+-----------------
+  1. Merge, then restart the backend so V12 runs.
+  2. Run the two DbTests above with the database password set.
+  3. Like five recipes, create a cookbook, read it, then delete it.
+  4. Open Print on a cookbook, in dark mode too. Check that each page starts a
+     new sheet, in light colours, and that the cover keeps its colour.
