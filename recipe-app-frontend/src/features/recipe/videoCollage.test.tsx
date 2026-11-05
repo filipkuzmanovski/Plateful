@@ -6,8 +6,9 @@ import { recipeFixture } from '@/test/fixtures';
 import { RecipeCard } from '@/components/RecipeCard';
 import { PhotoCollage } from './PhotoCollage';
 
-// The bookmark needs auth and query providers that have nothing to do with the badge.
+// The bookmark and heart need auth and query providers that have nothing to do with the badge.
 vi.mock('@/features/saved/BookmarkButton', () => ({ BookmarkButton: () => null }));
+vi.mock('@/features/likes/LikeButton', () => ({ LikeButton: () => null }));
 
 const video = { url: 'https://cdn.example.com/clip.mp4', posterUrl: 'https://cdn.example.com/poster.jpg', durationSeconds: 42 };
 const urls = (n: number) => Array.from({ length: n }, (_, i) => `https://cdn.example.com/p${i + 1}.webp`);

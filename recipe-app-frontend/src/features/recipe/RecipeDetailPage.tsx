@@ -19,6 +19,7 @@ import { SaveRecipeButton } from '@/features/saved/SaveRecipeButton';
 import { HiddenRecipePage } from './HiddenRecipePage';
 import { ReviewStatusBanner } from '@/features/review/ReviewStatusBanner';
 import { ReasonDialog } from '@/features/admin/ReasonDialog';
+import { LikeButton } from '@/features/likes/LikeButton';
 import type { RecipeDisplay } from '@/lib/types';
 
 /** Best-effort: once a recipe row is gone its photos and video are orphans; the helpers never throw. */
@@ -134,6 +135,7 @@ export default function RecipeDetailPage() {
       banner={isOwner && recipe.review && <ReviewStatusBanner review={recipe.review} recipeId={recipe.id} />}
       actions={
         <>
+          <LikeButton recipe={recipe} variant="page" />
           <SaveRecipeButton recipeId={recipe.id} />
           {acceptsFeedback && <ShareRecipe recipe={recipe} />}
           {isOwner && (

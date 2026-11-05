@@ -4,8 +4,9 @@ import { MemoryRouter } from 'react-router';
 import { recipeFixture } from '@/test/fixtures';
 import { RecipeCard } from './RecipeCard';
 
-// The bookmark needs auth and query providers that have nothing to do with the photo.
+// The bookmark and heart need auth and query providers that have nothing to do with the photo.
 vi.mock('@/features/saved/BookmarkButton', () => ({ BookmarkButton: () => null }));
+vi.mock('@/features/likes/LikeButton', () => ({ LikeButton: () => null }));
 
 const renderCard = (overrides = {}) =>
   render(

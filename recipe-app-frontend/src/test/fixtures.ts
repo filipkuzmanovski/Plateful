@@ -19,7 +19,7 @@ export function recipeFixture(overrides: Partial<RecipeDisplay> = {}): RecipeDis
       { ingredientName: 'penne', originalText: '8 oz penne pasta' },
       { ingredientName: 'pork chops', originalText: '2 boneless pork chops' },
     ],
-    averageRating: 4.6, ratingCount: 28, commentCount: 2, createdAt: '2026-07-14T00:00:00Z',
+    averageRating: 4.6, ratingCount: 28, commentCount: 2, likeCount: 0, createdAt: '2026-07-14T00:00:00Z',
     photos: [], video: null, review: null,
     ...overrides,
   };

@@ -187,10 +187,16 @@ export default function PrivacyPage() {
           id: 'public-content',
           title: 'Public content',
           body: (
-            <p>
-              Recipes, photos and videos, ratings, comments and your display name are visible to anyone who visits{' '}
-              {SITE.name}, not only to people who are signed in. Please do not post anything you want to keep private.
-            </p>
+            <>
+              <p>
+                Recipes, photos and videos, ratings, comments and your display name are visible to anyone who visits{' '}
+                {SITE.name}, not only to people who are signed in. Please do not post anything you want to keep private.
+              </p>
+              <p>
+                The number of likes on a recipe is public too. Who liked a recipe may be shown publicly in a later
+                version of {SITE.name}.
+              </p>
+            </>
           ),
         },
         {

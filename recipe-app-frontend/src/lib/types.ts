@@ -31,7 +31,7 @@ export interface RecipeDisplay {
   calories: number | null; proteinGrams: number | null; fatGrams: number | null;
   carbsGrams: number | null; nutrition: Record<string, unknown> | null;
   ingredients: IngredientDisplay[]; averageRating: number | null;
-  ratingCount: number; commentCount: number; createdAt: string | null;
+  ratingCount: number; commentCount: number; likeCount: number; createdAt: string | null;
   photos: string[];
   /** A video-only recipe has no photos and its `image` is the video's poster. */
   video?: RecipeVideo | null;

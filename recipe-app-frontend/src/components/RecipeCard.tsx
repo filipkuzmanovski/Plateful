@@ -5,12 +5,13 @@ import { StarDisplay } from './StarDisplay';
 import { Pill } from './ui';
 import { CARD_IMAGE_SIZES, recipeImageSrcSet } from '@/lib/recipeImage';
 import { BookmarkButton } from '@/features/saved/BookmarkButton';
+import { LikeButton } from '@/features/likes/LikeButton';
 import { StatusBadge } from '@/features/review/StatusBadge';
 
 export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
   return (
-    // No container: the photo and the text sit straight on the page. The bookmark is a sibling of the
-    // link (never inside it), so the link is the `group` and the bookmark only needs the wrapper to anchor to.
+    // No container: the photo and the text sit straight on the page. The heart and bookmark are siblings of the
+    // link (never inside it), so the link is the `group` and they only need the wrapper to anchor to.
     <div className="relative flex">
       <Link to={`/recipes/${recipe.id}`} className="group flex flex-1 flex-col gap-3">
         <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-tint">
@@ -29,8 +30,9 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
             </div>
           )}
           {recipe.video && (
-            // Top left; the bookmark owns the top right, and the review status badge sits in the text below.
-            <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2.5 py-1 text-[13px] font-semibold text-on-ink">
+            // Bottom left; the heart owns the top left, the bookmark the top right, and the review status
+            // badge sits in the text below.
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2.5 py-1 text-[13px] font-semibold text-on-ink">
               <Video aria-hidden="true" className="size-3.5" strokeWidth={2} />
               Video
             </span>
@@ -61,6 +63,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
           )}
         </div>
       </Link>
+      <LikeButton recipe={recipe} variant="card" />
       <BookmarkButton recipeId={recipe.id} title={recipe.title} />
     </div>
   );
