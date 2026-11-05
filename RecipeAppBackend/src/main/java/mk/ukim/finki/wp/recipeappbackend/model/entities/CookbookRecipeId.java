@@ -1,0 +1,28 @@
+package mk.ukim.finki.wp.recipeappbackend.model.entities;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.io.Serializable;
+import java.util.UUID;
+
+/** Composite primary key of public.cookbook_recipes: (cookbook_id, recipe_id). */
+@Embeddable
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode
+public class CookbookRecipeId implements Serializable {
+
+    @Column(name = "cookbook_id", nullable = false)
+    private UUID cookbookId;
+
+    @Column(name = "recipe_id", nullable = false)
+    private UUID recipeId;
+}

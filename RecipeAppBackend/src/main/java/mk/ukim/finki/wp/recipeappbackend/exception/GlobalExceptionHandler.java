@@ -115,6 +115,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    /** A cookbook request that breaks a rule -> 400 with the message as detail. */
+    @ExceptionHandler(InvalidCookbookException.class)
+    ProblemDetail handleInvalidCookbook(InvalidCookbookException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    /** A cookbook request the current state refuses -> 409 with the message as detail. */
+    @ExceptionHandler(CookbookConflictException.class)
+    ProblemDetail handleCookbookConflict(CookbookConflictException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     /** Unknown sortBy -> 400 in the same shape as bean-validation failures. */
     @ExceptionHandler(InvalidSortException.class)
     ProblemDetail handleInvalidSort(InvalidSortException ex) {
