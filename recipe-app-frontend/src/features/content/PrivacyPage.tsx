@@ -149,6 +149,10 @@ export default function PrivacyPage() {
                 account.
               </p>
               <p>
+                The ingredient lists of AI recipes and of approved uploaded recipes are also sent to Groq to estimate
+                calories, and never to Google for this.
+              </p>
+              <p>
                 The free tier of Google Gemini may use what is sent to improve Google's products, and human reviewers
                 may read it. Groq's data retention is switched off. Please do not type personal information into the
                 ingredient box, or into your food preferences either: the ingredients and cuisines you like or avoid are

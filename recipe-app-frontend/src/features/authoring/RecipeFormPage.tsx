@@ -22,7 +22,7 @@ const wholeNumber = z.string().regex(/^\d*$/, 'Whole number ≥ 0');
 
 const schema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(255),
-  servings: wholeNumber,
+  servings: z.string().regex(/^[1-9]\d*$/, 'Enter 1 or more servings'),
   readyInMinutes: wholeNumber,
   cookingMinutes: wholeNumber,
   preparationMinutes: wholeNumber,
@@ -210,7 +210,7 @@ export default function RecipeFormPage() {
   const needsReviewNotice = !!id && !profile?.isAdmin && (reviewStatus === 'approved' || reviewStatus === 'rejected');
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-3xl">
+    <form noValidate onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-3xl">
       <header className="mb-8">
         <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-ink sm:text-5xl">
           {id ? 'Edit recipe' : 'New recipe'}
@@ -264,7 +264,7 @@ export default function RecipeFormPage() {
               )}
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Field label="Servings" error={errors.servings?.message}><TextInput type="number" min={0} {...register('servings')} /></Field>
+              <Field label="Servings" error={errors.servings?.message}><TextInput type="number" min={1} {...register('servings')} /></Field>
               <Field label="Ready (min)" error={errors.readyInMinutes?.message}><TextInput type="number" min={0} {...register('readyInMinutes')} /></Field>
               <Field label="Cook (min)" error={errors.cookingMinutes?.message}><TextInput type="number" min={0} {...register('cookingMinutes')} /></Field>
               <Field label="Prep (min)" error={errors.preparationMinutes?.message}><TextInput type="number" min={0} {...register('preparationMinutes')} /></Field>

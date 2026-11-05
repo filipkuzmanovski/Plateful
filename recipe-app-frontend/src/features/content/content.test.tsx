@@ -143,6 +143,12 @@ describe('About us', () => {
 });
 
 describe('Privacy Policy', () => {
+  test('privacy page says calorie estimates go to Groq only', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    expect(screen.getByText(/to estimate calories, and never to Google for this/)).toBeInTheDocument();
+  });
+
   test('shows the last-updated date from SITE', async () => {
     renderApp('/privacy');
     expect(await screen.findByText(`Last updated: ${SITE.legalLastUpdated}`)).toBeInTheDocument();
