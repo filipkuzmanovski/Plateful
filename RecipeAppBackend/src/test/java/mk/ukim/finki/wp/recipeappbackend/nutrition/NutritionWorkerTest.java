@@ -179,6 +179,26 @@ class NutritionWorkerTest {
         verify(repo, never()).saveFailed(any(), any());
     }
 
+    @Test
+    void totalsThatRoundToTheColumnLimit_areStoredAsFailed() {
+        NutritionTotals total = new NutritionTotals(9_999_999.96, 1, 1, 1);
+        when(estimator.estimate(any(), any(), any()))
+                .thenReturn(new NutritionEstimator.Ready(total, ITEMS, "groq", "m"));
+        worker.run();
+        verify(repo, never()).saveReady(any(), any(), any(), any(), any(), any());
+        verify(repo).saveFailed(RECIPE_TARGET, hashOf(OLD));
+    }
+
+    @Test
+    void totalsThatRoundBelowTheColumnLimit_areSaved() {
+        NutritionTotals total = new NutritionTotals(9_999_999.94, 1, 1, 1);
+        when(estimator.estimate(any(), any(), any()))
+                .thenReturn(new NutritionEstimator.Ready(total, ITEMS, "groq", "m"));
+        worker.run();
+        verify(repo).saveReady(eq(RECIPE_TARGET), eq(total), any(), any(), any(), any());
+        verify(repo, never()).saveFailed(any(), any());
+    }
+
     @ParameterizedTest
     @MethodSource("overflowingTotals")
     void totalsAtTheColumnLimit_areStoredAsFailed_notPaused(NutritionTotals total) {
@@ -281,5 +301,68 @@ class NutritionWorkerTest {
         when(recipes.findById(ID)).thenReturn(Optional.empty());
         worker.run();
         verifyNoInteractions(estimator);
+    }
+
+    private static final Duration PAUSE_STEP = Duration.ofMinutes(5);
+
+    private void failTimes(RuntimeException error, int times) {
+        when(estimator.estimate(any(), any(), any())).thenThrow(error);
+        for (int i = 0; i < times; i++) {
+            worker.run();
+            advance(PAUSE_STEP);
+        }
+    }
+
+    @Test
+    void sixConsecutiveErrorsOnOneRecipe_storeItAsFailed() {
+        failTimes(new AiUnavailableException("down"), 5);
+        verify(repo, never()).saveFailed(any(), any());
+        worker.run();
+        verify(repo).saveFailed(RECIPE_TARGET, hashOf(OLD));
+    }
+
+    @Test
+    void sixthErrorOnAGeneratedRecipe_storesItAsFailed() {
+        generatedTarget();
+        failTimes(new AiUnavailableException("down"), 6);
+        verify(repo).saveFailed(GENERATED_TARGET, NutritionLines.hash(List.of("rice | 1 cup")));
+    }
+
+    @Test
+    void afterTheSixthError_stillWaitsFiveMinutes() {
+        failTimes(new AiUnavailableException("down"), 6);
+        verify(estimator, times(6)).estimate(any(), any(), any());
+        advance(Duration.ofMinutes(-1));
+        worker.run();
+        verify(estimator, times(6)).estimate(any(), any(), any());
+        advance(Duration.ofMinutes(1));
+        worker.run();
+        verify(estimator, times(7)).estimate(any(), any(), any());
+    }
+
+    @Test
+    void quotaErrors_neverStoreAFailedRow() {
+        failTimes(new AiQuotaExceededException("busy"), 10);
+        verify(repo, never()).saveFailed(any(), any());
+    }
+
+    @Test
+    void notConfiguredErrors_neverStoreAFailedRow() {
+        failTimes(new AiNotConfiguredException("none"), 10);
+        verify(repo, never()).saveFailed(any(), any());
+    }
+
+    @Test
+    void aDifferentTargetResetsTheCount() {
+        NutritionTarget other = new NutritionTarget(NutritionTarget.Kind.RECIPE,
+                UUID.fromString("22222222-2222-2222-2222-222222222222"));
+        failTimes(new AiUnavailableException("down"), 5);
+        when(recipes.findById(other.id())).thenReturn(Optional.of(Recipe.builder().id(other.id()).title("Soup").servings(4).build()));
+        when(repo.next(any())).thenReturn(Optional.of(other));
+        worker.run();
+        advance(PAUSE_STEP);
+        when(repo.next(any())).thenReturn(Optional.of(RECIPE_TARGET));
+        worker.run();
+        verify(repo, never()).saveFailed(any(), any());
     }
 }

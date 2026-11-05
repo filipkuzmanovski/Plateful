@@ -7,7 +7,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import mk.ukim.finki.wp.recipeappbackend.ai.AiNotConfiguredException;
 import mk.ukim.finki.wp.recipeappbackend.ai.AiProperties;
+import mk.ukim.finki.wp.recipeappbackend.ai.AiQuotaExceededException;
 import mk.ukim.finki.wp.recipeappbackend.generation.GeneratedRecipeMapper;
 import mk.ukim.finki.wp.recipeappbackend.generation.StoredRecipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.GeneratedRecipe;
@@ -38,8 +40,14 @@ public class NutritionWorker {
 
     static final Duration PAUSE = Duration.ofMinutes(5);
 
-    /** The columns are NUMERIC(8,1): a total at or above this cannot be stored. */
-    static final double COLUMN_LIMIT = 10_000_000;
+    /**
+     * The columns are NUMERIC(8,1) and Postgres rounds to one decimal before its range check, so a total of
+     * 9,999,999.95 or more rounds to 10,000,000.0 and overflows.
+     */
+    static final double COLUMN_LIMIT = 9_999_999.95;
+
+    /** Consecutive errors on one recipe before it is stored as failed. */
+    static final int MAX_ERRORS_IN_A_ROW = 6;
 
     private static final Logger log = LoggerFactory.getLogger(NutritionWorker.class);
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
@@ -55,6 +63,8 @@ public class NutritionWorker {
     private final Clock clock;
 
     private volatile Instant pausedUntil;
+    private NutritionTarget currentTarget;
+    private int errorsInARow;
 
     /** Used by Spring. */
     @Autowired
@@ -88,6 +98,7 @@ public class NutritionWorker {
         if (pausedUntil != null && now.isBefore(pausedUntil)) {
             return;
         }
+        NutritionTarget target = null;
         try {
             OffsetDateTime startOfDay = now.atOffset(ZoneOffset.UTC).toLocalDate().atStartOfDay()
                     .atOffset(ZoneOffset.UTC);
@@ -99,14 +110,66 @@ public class NutritionWorker {
             if (next.isEmpty()) {
                 return;
             }
-            NutritionTarget target = next.get();
+            target = next.get();
+            if (!target.equals(currentTarget)) {
+                currentTarget = target;
+                errorsInARow = 0;
+            }
             String outcome = target.kind() == NutritionTarget.Kind.RECIPE ? estimateRecipe(target)
                     : estimateGenerated(target);
             log.info("nutrition estimate kind={} id={} outcome={}", target.kind(), target.id(), outcome);
         } catch (RuntimeException e) {
             pausedUntil = clock.instant().plus(PAUSE);
             log.warn("nutrition estimate paused for {} after {}", PAUSE, e.getClass().getSimpleName());
+            if (target != null && !(e instanceof AiQuotaExceededException)
+                    && !(e instanceof AiNotConfiguredException)) {
+                errorsInARow++;
+                if (errorsInARow >= MAX_ERRORS_IN_A_ROW) {
+                    giveUp(target);
+                }
+            }
         }
+    }
+
+    /** A recipe that keeps raising errors is stored as failed so it cannot block the queue for ever. */
+    private void giveUp(NutritionTarget target) {
+        try {
+            String outcome = target.kind() == NutritionTarget.Kind.RECIPE ? failRecipe(target)
+                    : failGenerated(target);
+            errorsInARow = 0;
+            log.info("nutrition estimate kind={} id={} outcome={}", target.kind(), target.id(), outcome);
+        } catch (RuntimeException e) {
+            log.warn("nutrition estimate could not be stored as failed after {}", e.getClass().getSimpleName());
+        }
+    }
+
+    private String failRecipe(NutritionTarget target) {
+        String[] result = new String[1];
+        transaction.executeWithoutResult(status -> {
+            if (recipes.findForReviewById(target.id()).isEmpty()) {
+                result[0] = "gone";
+                return;
+            }
+            String hash = NutritionLines.hash(NutritionLines.forRecipe(
+                    ingredients.findByRecipeIdOrderBySortOrderAsc(target.id())));
+            estimates.saveFailed(target, hash);
+            result[0] = "failed";
+        });
+        return result[0];
+    }
+
+    private String failGenerated(NutritionTarget target) {
+        Optional<GeneratedRecipe> found = generated.findById(target.id());
+        if (found.isEmpty()) {
+            return "gone";
+        }
+        String hash;
+        try {
+            hash = NutritionLines.hash(NutritionLines.forGenerated(mapper.read(found.get())));
+        } catch (RuntimeException e) {
+            hash = NutritionLines.hash(List.of());
+        }
+        return saveGenerated(target, null, hash);
     }
 
     private String estimateRecipe(NutritionTarget target) {
