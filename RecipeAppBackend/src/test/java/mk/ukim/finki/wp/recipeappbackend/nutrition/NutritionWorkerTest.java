@@ -365,4 +365,47 @@ class NutritionWorkerTest {
         worker.run();
         verify(repo, never()).saveFailed(any(), any());
     }
+
+    @Test
+    void anEditBetweenTheFifthAndSixthError_storesNothingAndStartsAFreshCount() {
+        failTimes(new AiUnavailableException("down"), 5);
+        when(ingredients.findByRecipeIdOrderBySortOrderAsc(ID)).thenReturn(NEW);
+        worker.run();
+        advance(PAUSE_STEP);
+        for (int i = 0; i < 4; i++) {
+            worker.run();
+            advance(PAUSE_STEP);
+        }
+        verify(repo, never()).saveFailed(any(), any());
+        worker.run();
+        verify(repo).saveFailed(RECIPE_TARGET, hashOf(NEW));
+    }
+
+    @Test
+    void editedDuringTheSixthAttempt_storesNothing() {
+        when(ingredients.findByRecipeIdOrderBySortOrderAsc(ID)).thenReturn(OLD, OLD, OLD, OLD, OLD, OLD, NEW);
+        failTimes(new AiUnavailableException("down"), 6);
+        verify(repo, never()).saveFailed(any(), any());
+    }
+
+    @Test
+    void deletedBeforeTheSixthErrorIsStored_storesNothingAndDoesNotThrow() {
+        failTimes(new AiUnavailableException("down"), 5);
+        when(recipes.findForReviewById(ID)).thenReturn(Optional.empty());
+        assertThatCode(worker::run).doesNotThrowAnyException();
+        verify(repo, never()).saveFailed(any(), any());
+    }
+
+    @Test
+    void aFailingGiveUpSave_isLoggedKeepsThePauseAndIsTriedAgainOnTheNextError() {
+        doThrow(new IllegalStateException("db down")).doNothing().when(repo).saveFailed(any(), any());
+        assertThatCode(() -> failTimes(new AiUnavailableException("down"), 6)).doesNotThrowAnyException();
+        verify(repo, times(1)).saveFailed(RECIPE_TARGET, hashOf(OLD));
+        advance(Duration.ofMinutes(-1));
+        worker.run();
+        verify(estimator, times(6)).estimate(any(), any(), any());
+        advance(Duration.ofMinutes(1));
+        worker.run();
+        verify(repo, times(2)).saveFailed(RECIPE_TARGET, hashOf(OLD));
+    }
 }

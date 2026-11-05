@@ -64,6 +64,10 @@ public class NutritionWorker {
 
     private volatile Instant pausedUntil;
     private NutritionTarget currentTarget;
+    /** The ingredient hash the current error count belongs to; an edit starts a fresh count. */
+    private String currentHash;
+    /** The hash read by the attempt in progress, null until the attempt has read the ingredients. */
+    private String attemptHash;
     private int errorsInARow;
 
     /** Used by Spring. */
@@ -99,6 +103,7 @@ public class NutritionWorker {
             return;
         }
         NutritionTarget target = null;
+        attemptHash = null;
         try {
             OffsetDateTime startOfDay = now.atOffset(ZoneOffset.UTC).toLocalDate().atStartOfDay()
                     .atOffset(ZoneOffset.UTC);
@@ -113,6 +118,7 @@ public class NutritionWorker {
             target = next.get();
             if (!target.equals(currentTarget)) {
                 currentTarget = target;
+                currentHash = null;
                 errorsInARow = 0;
             }
             String outcome = target.kind() == NutritionTarget.Kind.RECIPE ? estimateRecipe(target)
@@ -121,55 +127,51 @@ public class NutritionWorker {
         } catch (RuntimeException e) {
             pausedUntil = clock.instant().plus(PAUSE);
             log.warn("nutrition estimate paused for {} after {}", PAUSE, e.getClass().getSimpleName());
-            if (target != null && !(e instanceof AiQuotaExceededException)
+            String hash = attemptHash;
+            if (target != null && hash != null && !(e instanceof AiQuotaExceededException)
                     && !(e instanceof AiNotConfiguredException)) {
+                if (!hash.equals(currentHash)) {
+                    currentHash = hash;
+                    errorsInARow = 0;
+                }
                 errorsInARow++;
                 if (errorsInARow >= MAX_ERRORS_IN_A_ROW) {
-                    giveUp(target);
+                    giveUp(target, hash);
                 }
             }
         }
     }
 
     /** A recipe that keeps raising errors is stored as failed so it cannot block the queue for ever. */
-    private void giveUp(NutritionTarget target) {
+    private void giveUp(NutritionTarget target, String hash) {
         try {
-            String outcome = target.kind() == NutritionTarget.Kind.RECIPE ? failRecipe(target)
-                    : failGenerated(target);
+            String outcome = target.kind() == NutritionTarget.Kind.RECIPE ? failRecipe(target, hash)
+                    : saveGenerated(target, null, hash);
             errorsInARow = 0;
+            currentHash = null;
             log.info("nutrition estimate kind={} id={} outcome={}", target.kind(), target.id(), outcome);
         } catch (RuntimeException e) {
             log.warn("nutrition estimate could not be stored as failed after {}", e.getClass().getSimpleName());
         }
     }
 
-    private String failRecipe(NutritionTarget target) {
+    private String failRecipe(NutritionTarget target, String hash) {
         String[] result = new String[1];
         transaction.executeWithoutResult(status -> {
             if (recipes.findForReviewById(target.id()).isEmpty()) {
                 result[0] = "gone";
                 return;
             }
-            String hash = NutritionLines.hash(NutritionLines.forRecipe(
+            String current = NutritionLines.hash(NutritionLines.forRecipe(
                     ingredients.findByRecipeIdOrderBySortOrderAsc(target.id())));
+            if (!hash.equals(current)) {
+                result[0] = "stale";
+                return;
+            }
             estimates.saveFailed(target, hash);
             result[0] = "failed";
         });
         return result[0];
-    }
-
-    private String failGenerated(NutritionTarget target) {
-        Optional<GeneratedRecipe> found = generated.findById(target.id());
-        if (found.isEmpty()) {
-            return "gone";
-        }
-        String hash;
-        try {
-            hash = NutritionLines.hash(NutritionLines.forGenerated(mapper.read(found.get())));
-        } catch (RuntimeException e) {
-            hash = NutritionLines.hash(List.of());
-        }
-        return saveGenerated(target, null, hash);
     }
 
     private String estimateRecipe(NutritionTarget target) {
@@ -181,6 +183,7 @@ public class NutritionWorker {
         List<String> lines = NutritionLines.forRecipe(
                 ingredients.findByRecipeIdOrderBySortOrderAsc(target.id()));
         String hash = NutritionLines.hash(lines);
+        attemptHash = hash;
         NutritionEstimator.Outcome outcome = estimator.estimate(recipe.getTitle(), recipe.getServings(), lines);
         String[] result = new String[1];
         transaction.executeWithoutResult(status -> {
@@ -211,6 +214,7 @@ public class NutritionWorker {
         }
         List<String> lines = NutritionLines.forGenerated(stored);
         String hash = NutritionLines.hash(lines);
+        attemptHash = hash;
         NutritionEstimator.Outcome outcome = estimator.estimate(stored.title(), stored.servings(), lines);
         return saveGenerated(target, outcome, hash);
     }
