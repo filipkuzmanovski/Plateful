@@ -11,6 +11,7 @@ import { Button, Field, SectionHeading, Spinner, TextInput } from '@/components/
 import { SavedRecipesPanel } from '@/features/saved/SavedRecipesPanel';
 import { SavedAiRecipes } from '@/features/ai/SavedAiRecipes';
 import { PreferencesPanel } from '@/features/preferences/PreferencesPanel';
+import { CookbooksPanel } from '@/features/cookbooks/CookbooksPanel';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfileTabs } from './ProfileTabs';
 import { TwoFactorSettings } from './TwoFactorSettings';
@@ -101,6 +102,7 @@ export default function MyProfilePage() {
           </>
         }
         saved={<SavedRecipesPanel />}
+        cookbooks={<CookbooksPanel />}
         ai={<SavedAiRecipes />}
         preferences={<PreferencesPanel />}
         needsAttention={profile.rejectedCount}

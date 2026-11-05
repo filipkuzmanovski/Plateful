@@ -185,13 +185,13 @@ describe('profile tabs', () => {
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/));
   });
 
-  test('hasFourTabsInOrder', async () => {
+  test('hasFiveTabsInOrder', async () => {
     signedIn();
     fakeSavedServer([soup]);
     renderAt('/me');
 
     await screen.findByRole('tab', { name: 'My recipes' });
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['My recipes', 'Saved', 'AI recipes', 'Preferences']);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['My recipes', 'Saved', 'Cookbooks', 'AI recipes', 'Preferences']);
   });
 
   test('aiTabFollowsUrl', async () => {
@@ -228,16 +228,22 @@ describe('profile tabs', () => {
     signedIn();
     fakeSavedServer([soup]);
     stubPreferencesApi();
-    server.use(http.get(`${BASE}/api/users/me/ai-recipes`, () => HttpResponse.json(pageOf([]))));
+    server.use(
+      http.get(`${BASE}/api/users/me/ai-recipes`, () => HttpResponse.json(pageOf([]))),
+      http.get(`${BASE}/api/users/me/cookbooks`, () => HttpResponse.json([])),
+      http.get(`${BASE}/api/users/me/likes`, () => HttpResponse.json(pageOf([]))),
+    );
     renderAt('/me');
 
     const mineTab = await screen.findByRole('tab', { name: 'My recipes' });
     const savedTab = screen.getByRole('tab', { name: 'Saved' });
+    const cookbooksTab = screen.getByRole('tab', { name: 'Cookbooks' });
     const aiTab = screen.getByRole('tab', { name: 'AI recipes' });
     const prefsTab = screen.getByRole('tab', { name: 'Preferences' });
     // Roving tabindex: only the selected tab is in the page's tab order.
     expect(mineTab).toHaveAttribute('tabindex', '0');
     expect(savedTab).toHaveAttribute('tabindex', '-1');
+    expect(cookbooksTab).toHaveAttribute('tabindex', '-1');
     expect(aiTab).toHaveAttribute('tabindex', '-1');
     expect(prefsTab).toHaveAttribute('tabindex', '-1');
     const tabParam = () => new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('tab');
@@ -252,10 +258,17 @@ describe('profile tabs', () => {
     expect(tabParam()).toBe('saved');
 
     await userEvent.keyboard('{ArrowRight}');
+    expect(cookbooksTab).toHaveFocus();
+    expect(cookbooksTab).toHaveAttribute('aria-selected', 'true');
+    expect(cookbooksTab).toHaveAttribute('tabindex', '0');
+    expect(savedTab).toHaveAttribute('tabindex', '-1');
+    expect(tabParam()).toBe('cookbooks');
+
+    await userEvent.keyboard('{ArrowRight}');
     expect(aiTab).toHaveFocus();
     expect(aiTab).toHaveAttribute('aria-selected', 'true');
     expect(aiTab).toHaveAttribute('tabindex', '0');
-    expect(savedTab).toHaveAttribute('tabindex', '-1');
+    expect(cookbooksTab).toHaveAttribute('tabindex', '-1');
     expect(tabParam()).toBe('ai');
 
     await userEvent.keyboard('{ArrowRight}');
@@ -277,6 +290,10 @@ describe('profile tabs', () => {
     await userEvent.keyboard('{ArrowLeft}');
     expect(aiTab).toHaveFocus();
     expect(aiTab).toHaveAttribute('aria-selected', 'true');
+
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(cookbooksTab).toHaveFocus();
+    expect(cookbooksTab).toHaveAttribute('aria-selected', 'true');
 
     await userEvent.keyboard('{ArrowLeft}');
     expect(savedTab).toHaveFocus();

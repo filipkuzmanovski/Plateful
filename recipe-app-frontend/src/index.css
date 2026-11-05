@@ -28,6 +28,13 @@
   --color-on-danger: #fbfbf7;
   --color-scrim: rgb(38 48 34 / 0.4);
 
+  /* Cookbook covers, the same in both themes. Each cover colour reaches at least 6:1 with on-cover. */
+  --color-cover-1: #263022;
+  --color-cover-2: #7a3b2e;
+  --color-cover-3: #2f4a57;
+  --color-cover-4: #5a4a1f;
+  --color-on-cover: #f0d9a8;
+
   /* Only things that float get a shadow (menus, dialogs, the drawer, toasts). */
   --shadow-float: 0 1px 2px rgb(0 0 0 / 0.06), 0 12px 32px -8px rgb(0 0 0 / 0.22);
 

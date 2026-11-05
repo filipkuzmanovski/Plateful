@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 const TABS = [
   { key: 'mine', label: 'My recipes' },
   { key: 'saved', label: 'Saved' },
+  { key: 'cookbooks', label: 'Cookbooks' },
   { key: 'ai', label: 'AI recipes' },
   { key: 'preferences', label: 'Preferences' },
 ] as const;
@@ -14,19 +15,21 @@ const tabId = (key: TabKey) => `profile-tab-${key}`;
 const panelId = (key: TabKey) => `profile-panel-${key}`;
 
 /**
- * The "My recipes" / "Saved" / "AI recipes" / "Preferences" tabs on the user's own profile. The selected tab lives in the URL
- * (`?tab=saved`, `?tab=ai` or `?tab=preferences`; anything else is "My recipes"). Arrow keys move focus and select (automatic activation).
- * Only the selected panel's content is rendered, so the Saved and AI recipes lists and preferences are not fetched until opened.
+ * The "My recipes" / "Saved" / "Cookbooks" / "AI recipes" / "Preferences" tabs on the user's own profile. The selected tab lives in the URL
+ * (`?tab=saved`, `?tab=cookbooks`, `?tab=ai` or `?tab=preferences`; anything else is "My recipes"). Arrow keys move focus and select (automatic activation).
+ * Only the selected panel's content is rendered, so the Saved, Cookbooks and AI recipes lists and preferences are not fetched until opened.
  */
 export function ProfileTabs({
   mine,
   saved,
+  cookbooks,
   ai,
   preferences,
   needsAttention = 0,
 }: {
   mine: ReactNode;
   saved: ReactNode;
+  cookbooks: ReactNode;
   ai: ReactNode;
   preferences: ReactNode;
   /** Rejected recipes the author should look at; shown in the "My recipes" label when above 0. */
@@ -35,7 +38,7 @@ export function ProfileTabs({
   const [params, setParams] = useSearchParams();
   const tabParam = params.get('tab');
   const selected: TabKey = TABS.find((t) => t.key === tabParam)?.key ?? 'mine';
-  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ mine: null, saved: null, ai: null, preferences: null });
+  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ mine: null, saved: null, cookbooks: null, ai: null, preferences: null });
 
   function select(key: TabKey) {
     const next = new URLSearchParams(params);
@@ -61,7 +64,7 @@ export function ProfileTabs({
     tabRefs.current[key]?.focus();
   }
 
-  const content: Record<TabKey, ReactNode> = { mine, saved, ai, preferences };
+  const content: Record<TabKey, ReactNode> = { mine, saved, cookbooks, ai, preferences };
 
   return (
     <div className="mt-10">

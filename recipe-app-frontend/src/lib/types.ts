@@ -51,6 +51,12 @@ export type SavedItem =
   | { kind: 'recipe'; recipe: RecipeDisplay; stub: null }
   | { kind: 'stub'; recipe: null; stub: { id: string; approvedTitle: string; state: HiddenState } };
 
+export interface CookbookSummary { id: string; volume: number; subtitle: string | null; createdAt: string; recipeCount: number; }
+export interface Cookbook {
+  id: string; volume: number; subtitle: string | null; createdAt: string;
+  ownerFirstName: string; ownerLastName: string; chapters: SavedItem[];
+}
+
 export interface Page<T> { content: T[]; page: { size: number; number: number; totalElements: number; totalPages: number }; }
 
 export interface RecipeFilter {
