@@ -5584,3 +5584,150 @@ Your manual steps
   3. Like five recipes, create a cookbook, read it, then delete it.
   4. Open Print on a cookbook, in dark mode too. Check that each page starts a
      new sheet, in light colours, and that the cover keeps its colour.
+
+
+################################################################################
+################################################################################
+ PART 23 — AI CALORIE ESTIMATES
+ Branch: claude/silly-bohr-1817bf
+################################################################################
+################################################################################
+
+Why this exists
+---------------
+Uploaded recipes and private AI recipes now show calories, protein, fat and
+carbs per serving, labelled as an AI estimate. Imported recipes keep their own
+values and look the same as before. This is sub-project 2 of 3. The preference
+cookbook comes next, and its recipes will get estimates without further work.
+Spec: docs/superpowers/specs/2026-11-05-calorie-estimates-design.md
+Plan: docs/superpowers/plans/2026-11-05-calorie-estimates.md
+
+The decisions you made
+----------------------
+  - Nobody waits. A background job adds the numbers shortly after a recipe is
+    saved. Uploaded recipes are estimated only once an admin approves them, so
+    spam and rejected recipes can never spend AI tokens.
+  - Editing the title, photos or steps keeps the estimate. Changing servings
+    recalculates it with no AI call. Changing ingredients removes the number at
+    once, and it is estimated again after re-approval.
+  - Servings is now required, 1 or more, in the form and on the server. An older
+    recipe without servings shows nothing until its author edits it. The AI
+    never guesses servings.
+  - Estimates never use a person's 10 daily generations. The whole app does at
+    most 40 a day, about 70,000 of Groq's 200,000 daily tokens.
+  - Estimates live in their own table, so imported values can never be mixed up
+    with AI numbers.
+
+How an estimate is made
+-----------------------
+  1. Every 30 seconds the job picks the newest recipe with no estimate: approved
+     uploads with servings, and AI recipes that are saved or under a day old.
+  2. It sends the title, servings and numbered ingredient lines to Groq, and
+     only Groq, so Gemini's small allowance stays free for generating recipes.
+  3. The AI gives grams, calories, protein, fat and carbs for each line, for the
+     whole recipe. Our code adds them up and checks them. The AI never divides.
+  4. An answer that fails is asked once more, with the reason. If it fails again
+     the recipe is marked failed and shows nothing.
+  5. Calories per serving are worked out when the page loads, rounded to the
+     nearest 10, with macros to the nearest gram.
+
+The checks
+----------
+  - Every line is answered exactly once, and no number is negative.
+  - Protein, fat and carbs can't weigh more than the ingredient.
+  - No more than 900 kcal per 100 g.
+  - Recipe calories match the 4/4/9 macro sum within 20% or 50 kcal.
+  - Per serving: 1 to 3,000 kcal and at most 3 kg of food.
+
+How accurate it is
+------------------
+Compared with the stored values of 30 imported recipes, one from each band of
+the calorie range. Those values are calculated by Spoonacular, not measured, so
+this shows agreement, not truth.
+
+                               First test     Final version    Smaller model
+                               main model     main model       first test
+  Typical calorie miss         7%             9%               18%
+  Within 20% of stored value   22 of 29       23 of 30         16 of 29
+  Within 30% of stored value   26 of 29       27 of 30         22 of 29
+  Typical protein miss         1.7 g          2.0 g            3.6 g
+  Typical fat miss             1.5 g          1.4 g            1.8 g
+  Typical carbs miss           1.8 g          2.7 g            7.6 g
+  Passed the checks            29 of 29       30 of 30         29 of 30
+
+The final run passed the bar in the spec (10% or less, at least 20 of 30 within
+20%), all 30 on the first try. Asking 5 recipes a second time gave a median
+difference of 0%. It used 61,933 tokens, and the first test about 93,500.
+
+What it can't do: real misses remain that no check can catch, such as a pork
+recipe at 499 kcal against 705 stored. That is why the number says "about" and
+carries the label. The largest miss was a black bean soup at 429 against 190,
+where the stored value looks wrong: a pound of dry beans over 6 servings is
+already about 258 kcal.
+
+What you see
+------------
+  - Uploaded and AI recipes: "AI estimate, per serving", then "about 450 kcal",
+    "28 g protein", "18 g fat" and "42 g carbs".
+  - While waiting: "Working out calories...". The page looks again every 10
+    seconds for up to 2 minutes, then the line goes away.
+  - Nothing shows if the estimate failed, the recipe has no servings or it is
+    waiting for review. Cards, cookbooks and sorting don't use estimates.
+  - The Privacy page now says what is sent to Groq for this, and has a new date.
+
+Decisions I took along the way
+------------------------------
+  - A recipe Groq keeps refusing (HTTP 400, 413, 422 or an empty reply) is marked
+    failed after 6 tries, so it can't block the job for ever. Outages, timeouts
+    and bad keys never count, so they can't fail a recipe. Find these rows with
+    "failed-after-errors" in the log.
+  - Totals too big for the database column count as failed, so one absurd recipe
+    can't stop the job.
+  - A number out of range after a servings edit shows nothing.
+  - If a look at the server fails briefly, the recipe stays on screen. Before,
+    one failed look would have replaced it with an error message. A real "not
+    found" still leaves the page.
+  - The form no longer uses the browser's own number check, so "Enter 1 or more
+    servings" can show. A half-typed number in a time field now saves as empty.
+
+Checks done
+-----------
+  - Backend 1206 tests and frontend 890 tests pass. Build and lint are clean,
+    apart from warnings that were already there.
+  - Browser check with made-up data, since deleted: estimate, waiting line
+    turning into the number, nothing shown, imported recipe, AI recipe and the
+    form error, in light and dark, on desktop and phone width.
+
+Not checked yet
+---------------
+  - The new table and its queries have never run on real Postgres. V13 only goes
+    live when you restart the backend after merging, and the database tests skip
+    until then. The job also starts for the first time at that restart.
+  - Live estimates from the running app. The accuracy tests used a separate
+    script with the same prompt and checks.
+  - How the 8,000 tokens a minute hold up with estimates and recipe generation
+    running together. Watch for outcome=quota in the logs.
+
+Deferred
+--------
+  - Two database tests are weaker than they look: the shared connection test and
+    the created_at fallback test.
+  - The 100 entry limit and the empty reply mapping have thin unit tests.
+  - Groq refusing and Gemini then answering 429 gives the wrong error type, with
+    no effect you can see today.
+  - No on/off setting for the job. plateful.ai.nutrition-order=none turns it off.
+  - Very long recipes (30 to 40 lines) were not measured.
+  - The Privacy page's Groq bullet says "the data sent for AI recipes (see
+    below)". Uploaded recipes are named in the sentence below it. Reword it if
+    you prefer.
+
+Your manual steps
+-----------------
+  1. Merge, then restart the backend so V13 runs.
+  2. Right after the restart, generate an AI recipe and watch the number appear.
+     If many saved recipes are waiting, the 40 a day can run out in 20 minutes
+     and later numbers wait until the next UTC day.
+  3. Run NutritionEstimateRepositoryDbTest with the database password set, and
+     check that nothing is skipped. A skipped test means V13 is not live.
+  4. Approve an upload and check that it gets a number. Edit its ingredients and
+     check that the number goes away until re-approval.
