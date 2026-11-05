@@ -48,6 +48,9 @@ class NutritionEstimateRepositoryDbTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private RecipeRepository recipes;
+
     // Built by hand instead of @Import-ed: an @Import changes the Spring test-context cache key, and a
     // second cached context opens a second Hikari pool, which exhausts the Supabase session limit.
     private NutritionEstimateRepository repository;
@@ -70,10 +73,15 @@ class NutritionEstimateRepositoryDbTest {
     }
 
     private UUID newRecipe(String source, String status, Integer servings, OffsetDateTime reviewedAt) {
+        return newRecipe(source, status, servings, reviewedAt, reviewedAt);
+    }
+
+    private UUID newRecipe(String source, String status, Integer servings, OffsetDateTime reviewedAt,
+                           OffsetDateTime createdAt) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO recipes (id, user_id, source, title, servings, status, reviewed_at, created_at) "
                         + "VALUES (?, NULL, ?, 'Nutrition fixture', ?, ?, ?, ?)",
-                id, source, servings, status, reviewedAt, reviewedAt);
+                id, source, servings, status, reviewedAt, createdAt);
         return id;
     }
 
@@ -236,6 +244,67 @@ class NutritionEstimateRepositoryDbTest {
 
         assertThatThrownBy(() -> jdbc.update("INSERT INTO nutrition_estimates (recipe_id, status, calories, "
                 + "ingredients_hash) VALUES (?, 'ready', NULL, 'h')", upload))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void next_fallsBackToCreatedAt_whenAnApprovedUploadWasNeverReviewed() {
+        newUpload(Y2099_01);
+        UUID unreviewed = newRecipe("user", "approved", 4, null, Y2099_02);
+
+        assertThat(repository.next(SINCE_2098)).contains(recipe(unreviewed));
+    }
+
+    @Test
+    void saveFailed_thenForRecipe_isFailedWithNoNumbers() {
+        UUID upload = newUpload(Y2099_01);
+
+        repository.saveFailed(recipe(upload), "h");
+
+        var row = repository.forRecipe(upload).orElseThrow();
+        assertThat(row.status()).isEqualTo("failed");
+        assertThat(row.calories()).isNull();
+        assertThat(row.proteinGrams()).isNull();
+        assertThat(row.fatGrams()).isNull();
+        assertThat(row.carbsGrams()).isNull();
+        assertThat(row.ingredientsHash()).isEqualTo("h");
+    }
+
+    @Test
+    void saveReady_storesTheBreakdownProviderAndModel() {
+        UUID upload = newUpload(Y2099_01);
+
+        repository.saveReady(recipe(upload), new NutritionTotals(900, 50, 30, 100),
+                "[{\"line\":1,\"kcal\":900}]", "h", "groq", "openai/gpt-oss-120b");
+
+        assertThat(jdbc.queryForObject("SELECT provider FROM nutrition_estimates WHERE recipe_id = ?",
+                String.class, upload)).isEqualTo("groq");
+        assertThat(jdbc.queryForObject("SELECT model FROM nutrition_estimates WHERE recipe_id = ?",
+                String.class, upload)).isEqualTo("openai/gpt-oss-120b");
+        assertThat(jdbc.queryForObject("SELECT breakdown -> 0 ->> 'line' FROM nutrition_estimates "
+                + "WHERE recipe_id = ?", String.class, upload)).isEqualTo("1");
+        assertThat(jdbc.queryForObject("SELECT breakdown -> 0 ->> 'kcal' FROM nutrition_estimates "
+                + "WHERE recipe_id = ?", String.class, upload)).isEqualTo("900");
+    }
+
+    @Test
+    void jpaAndJdbcShareOneConnection_soTheWorkersLockedSaveDoesNotHang() {
+        UUID upload = newUpload(Y2099_01);
+
+        // the row was inserted through JDBC and is not committed: JPA finds it only on the same connection
+        assertThat(recipes.findForReviewById(upload)).isPresent();
+
+        // a mistake below fails after 3 s instead of hanging on a lock held by this very transaction
+        jdbc.execute("SET LOCAL lock_timeout = '3s'");
+        repository.saveReady(recipe(upload), new NutritionTotals(900, 50, 30, 100), "[]", "h", "groq", "m");
+
+        assertThat(repository.forRecipe(upload)).isPresent();
+    }
+
+    // Keep this last: a violation aborts the Postgres transaction.
+    @Test
+    void saveFailed_forAnOwnerThatDoesNotExist_isRejected() {
+        assertThatThrownBy(() -> repository.saveFailed(recipe(UUID.randomUUID()), "h"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

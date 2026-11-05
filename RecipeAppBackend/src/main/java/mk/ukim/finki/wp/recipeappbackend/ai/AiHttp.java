@@ -109,7 +109,8 @@ final class AiHttp {
 
     /**
      * Returns normally for 2xx. HTTP 429 is always quota; so is a {@code RESOURCE_EXHAUSTED} error
-     * status when {@code bodyCanSignalQuota}. Every other failure is "unavailable".
+     * status when {@code bodyCanSignalQuota}. HTTP 400, 413 and 422 are
+     * {@link AiRequestRejectedException}. Every other failure is "unavailable".
      */
     static void requireSuccess(String provider, Response response, boolean bodyCanSignalQuota) {
         int status = response.status();
@@ -119,6 +120,9 @@ final class AiHttp {
         String message = provider + " HTTP " + status;
         if (status == 429 || (bodyCanSignalQuota && isResourceExhausted(response.body()))) {
             throw new AiQuotaExceededException(message, retryAfter(response.retryAfter()));
+        }
+        if (status == 400 || status == 413 || status == 422) {
+            throw new AiRequestRejectedException(message);
         }
         throw new AiUnavailableException(message);
     }

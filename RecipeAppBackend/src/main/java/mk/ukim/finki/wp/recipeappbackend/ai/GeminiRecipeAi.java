@@ -83,7 +83,7 @@ public class GeminiRecipeAi implements RecipeAi {
             }
         }
         if (text.toString().isBlank()) {
-            throw new AiUnavailableException(NAME + " empty reply");
+            throw new AiRequestRejectedException(NAME + " empty reply");
         }
         JsonNode usage = root.path("usageMetadata");
         Integer candidates = AiHttp.intOrNull(usage.get("candidatesTokenCount"));

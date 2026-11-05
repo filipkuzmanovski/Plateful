@@ -1,9 +1,11 @@
 package mk.ukim.finki.wp.recipeappbackend.nutrition;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -26,6 +28,7 @@ import java.util.stream.Stream;
 import mk.ukim.finki.wp.recipeappbackend.ai.AiNotConfiguredException;
 import mk.ukim.finki.wp.recipeappbackend.ai.AiProperties;
 import mk.ukim.finki.wp.recipeappbackend.ai.AiQuotaExceededException;
+import mk.ukim.finki.wp.recipeappbackend.ai.AiRequestRejectedException;
 import mk.ukim.finki.wp.recipeappbackend.ai.AiUnavailableException;
 import mk.ukim.finki.wp.recipeappbackend.generation.GeneratedRecipeMapper;
 import mk.ukim.finki.wp.recipeappbackend.generation.StoredRecipe;
@@ -240,6 +243,7 @@ class NutritionWorkerTest {
         return Stream.of(
                 Arguments.of(new AiQuotaExceededException("busy")),
                 Arguments.of(new AiUnavailableException("down")),
+                Arguments.of(new AiRequestRejectedException("groq HTTP 400")),
                 Arguments.of(new AiNotConfiguredException("none")),
                 Arguments.of(new IllegalStateException("boom")));
     }
@@ -306,7 +310,7 @@ class NutritionWorkerTest {
     private static final Duration PAUSE_STEP = Duration.ofMinutes(5);
 
     private void failTimes(RuntimeException error, int times) {
-        when(estimator.estimate(any(), any(), any())).thenThrow(error);
+        doThrow(error).when(estimator).estimate(any(), any(), any());
         for (int i = 0; i < times; i++) {
             worker.run();
             advance(PAUSE_STEP);
@@ -315,7 +319,7 @@ class NutritionWorkerTest {
 
     @Test
     void sixConsecutiveErrorsOnOneRecipe_storeItAsFailed() {
-        failTimes(new AiUnavailableException("down"), 5);
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 5);
         verify(repo, never()).saveFailed(any(), any());
         worker.run();
         verify(repo).saveFailed(RECIPE_TARGET, hashOf(OLD));
@@ -324,13 +328,13 @@ class NutritionWorkerTest {
     @Test
     void sixthErrorOnAGeneratedRecipe_storesItAsFailed() {
         generatedTarget();
-        failTimes(new AiUnavailableException("down"), 6);
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 6);
         verify(repo).saveFailed(GENERATED_TARGET, NutritionLines.hash(List.of("rice | 1 cup")));
     }
 
     @Test
     void afterTheSixthError_stillWaitsFiveMinutes() {
-        failTimes(new AiUnavailableException("down"), 6);
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 6);
         verify(estimator, times(6)).estimate(any(), any(), any());
         advance(Duration.ofMinutes(-1));
         worker.run();
@@ -353,22 +357,169 @@ class NutritionWorkerTest {
     }
 
     @Test
-    void aDifferentTargetResetsTheCount() {
+    void anotherRecipeComingInBetween_doesNotResetTheCount() {
         NutritionTarget other = new NutritionTarget(NutritionTarget.Kind.RECIPE,
                 UUID.fromString("22222222-2222-2222-2222-222222222222"));
-        failTimes(new AiUnavailableException("down"), 5);
-        when(recipes.findById(other.id())).thenReturn(Optional.of(Recipe.builder().id(other.id()).title("Soup").servings(4).build()));
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 5);
+        when(recipes.findById(other.id()))
+                .thenReturn(Optional.of(Recipe.builder().id(other.id()).title("Soup").servings(4).build()));
         when(repo.next(any())).thenReturn(Optional.of(other));
         worker.run();
         advance(PAUSE_STEP);
+        verify(repo, never()).saveFailed(any(), any());
         when(repo.next(any())).thenReturn(Optional.of(RECIPE_TARGET));
+        worker.run();
+        verify(repo).saveFailed(RECIPE_TARGET, hashOf(OLD));
+        verify(repo, never()).saveFailed(eq(other), any());
+    }
+
+    @Test
+    void tenPlainUnavailableErrors_neverStoreAFailedRow() {
+        failTimes(new AiUnavailableException("groq HTTP 503"), 10);
+        verify(estimator, times(10)).estimate(any(), any(), any());
+        verify(repo, never()).saveFailed(any(), any());
+    }
+
+    @Test
+    void unavailableErrorsBetweenRejections_leaveTheCountUnchanged() {
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 5);
+        failTimes(new AiUnavailableException("groq HTTP 503"), 3);
+        verify(repo, never()).saveFailed(any(), any());
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 1);
+        verify(repo).saveFailed(RECIPE_TARGET, hashOf(OLD));
+    }
+
+    @Test
+    void sixRejectedErrors_storeTheRecipeWithTheRightHash() {
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 6);
+        verify(repo).saveFailed(RECIPE_TARGET, hashOf(OLD));
+    }
+
+    @Test
+    void aNonAiErrorAfterTheHashIsKnown_counts() {
+        failTimes(new IllegalStateException("boom"), 6);
+        verify(repo).saveFailed(RECIPE_TARGET, hashOf(OLD));
+    }
+
+    @Test
+    void aNonAiErrorBeforeTheHashIsKnown_doesNotCount() {
+        when(recipes.findById(ID)).thenThrow(new IllegalStateException("db"));
+        for (int i = 0; i < 8; i++) {
+            worker.run();
+            advance(PAUSE_STEP);
+        }
+        verify(repo, never()).saveFailed(any(), any());
+    }
+
+    private List<String> logMessagesDuring(Runnable action) {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(NutritionWorker.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+                new ch.qos.logback.core.read.ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            action.run();
+        } finally {
+            logger.detachAppender(appender);
+        }
+        return appender.list.stream().map(e -> e.getFormattedMessage()).toList();
+    }
+
+    @Test
+    void giveUpIsLoggedAsFailedAfterErrors() {
+        List<String> messages = logMessagesDuring(
+                () -> failTimes(new AiRequestRejectedException("groq HTTP 400"), 6));
+        assertThat(messages).anyMatch(m -> m.contains("outcome=failed-after-errors"));
+    }
+
+    @Test
+    void atMost100CountsAreKept_theOldestIsDropped() {
+        UUID[] ids = new UUID[101];
+        for (int i = 0; i < ids.length; i++) {
+            ids[i] = new UUID(0, i + 1000L);
+            Recipe r = Recipe.builder().id(ids[i]).title("Soup").servings(4).build();
+            when(recipes.findById(ids[i])).thenReturn(Optional.of(r));
+            when(ingredients.findByRecipeIdOrderBySortOrderAsc(ids[i])).thenReturn(OLD);
+        }
+        when(estimator.estimate(any(), any(), any())).thenThrow(new AiRequestRejectedException("groq HTTP 400"));
+        for (int round = 0; round < 5; round++) {
+            runFor(new NutritionTarget(NutritionTarget.Kind.RECIPE, ids[0]));
+        }
+        for (int i = 1; i <= 100; i++) {
+            runFor(new NutritionTarget(NutritionTarget.Kind.RECIPE, ids[i]));
+        }
+        runFor(new NutritionTarget(NutritionTarget.Kind.RECIPE, ids[0]));
+        verify(repo, never()).saveFailed(any(), any());
+    }
+
+    private void runFor(NutritionTarget target) {
+        when(repo.next(any())).thenReturn(Optional.of(target));
+        worker.run();
+        advance(PAUSE_STEP);
+    }
+
+    @Test
+    void aRecipeThatGetsARow_forgetsItsCount() {
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 5);
+        doReturn(new NutritionEstimator.Ready(TOTALS, ITEMS, "groq", "m")).when(estimator)
+                .estimate(any(), any(), any());
+        worker.run();
+        advance(PAUSE_STEP);
+        doThrow(new AiRequestRejectedException("groq HTTP 400")).when(estimator).estimate(any(), any(), any());
         worker.run();
         verify(repo, never()).saveFailed(any(), any());
     }
 
     @Test
+    void aGeneratedRecipeThatIsStillThereAfterAnIntegrityError_isRethrownAndPauses() {
+        generatedTarget();
+        when(generated.existsById(ID)).thenReturn(true);
+        doThrow(new DataIntegrityViolationException("check")).when(repo)
+                .saveReady(any(), any(), any(), any(), any(), any());
+        worker.run();
+        worker.run();
+        verify(repo, times(1)).next(any());
+        advance(PAUSE_STEP);
+        worker.run();
+        verify(repo, times(2)).next(any());
+    }
+
+    @Test
+    void aGeneratedRecipeThatIsGoneAfterAnIntegrityError_isGone() {
+        generatedTarget();
+        when(generated.existsById(ID)).thenReturn(false);
+        doThrow(new DataIntegrityViolationException("fk")).when(repo)
+                .saveReady(any(), any(), any(), any(), any(), any());
+        worker.run();
+        worker.run();
+        verify(repo, times(2)).next(any());
+    }
+
+    @Test
+    void anAiDocumentWithANullIngredient_isMarkedFailedLikeAnUnreadableOne() {
+        GeneratedRecipe row = GeneratedRecipe.builder().id(ID).build();
+        when(repo.next(any())).thenReturn(Optional.of(GENERATED_TARGET));
+        when(generated.findById(ID)).thenReturn(Optional.of(row));
+        List<StoredRecipe.StoredIngredient> withNull = new java.util.ArrayList<>();
+        withNull.add(null);
+        when(mapper.read(row)).thenReturn(new StoredRecipe("Soup", null, 4, 0, 0, null, withNull,
+                List.of(), null, List.of(), null));
+        worker.run();
+        verify(repo).saveFailed(eq(GENERATED_TARGET), eq(NutritionLines.hash(List.of())));
+        verifyNoInteractions(estimator);
+    }
+
+    @Test
+    void aFailedOutcome_logsItsReason() {
+        when(estimator.estimate(any(), any(), any())).thenReturn(new NutritionEstimator.Failed("totals off"));
+        List<String> messages = logMessagesDuring(worker::run);
+        assertThat(messages).anyMatch(m -> m.contains("totals off"));
+    }
+
+    @Test
     void anEditBetweenTheFifthAndSixthError_storesNothingAndStartsAFreshCount() {
-        failTimes(new AiUnavailableException("down"), 5);
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 5);
         when(ingredients.findByRecipeIdOrderBySortOrderAsc(ID)).thenReturn(NEW);
         worker.run();
         advance(PAUSE_STEP);
@@ -384,13 +535,13 @@ class NutritionWorkerTest {
     @Test
     void editedDuringTheSixthAttempt_storesNothing() {
         when(ingredients.findByRecipeIdOrderBySortOrderAsc(ID)).thenReturn(OLD, OLD, OLD, OLD, OLD, OLD, NEW);
-        failTimes(new AiUnavailableException("down"), 6);
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 6);
         verify(repo, never()).saveFailed(any(), any());
     }
 
     @Test
     void deletedBeforeTheSixthErrorIsStored_storesNothingAndDoesNotThrow() {
-        failTimes(new AiUnavailableException("down"), 5);
+        failTimes(new AiRequestRejectedException("groq HTTP 400"), 5);
         when(recipes.findForReviewById(ID)).thenReturn(Optional.empty());
         assertThatCode(worker::run).doesNotThrowAnyException();
         verify(repo, never()).saveFailed(any(), any());
@@ -399,7 +550,7 @@ class NutritionWorkerTest {
     @Test
     void aFailingGiveUpSave_isLoggedKeepsThePauseAndIsTriedAgainOnTheNextError() {
         doThrow(new IllegalStateException("db down")).doNothing().when(repo).saveFailed(any(), any());
-        assertThatCode(() -> failTimes(new AiUnavailableException("down"), 6)).doesNotThrowAnyException();
+        assertThatCode(() -> failTimes(new AiRequestRejectedException("groq HTTP 400"), 6)).doesNotThrowAnyException();
         verify(repo, times(1)).saveFailed(RECIPE_TARGET, hashOf(OLD));
         advance(Duration.ofMinutes(-1));
         worker.run();

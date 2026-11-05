@@ -144,7 +144,7 @@ public class GroqRecipeAi implements RecipeAi {
         JsonNode root = AiHttp.parse(NAME, response.body());
         JsonNode content = root.path("choices").path(0).path("message").path("content");
         if (!content.isString() || content.asString().isBlank()) {
-            throw new AiUnavailableException(NAME + " empty reply");
+            throw new AiRequestRejectedException(NAME + " empty reply");
         }
         JsonNode usage = root.path("usage");
         return new AiReply(content.asString(), NAME, usedModel,

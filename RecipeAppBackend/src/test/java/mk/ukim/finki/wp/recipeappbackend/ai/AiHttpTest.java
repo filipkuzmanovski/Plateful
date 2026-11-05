@@ -7,6 +7,7 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class AiHttpTest {
 
@@ -51,9 +52,25 @@ class AiHttpTest {
     }
 
     @Test
-    void status413_isUnavailable_evenWithARetryAfter() {
+    void status413_isRejected_evenWithARetryAfter() {
         assertThatThrownBy(() -> AiHttp.requireSuccess("groq", new AiHttp.Response(413, "", "5"), true))
-                .isInstanceOf(AiUnavailableException.class)
+                .isInstanceOf(AiRequestRejectedException.class)
                 .hasMessage("groq HTTP 413");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {400, 413, 422})
+    void requestRefusals_areRejected(int status) {
+        assertThatThrownBy(() -> AiHttp.requireSuccess("groq", new AiHttp.Response(status, ""), true))
+                .isInstanceOf(AiRequestRejectedException.class)
+                .hasMessage("groq HTTP " + status);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {401, 403, 404, 500, 503})
+    void otherFailures_areMerelyUnavailable(int status) {
+        assertThatThrownBy(() -> AiHttp.requireSuccess("groq", new AiHttp.Response(status, ""), true))
+                .isInstanceOf(AiUnavailableException.class)
+                .isNotInstanceOf(AiRequestRejectedException.class);
     }
 }

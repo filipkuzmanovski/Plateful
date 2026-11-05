@@ -146,7 +146,26 @@ describe('Privacy Policy', () => {
   test('privacy page says calorie estimates go to Groq only', async () => {
     renderApp('/privacy');
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
-    expect(screen.getByText(/to estimate calories, and never to Google for this/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'The titles, servings and ingredient lists of AI recipes and of approved uploaded recipes are also sent to Groq to estimate calories, and never to Google for this.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test('groq entry says it estimates calories for AI and approved uploaded recipes', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const processors = document.getElementById('who-processes-your-data')!;
+    const groq = within(processors)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent ?? '')
+      .find((t) => t.startsWith('Groq'))!;
+    expect(groq).toContain('estimates the calories of AI recipes and of approved uploaded recipes');
+  });
+
+  test('the policy date was bumped for the calorie estimates', () => {
+    expect(SITE.legalLastUpdated).toBe('5 November 2026');
   });
 
   test('shows the last-updated date from SITE', async () => {

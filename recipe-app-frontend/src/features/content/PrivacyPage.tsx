@@ -111,8 +111,9 @@ export default function PrivacyPage() {
                   servers are in the EU, in Stockholm, Sweden.
                 </li>
                 <li>
-                  <Strong>Groq</Strong> writes AI recipes, reads the photos you scan for ingredients and reads the
-                  screenshots of posts you turn into recipes. It processes the data sent for AI recipes (see below)
+                  <Strong>Groq</Strong> writes AI recipes, reads the photos you scan for ingredients, reads the
+                  screenshots of posts you turn into recipes and estimates the calories of AI recipes and of approved
+                  uploaded recipes from their titles, servings and ingredient lists. It processes the data sent for AI recipes (see below)
                   outside the EU.
                 </li>
                 <li>
@@ -149,8 +150,8 @@ export default function PrivacyPage() {
                 account.
               </p>
               <p>
-                The ingredient lists of AI recipes and of approved uploaded recipes are also sent to Groq to estimate
-                calories, and never to Google for this.
+                The titles, servings and ingredient lists of AI recipes and of approved uploaded recipes are also sent
+                to Groq to estimate calories, and never to Google for this.
               </p>
               <p>
                 The free tier of Google Gemini may use what is sent to improve Google's products, and human reviewers

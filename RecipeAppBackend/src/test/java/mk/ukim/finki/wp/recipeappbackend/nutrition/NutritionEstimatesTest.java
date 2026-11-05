@@ -23,6 +23,7 @@ import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeIngredient;
 import mk.ukim.finki.wp.recipeappbackend.repository.NutritionEstimateRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -113,6 +114,14 @@ class NutritionEstimatesTest {
         when(repo.forRecipe(ID)).thenReturn(Optional.of(stored("ready", 1800, 112, 72, 168)));
 
         assertThat(estimates.forRecipe(upload(status, 4))).isEqualTo(NutritionEstimateDto.none());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1, ready", "0.9, none", "3000, ready", "3000.1, none"})
+    void perServingCaloriesOutsideOneTo3000_areNone(double kcalPerServing, String status) {
+        when(repo.forRecipe(ID)).thenReturn(Optional.of(stored("ready", kcalPerServing * 4, 10, 10, 10)));
+
+        assertThat(estimates.forRecipe(upload(RecipeStatus.APPROVED, 4)).status()).isEqualTo(status);
     }
 
     @ParameterizedTest

@@ -12,7 +12,8 @@ import org.slf4j.LoggerFactory;
  * Tries the active providers in order. After a quota answer a provider is skipped for the
  * {@link AiQuotaExceededException#retryAfter()} it carries: the provider's {@code Retry-After} (1 to 300 s)
  * or 60 s. Every provider quota-limited or cooling down gives
- * {@link AiQuotaExceededException}; any other mix of failures gives {@link AiUnavailableException};
+ * {@link AiQuotaExceededException}; any other mix of failures gives {@link AiUnavailableException}, except that if every provider actually
+ * tried rejected the request the result is {@link AiRequestRejectedException} (a subclass);
  * no provider at all gives {@link AiNotConfiguredException}.
  *
  * <p>Logs one INFO line per provider call and never the prompt, the reply or a key. A failed call's line
@@ -42,6 +43,7 @@ public class FallbackRecipeAi implements RecipeAi {
             throw new AiNotConfiguredException("no AI provider has an API key configured");
         }
         boolean unavailable = false;
+        boolean allRejected = true;
         for (NamedRecipeAi provider : providers) {
             Instant until = cooldownUntil.get(provider.name());
             if (until != null && clock.instant().isBefore(until)) {
@@ -58,8 +60,12 @@ public class FallbackRecipeAi implements RecipeAi {
                 logFailure(provider, "quota", started, e, request.images().size());
             } catch (RuntimeException e) {
                 unavailable = true;
+                allRejected &= e instanceof AiRequestRejectedException;
                 logFailure(provider, "unavailable", started, e, request.images().size());
             }
+        }
+        if (unavailable && allRejected) {
+            throw new AiRequestRejectedException("every AI provider that was tried rejected the request");
         }
         if (unavailable) {
             throw new AiUnavailableException("no AI provider could answer");

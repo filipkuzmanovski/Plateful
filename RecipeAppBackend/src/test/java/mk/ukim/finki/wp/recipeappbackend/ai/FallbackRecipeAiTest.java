@@ -116,6 +116,36 @@ class FallbackRecipeAiTest {
     }
 
     @Test
+    void oneRejectingProvider_throwsRejected() {
+        FallbackRecipeAi ai = new FallbackRecipeAi(
+                List.of(named("groq", new Fake().failing(new AiRequestRejectedException("groq HTTP 400")))), clock);
+
+        assertThatThrownBy(() -> ai.complete(REQUEST)).isInstanceOf(AiRequestRejectedException.class);
+    }
+
+    @Test
+    void rejectingThenSucceeding_returnsTheReply() {
+        Fake first = new Fake().failing(new AiRequestRejectedException("groq HTTP 400"));
+        Fake second = new Fake();
+        FallbackRecipeAi ai = new FallbackRecipeAi(
+                List.of(named("groq", first), named("gemini", second)), clock);
+
+        assertThat(ai.complete(REQUEST).json()).isEqualTo("{}");
+        assertThat(second.calls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void rejectingThenUnavailable_throwsPlainUnavailable() {
+        FallbackRecipeAi ai = new FallbackRecipeAi(List.of(
+                named("groq", new Fake().failing(new AiRequestRejectedException("groq HTTP 400"))),
+                named("gemini", new Fake().failing(new AiUnavailableException("gemini HTTP 503")))), clock);
+
+        assertThatThrownBy(() -> ai.complete(REQUEST))
+                .isInstanceOf(AiUnavailableException.class)
+                .isNotInstanceOf(AiRequestRejectedException.class);
+    }
+
+    @Test
     void afterQuota_firstSkippedFor60s_thenTriedAgain() {
         Fake first = new Fake().failing(new AiQuotaExceededException("groq quota"));
         Fake second = new Fake();
