@@ -67,7 +67,16 @@ public class SavedRecipeService {
         // The repository query owns the ordering, so the page request must carry no Sort.
         Page<UUID> idPage = savedRepository.findRecipeIdsByUserId(
                 userId, PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
-        List<UUID> ids = idPage.getContent();
+        return new PageImpl<>(assembleItems(idPage.getContent(), userId), idPage.getPageable(),
+                idPage.getTotalElements());
+    }
+
+    /**
+     * Cards and stubs for these recipe ids, in the given order and assembled in one batch. A visible recipe is a
+     * card, an ever-approved recipe the viewer can't see right now is a stub, and anything else is skipped. Runs
+     * inside the caller's transaction, because assembling a card reads lazy relations.
+     */
+    public List<SavedItemDto> assembleItems(List<UUID> ids, UUID userId) {
         Map<UUID, Recipe> byId = recipeRepository.findAllById(ids).stream()
                 .collect(Collectors.toMap(Recipe::getId, Function.identity()));
         List<Recipe> ordered = ids.stream().map(byId::get).filter(r -> r != null).toList();
@@ -85,7 +94,7 @@ public class SavedRecipeService {
                 items.add(SavedItemDto.ofStub(stubOf(recipe)));
             }
         }
-        return new PageImpl<>(items, idPage.getPageable(), idPage.getTotalElements());
+        return items;
     }
 
     private static SavedRecipeStubDto stubOf(Recipe recipe) {
