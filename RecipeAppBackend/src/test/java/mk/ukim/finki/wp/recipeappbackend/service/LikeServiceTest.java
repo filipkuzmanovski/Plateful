@@ -160,6 +160,25 @@ class LikeServiceTest {
     }
 
     @Test
+    void list_ownPendingRecipe_carriesItsReviewBlock() {
+        UUID own = UUID.randomUUID();
+        UUID others = UUID.randomUUID();
+        Pageable pageable = PageRequest.of(0, 12);
+        when(likeRepository.findRecipeIdsByUserId(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(own, others), pageable, 2));
+        when(recipeRepository.findAllById(any())).thenReturn(List.of(
+                Recipe.builder().id(own).title("Mine").status(RecipeStatus.PENDING)
+                        .user(User.builder().id(user).build()).build(),
+                recipe(others, RecipeStatus.APPROVED)));
+
+        List<SavedItemDto> items = service.list(user, pageable).getContent();
+
+        assertThat(items.get(0).recipe().review()).isNotNull();
+        assertThat(items.get(0).recipe().review().status()).isEqualTo("pending");
+        assertThat(items.get(1).recipe().review()).isNull();
+    }
+
+    @Test
     void ids_comeFromTheRepository() {
         when(likeRepository.findAllRecipeIdsByUserId(user)).thenReturn(List.of(recipeId));
 

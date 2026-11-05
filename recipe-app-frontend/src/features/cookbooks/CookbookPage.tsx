@@ -94,7 +94,8 @@ export default function CookbookPage() {
   }, [loaded, leaf, leafCount, deleting, setParams]);
 
   if (query.isPending) return <Spinner />;
-  if (query.isError) {
+  // A failed background reload keeps the book that is open; only a first load with nothing to show is an error.
+  if (!query.data) {
     const notFound = query.error instanceof ApiError && query.error.status === 404;
     return (
       <EmptyState icon={notFound ? SearchX : CircleAlert}>

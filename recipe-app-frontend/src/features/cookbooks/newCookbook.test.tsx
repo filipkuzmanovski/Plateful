@@ -162,6 +162,31 @@ test('stubsAreNotOffered', async () => {
   expect(screen.queryByText('Hidden Stew')).not.toBeInTheDocument();
 });
 
+test('aRecipeUnderReviewIsNotOffered', async () => {
+  fakeServer([
+    ...items(5),
+    {
+      kind: 'recipe',
+      recipe: recipeFixture({
+        id: 'r-own', title: 'My Pending Pie',
+        review: { status: 'pending', rejectionReason: null, everApproved: true, revision: 2, submittedAt: '2026-11-05T10:00:00Z' },
+      }),
+      stub: null,
+    },
+    {
+      kind: 'recipe',
+      recipe: recipeFixture({
+        id: 'r-fine', title: 'My Approved Pie',
+        review: { status: 'approved', rejectionReason: null, everApproved: true, revision: 1, submittedAt: '2026-11-05T10:00:00Z' },
+      }),
+      stub: null,
+    },
+  ]);
+  renderPage();
+  await box('My Approved Pie');
+  expect(screen.queryByText('My Pending Pie')).not.toBeInTheDocument();
+});
+
 test('saysWhenFewerThanFiveCanBeChosen', async () => {
   fakeServer([
     ...items(4),

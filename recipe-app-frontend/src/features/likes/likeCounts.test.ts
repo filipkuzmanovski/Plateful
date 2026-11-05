@@ -58,6 +58,35 @@ describe('withLikeDelta', () => {
 });
 
 describe('patchLikeCount', () => {
+  test('leavesAQueryThatDoesNotHoldTheRecipeUntouched', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
+    const key = ['savedRecipes', 'u-1', 0];
+    client.setQueryData(key, pageOf<SavedItem>([{ kind: 'recipe', recipe: other, stub: null }]), { updatedAt: 1000 });
+    await client.invalidateQueries({ queryKey: ['savedRecipes'] });
+
+    patchLikeCount(client, 'r-1', 1);
+
+    const state = client.getQueryState(key)!;
+    expect(state.isInvalidated).toBe(true);
+    expect(state.dataUpdatedAt).toBe(1000);
+  });
+
+  test('aPatchedQueryKeepsItsFreshnessState', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
+    const stale = ['recipes', 'stale'];
+    const fresh = ['recipes', 'fresh'];
+    client.setQueryData(stale, pageOf([liked]), { updatedAt: 1000 });
+    await client.invalidateQueries({ queryKey: stale });
+    client.setQueryData(fresh, pageOf([liked]), { updatedAt: 2000 });
+
+    patchLikeCount(client, 'r-1', 1);
+
+    expect(client.getQueryData<{ content: { likeCount: number }[] }>(stale)?.content[0].likeCount).toBe(3);
+    expect(client.getQueryState(stale)).toMatchObject({ isInvalidated: true, dataUpdatedAt: 1000 });
+    expect(client.getQueryData<{ content: { likeCount: number }[] }>(fresh)?.content[0].likeCount).toBe(3);
+    expect(client.getQueryState(fresh)).toMatchObject({ isInvalidated: false, dataUpdatedAt: 2000 });
+  });
+
   test('patchesEveryCachedPlaceARecipeAppears', () => {
     const client = new QueryClient();
     client.setQueryData(['recipes', { q: '' }], pageOf([liked]));

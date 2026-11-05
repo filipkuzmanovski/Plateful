@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -35,10 +35,13 @@ function LocationProbe() {
   );
 }
 
-function renderBook(search = '') {
-  const queryClient = new QueryClient({
+function newClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: 30_000 }, mutations: { retry: false } },
   });
+}
+
+function renderBook(search = '', queryClient = newClient()) {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -185,6 +188,15 @@ describe('a chapter', () => {
     expect(within(activeLeaf()).getAllByText('Plain Stew')).toHaveLength(2);
   });
 
+  test('onWideScreensThePhotoKeepsItsOwnShape_howeverLongTheRecipeIs', async () => {
+    fakeServer(bookOf([asItem(lemon), asItem(stew)]));
+    renderBook('?page=3');
+    await cover();
+    const frame = activeLeaf().querySelector('img')!.parentElement!;
+    expect(frame).toHaveClass('md:self-start', 'md:aspect-[3/4]');
+    expect(frame).not.toHaveClass('md:min-h-full');
+  });
+
   test('aStubUnderReviewSaysSo', async () => {
     fakeServer(bookOf([reviewStub]));
     renderBook('?page=3');
@@ -259,11 +271,11 @@ describe('turning pages', () => {
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
   });
 
-  test('arrowKeysDoNothingWithAModifierHeld', async () => {
+  test.each(['Alt', 'Control', 'Shift', 'Meta'])('arrowKeysDoNothingWith %s held', async (modifier) => {
     fakeServer(bookOf([asItem(lemon)]));
     renderBook();
     await cover();
-    await userEvent.keyboard('{Alt>}{ArrowRight}{/Alt}');
+    await userEvent.keyboard(`{${modifier}>}{ArrowRight}{/${modifier}}`);
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
   });
 
@@ -391,6 +403,23 @@ describe('printing', () => {
     expect(frame).not.toHaveClass('print:max-h-72');
   });
 
+  test('theCreditPrintsAsPlainText', async () => {
+    fakeServer(bookOf([asItem(lemon)]));
+    renderBook('?page=3');
+    await cover();
+    const credit = within(activeLeaf()).getByRole('link', { name: 'by Mira Stone' }).parentElement!;
+    expect(credit).toHaveClass('print:[&_a]:no-underline', 'print:[&_svg]:hidden');
+  });
+
+  test('theCoverSpineUsesARoleNamedToken', async () => {
+    fakeServer(bookOf([asItem(lemon)]));
+    renderBook();
+    await cover();
+    const coverBox = within(activeLeaf()).getByRole('heading', { level: 1 }).parentElement!;
+    expect(coverBox).toHaveClass('shadow-spine');
+    expect(coverBox.className).not.toMatch(/rgb\(/);
+  });
+
   test('theRecipePageLinkDoesNotPrint', async () => {
     fakeServer(bookOf([asItem(lemon)]));
     renderBook('?page=3');
@@ -398,6 +427,49 @@ describe('printing', () => {
     const link = within(activeLeaf()).getByRole('link', { name: /open the recipe page/i });
     expect(link.closest('.print\\:hidden')).not.toBeNull();
   });
+});
+
+test('aFailedBackgroundReloadKeepsTheOpenBook', async () => {
+  const queryClient = newClient();
+  fakeServer(bookOf([asItem(lemon)]));
+  renderBook('?page=3', queryClient);
+  await cover();
+  server.use(http.get(`${BASE}/api/users/me/cookbooks/b-1`, () => HttpResponse.json({ status: 500, detail: 'no' }, { status: 500 })));
+
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['cookbook'] });
+  });
+
+  await waitFor(() => expect(queryClient.getQueryState(['cookbook', 'b-1', 'u-1'])?.status).toBe('error'));
+  expect(within(activeLeaf()).getByRole('heading', { level: 2, name: 'Lemon Tart' })).toBeInTheDocument();
+  expect(screen.queryByText(/couldn't load this cookbook/i)).not.toBeInTheDocument();
+});
+
+test('anotherAccountNeverSeesTheFirstUsersBook', async () => {
+  const queryClient = newClient();
+  fakeServer(bookOf([asItem(lemon)], { ownerFirstName: 'Firstuser' }));
+  const first = renderBook('', queryClient);
+  await cover();
+  expect(screen.getAllByText(/Firstuser/).length).toBeGreaterThan(0);
+  first.unmount();
+
+  let open!: () => void;
+  const gate = new Promise<void>((resolve) => { open = resolve; });
+  mocks.session = { access_token: 't', user: { id: 'u-2', email: 'other@example.com' } };
+  server.use(
+    http.get(`${BASE}/api/users/me`, () => HttpResponse.json({ ...profileFixture, id: 'u-2', firstName: 'Second' })),
+    http.get(`${BASE}/api/users/me/cookbooks/b-1`, async () => {
+      await gate;
+      return HttpResponse.json({ status: 404, detail: 'Cookbook not found' }, { status: 404 });
+    }),
+  );
+  renderBook('', queryClient);
+
+  await waitFor(() => expect(queryClient.getQueryCache().find({ queryKey: ['cookbook', 'b-1', 'u-2'] })).toBeDefined());
+  expect(screen.queryByText(/Firstuser/)).not.toBeInTheDocument();
+  open();
+  expect(await screen.findByText(/cookbook not found/i)).toBeInTheDocument();
+  expect(screen.queryByText(/Firstuser/)).not.toBeInTheDocument();
 });
 
 test('aMissingBookShowsNotFound', async () => {

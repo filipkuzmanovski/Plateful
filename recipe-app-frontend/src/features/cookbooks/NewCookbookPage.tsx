@@ -29,9 +29,14 @@ export default function NewCookbookPage() {
     refetchOnMount: 'always',
   });
 
-  // Hidden recipes come back as stubs and cannot go in a book.
+  // Only published recipes can go in a book. Hidden ones come back as stubs; your own under review as cards.
   const recipes = useMemo<RecipeDisplay[]>(
-    () => (liked.data?.pages ?? []).flatMap((page) => page.content.flatMap((item) => (item.recipe ? [item.recipe] : []))),
+    () =>
+      (liked.data?.pages ?? []).flatMap((page) =>
+        page.content.flatMap((item) =>
+          item.recipe && (!item.recipe.review || item.recipe.review.status === 'approved') ? [item.recipe] : [],
+        ),
+      ),
     [liked.data],
   );
 

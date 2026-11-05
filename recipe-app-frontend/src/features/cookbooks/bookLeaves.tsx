@@ -33,7 +33,7 @@ const chapterTitle = (item: SavedItem) => (item.recipe ? item.recipe.title : ite
 export function CoverLeaf({ book }: { book: Cookbook }) {
   return (
     <div
-      className={`mx-auto flex aspect-[3/4] max-w-sm flex-col justify-between rounded-l-sm rounded-r-xl border border-rule p-8 text-center font-serif shadow-[inset_0.75rem_0_0_rgb(0_0_0/0.18)] [print-color-adjust:exact] print:shadow-none ${coverClasses(book.volume)}`}
+      className={`mx-auto flex aspect-[3/4] max-w-sm flex-col justify-between rounded-l-sm rounded-r-xl border border-rule p-8 text-center font-serif shadow-spine [print-color-adjust:exact] print:shadow-none ${coverClasses(book.volume)}`}
     >
       <p className="font-sans text-[13px] tracking-[0.14em] uppercase">Volume {book.volume}</p>
       <h1 data-leaf-heading tabIndex={-1} className={`border-y border-on-cover/60 py-6 ${FOCUS_HEADING}`}>
@@ -111,11 +111,11 @@ export function OpeningLeaf({
 export function ChapterLeaf({ recipe, number }: { recipe: RecipeDisplay; number: number }) {
   return (
     <Sheet>
-      <div className="relative aspect-[4/3] bg-tint md:aspect-auto md:min-h-full print:aspect-auto print:h-72">
+      <div className="relative aspect-[4/3] bg-tint md:aspect-[3/4] md:self-start print:aspect-auto print:h-72">
         {recipe.image ? (
           <img src={recipe.image} alt="" className="absolute inset-0 size-full object-cover" />
         ) : (
-          <div className="flex size-full items-center justify-center p-8 md:absolute md:inset-0">
+          <div className="flex size-full items-center justify-center p-8">
             <p className="text-center font-serif text-4xl leading-tight font-medium text-balance break-words text-ink-soft italic">
               {recipe.title}
             </p>
@@ -131,7 +131,7 @@ export function ChapterLeaf({ recipe, number }: { recipe: RecipeDisplay; number:
         >
           {recipe.title}
         </h2>
-        <div className="mt-2">
+        <div className="mt-2 print:[&_a]:no-underline print:[&_svg]:hidden">
           <RecipeCredit recipe={recipe} />
         </div>
 

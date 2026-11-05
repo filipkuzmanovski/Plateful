@@ -206,7 +206,24 @@ test('anotherAccountInTheSameTabNeverSeesTheFirstUsersData', async () => {
   await act(async () => first.unmount());
 
   signedIn({ userId: 'u-2' });
+  let open!: () => void;
+  const gate = new Promise<void>((resolve) => { open = resolve; });
+  const held = async <T,>(body: T) => {
+    await gate;
+    return HttpResponse.json(body as never);
+  };
+  server.use(
+    http.get(`${BASE}/api/users/me/cookbooks`, () => held([])),
+    http.get(`${BASE}/api/users/me/likes`, () => held(pageOf([]))),
+    http.get(`${BASE}/api/users/me/likes/ids`, () => held([])),
+  );
   renderAt(TAB, queryClient);
+
+  await screen.findByRole('tab', { name: 'Cookbooks' });
+  await waitFor(() => expect(queryClient.getQueryCache().find({ queryKey: ['cookbooks', 'u-2'] })).toBeDefined());
+  expect(screen.queryByText('First users book')).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'First users tart' })).not.toBeInTheDocument();
+  open();
 
   expect(await screen.findByText(/no cookbooks yet/i)).toBeInTheDocument();
   expect(await screen.findByText('0 of 5 likes to make your first cookbook')).toBeInTheDocument();

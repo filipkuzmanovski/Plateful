@@ -5507,8 +5507,8 @@ Frontend:
 
 Test results
 ------------
-  - Backend without the database: 1071 tests pass.
-  - Frontend: 848 tests pass in 70 files. The build and lint are clean for the
+  - Backend without the database: 1072 tests pass.
+  - Frontend: 859 tests pass in 70 files. The build and lint are clean for the
     new code.
   - RecipeLikeRepositoryDbTest and CookbookRepositoryDbTest are written but NOT
     run. They need V12 on the live database, which happens when you restart the
@@ -5527,6 +5527,37 @@ afterwards and never committed.
     covered by a test.
   - NOT checked: a real print preview, and anything against the real backend
     and database.
+
+Independent review
+------------------
+A fresh reviewer read the whole branch, found nothing critical, and booted
+Hibernate without a database to confirm the new queries are valid. Fixed, each
+with a test that failed first:
+  - Your own recipe under review was offered in the pick page, and the 409 could
+    never be cleared. Cards now carry their review block for the author, so the
+    pick page leaves it out and the heart hides itself. As a result those cards
+    in Saved now show their status badge.
+  - A like wrote to every cached list and cancelled refetches other actions had
+    asked for, so a new bookmark could be missing from Saved. Now only lists
+    holding the recipe are touched, and they keep their freshness.
+  - On wide screens a long recipe stretched the photo into a narrow, zoomed
+    slice. The photo now keeps a 3:4 shape at the top of the left page. This
+    last layout was NOT looked at again in the browser after the fix.
+  - A failed background reload replaced the open book with an error.
+  - Printed credit links kept their underline and icon.
+  - The cover's spine used a raw colour; it is now the shadow-spine token.
+  - Two tests proved less than they claimed. The cross-account tests now hold
+    the second user's answers back, and removing the user id from the query keys
+    was confirmed to make them fail.
+
+Left for later, all small:
+  - Deleting a book triggers one request that returns 404.
+  - After deleting a recipe, a cached book can still show it for up to 30 s.
+  - Printing within a quarter of a second of a page turn can blank that page.
+  - A recipe deleted during the moment a book is created gives a 500, not a 409.
+  - The heart on the recipe page is not larger than the one on cards.
+  - A like count can be off by one until the next reload in rare races.
+  - Creating a book runs a few extra SELECTs while the lock is held.
 
 Your manual steps
 -----------------

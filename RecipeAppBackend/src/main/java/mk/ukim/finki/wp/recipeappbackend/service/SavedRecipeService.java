@@ -3,6 +3,7 @@ package mk.ukim.finki.wp.recipeappbackend.service;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
+import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeReviewDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.SavedItemDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.SavedRecipeStubDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
@@ -73,8 +74,9 @@ public class SavedRecipeService {
 
     /**
      * Cards and stubs for these recipe ids, in the given order and assembled in one batch. A visible recipe is a
-     * card, an ever-approved recipe the viewer can't see right now is a stub, and anything else is skipped. Runs
-     * inside the caller's transaction, because assembling a card reads lazy relations.
+     * card, an ever-approved recipe the viewer can't see right now is a stub, and anything else is skipped. A card
+     * carries its review block for its author or an admin, so the UI can tell it is not published. Runs inside the
+     * caller's transaction, because assembling a card reads lazy relations.
      */
     public List<SavedItemDto> assembleItems(List<UUID> ids, UUID userId) {
         Map<UUID, Recipe> byId = recipeRepository.findAllById(ids).stream()
@@ -89,7 +91,9 @@ public class SavedRecipeService {
         for (Recipe recipe : ordered) {
             RecipeDisplayDto card = cards.get(recipe.getId());
             if (card != null) {
-                items.add(SavedItemDto.ofRecipe(card));
+                items.add(SavedItemDto.ofRecipe(visibility.showsReview(recipe, userId)
+                        ? card.withReview(RecipeReviewDto.of(recipe))
+                        : card));
             } else if (recipe.isEverApproved()) {
                 items.add(SavedItemDto.ofStub(stubOf(recipe)));
             }

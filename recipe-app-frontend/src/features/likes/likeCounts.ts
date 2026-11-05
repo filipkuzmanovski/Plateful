@@ -47,9 +47,20 @@ export function withLikeDelta<T>(data: T, recipeId: string, delta: number): T {
 
 const CACHES = ['recipes', 'userRecipes', 'savedRecipes', 'likedRecipes', 'recipe', 'cookbook'];
 
-/** Changes the count everywhere the recipe is cached, so every card and page agrees without a refetch. */
+/**
+ * Changes the count everywhere the recipe is cached, so every card and page agrees without a refetch. Only queries
+ * holding the recipe are touched, and they keep their freshness: writing to a query would otherwise mark it fresh
+ * and cancel a refetch something else asked for, such as a new bookmark's for the Saved list.
+ */
 export function patchLikeCount(queryClient: QueryClient, recipeId: string, delta: number): void {
   for (const name of CACHES) {
-    queryClient.setQueriesData({ queryKey: [name] }, (data: unknown) => withLikeDelta(data, recipeId, delta));
+    for (const query of queryClient.getQueryCache().findAll({ queryKey: [name] })) {
+      const before = query.state.data;
+      const after = withLikeDelta(before, recipeId, delta);
+      if (after === before) continue;
+      const wasInvalidated = query.state.isInvalidated;
+      queryClient.setQueryData(query.queryKey, after, { updatedAt: query.state.dataUpdatedAt });
+      if (wasInvalidated) query.invalidate();
+    }
   }
 }
