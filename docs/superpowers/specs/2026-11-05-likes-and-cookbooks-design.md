@@ -226,5 +226,5 @@ The book is a sequence of leaves, and the current leaf is in the URL (`?page=N`,
 **Sub-project 3, preference cookbook:**
 - The user wants 5 recipes, to save tokens.
 - It reuses the `cookbooks` tables, with a new `kind` and a way to point at private `generated_recipes`. Those rows must then be protected from the 30-day cleanup.
-- Five recipes will not fit one AI call within Groq's free per-minute token limit, so it needs small batches. The limit should be re-checked at design time.
+- Five recipes are unlikely to fit one AI call within Groq's free per-minute token limit, so it probably needs small batches. The limit should be re-checked and tested at design time.
 - Still open: how it counts against the 10 daily generations.
