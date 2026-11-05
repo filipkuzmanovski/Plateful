@@ -33,6 +33,16 @@ class NutritionCheckTest {
     }
 
     @Test
+    void macroLimitIs105PercentOfGramsPlusOne() {
+        assertThat(problem(List.of(item(1, 0, 4, 1, 0, 0)), 1, 1)).isEmpty();
+        assertThat(problem(List.of(item(1, 0, 4.4, 1.1, 0, 0)), 1, 1))
+                .hasValue("line 1 has more protein, fat and carbs than its weight");
+        assertThat(problem(List.of(item(1, 1000, 4204, 1051, 0, 0)), 1, 2)).isEmpty();
+        assertThat(problem(List.of(item(1, 1000, 4208, 1052, 0, 0)), 1, 2))
+                .hasValue("line 1 has more protein, fat and carbs than its weight");
+    }
+
+    @Test
     void atMost900KcalPer100GramsPlus5() {
         assertThat(problem(List.of(item(1, 100, 905, 0, 100, 0)), 1, 1)).isEmpty();
         assertThat(problem(List.of(item(1, 100, 905.1, 0, 100, 0)), 1, 1)).isPresent();
