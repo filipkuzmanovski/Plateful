@@ -47,19 +47,6 @@ public class AiConfig {
     }
 
     /**
-     * The post chain: recipes written from an Instagram post that came with screenshots go through Groq
-     * only, with the text model. Its own {@link FallbackRecipeAi}, so its cooldowns never touch the other
-     * chains. Injected with {@code @Qualifier("postAi")}.
-     */
-    @Bean("postAi")
-    public RecipeAi postAi(AiProperties properties, ObjectProvider<RestClient.Builder> builders) {
-        List<NamedRecipeAi> active =
-                activePostProviders(properties, builders.getIfAvailable(RestClient::builder));
-        log.info("ai post providers active={}", active.stream().map(NamedRecipeAi::name).toList());
-        return new FallbackRecipeAi(active, Clock.systemUTC());
-    }
-
-    /**
      * The calorie estimate chain: Groq only, with the text model. Its own {@link FallbackRecipeAi}, so its
      * cooldowns never touch the other chains. Injected with {@code @Qualifier("nutritionAi")}.
      */
@@ -80,12 +67,6 @@ public class AiConfig {
     static List<NamedRecipeAi> activeVisionProviders(AiProperties properties, RestClient.Builder builder) {
         return build(properties.visionOrder(), "plateful.ai.vision-order", properties, builder,
                 AiProperties.Provider::visionModel);
-    }
-
-    /** Active providers in {@code plateful.ai.post-order}, each named with its text model. */
-    static List<NamedRecipeAi> activePostProviders(AiProperties properties, RestClient.Builder builder) {
-        return build(properties.postOrder(), "plateful.ai.post-order", properties, builder,
-                AiProperties.Provider::model);
     }
 
     /** Active providers in {@code plateful.ai.nutrition-order}, each named with its text model. */

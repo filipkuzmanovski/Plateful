@@ -26,7 +26,7 @@ const aiRecipe: GeneratedRecipe = {
   id: 'a-1', kind: 'cook', mealType: null, title: 'Soup', description: '', servings: 2, prepMinutes: 5, cookMinutes: 10,
   cuisine: null, ingredients: [{ name: 'water', amount: '1 cup', extra: false }], steps: ['Boil.'],
   diets: { vegetarian: true, vegan: true, glutenFree: true, dairyFree: true }, allergens: [], saved: false,
-  createdAt: '2026-11-05T00:00:00Z', provider: null, origin: null, swaps: [], estimate: ready,
+  createdAt: '2026-11-05T00:00:00Z', provider: null, estimate: ready,
 };
 
 afterEach(() => {

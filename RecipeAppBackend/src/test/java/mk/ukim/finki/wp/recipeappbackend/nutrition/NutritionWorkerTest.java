@@ -101,7 +101,7 @@ class NutritionWorkerTest {
         generated = mock(GeneratedRecipeRepository.class);
         mapper = mock(GeneratedRecipeMapper.class);
         clock = new MovingClock();
-        AiProperties properties = new AiProperties(null, null, null, 0, 0, null, null, null, 40);
+        AiProperties properties = new AiProperties(null, null, null, 0, 0, null, null, 40);
         worker = new NutritionWorker(estimator, repo, recipes, ingredients, generated, mapper, properties,
                 new TransactionTemplate(mock(PlatformTransactionManager.class)), clock);
 
@@ -132,7 +132,7 @@ class NutritionWorkerTest {
         when(generated.findById(ID)).thenReturn(Optional.of(row));
         when(mapper.read(row)).thenReturn(new StoredRecipe("Soup", null, 4, 0, 0, null,
                 List.of(new StoredRecipe.StoredIngredient("rice", "1 cup", false)),
-                List.of(), null, List.of(), null));
+                List.of(), null, List.of()));
     }
 
     @Test
@@ -504,7 +504,7 @@ class NutritionWorkerTest {
         List<StoredRecipe.StoredIngredient> withNull = new java.util.ArrayList<>();
         withNull.add(null);
         when(mapper.read(row)).thenReturn(new StoredRecipe("Soup", null, 4, 0, 0, null, withNull,
-                List.of(), null, List.of(), null));
+                List.of(), null, List.of()));
         worker.run();
         verify(repo).saveFailed(eq(GENERATED_TARGET), eq(NutritionLines.hash(List.of())));
         verifyNoInteractions(estimator);

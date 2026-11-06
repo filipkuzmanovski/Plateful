@@ -135,7 +135,7 @@ describe('About us', () => {
     expect(items).toContain(
       'Cook with what you have: list your ingredients or scan your fridge, and get a new recipe made for you.',
     );
-    expect(items).toContain('Turn a recipe post into your own version, adjusted to your food preferences.');
+    expect(screen.getByRole('main')).not.toHaveTextContent(/recipe post|instagram/i);
     expect(items).toContain('See three meals made for you each day.');
     expect(screen.getByRole('main')).not.toHaveTextContent(/up to 6 photos/i);
     expectNoEmoji(section);
@@ -165,7 +165,7 @@ describe('Privacy Policy', () => {
   });
 
   test('the policy date was bumped for the calorie estimates', () => {
-    expect(SITE.legalLastUpdated).toBe('5 November 2026');
+    expect(SITE.legalLastUpdated).toBe('6 November 2026');
   });
 
   test('shows the last-updated date from SITE', async () => {
@@ -283,47 +283,10 @@ describe('Privacy Policy', () => {
     expectNoEmoji(processors);
   });
 
-  test('privacy_hasRecipesFromAPostParagraph', async () => {
+  test('privacy_sayNothingAboutPosts', async () => {
     renderApp('/privacy');
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
-    const section = document.getElementById('ai-recipes')!;
-    const paragraphs = within(section).getAllByText(
-      (_, el) => el?.tagName === 'P' && /^Recipes from a post/.test(el.textContent ?? ''),
-    );
-    expect(paragraphs).toHaveLength(1);
-    const post = paragraphs[0]!;
-    expect(post).toHaveTextContent('up to 2 screenshots');
-    expect(post).toHaveTextContent('without location');
-    expect(post).toHaveTextContent('never your name, your email address or your account');
-    expect(post).toHaveTextContent('go only to Groq');
-    expect(post).toHaveTextContent('may go to Google Gemini');
-    expect(post).toHaveTextContent("may use it to improve Google's products");
-    expect(post).toHaveTextContent(
-      'Plateful does not store the caption, the screenshots or a link to the post',
-    );
-    expect(post).toHaveTextContent('crop it to the post');
-    expectNoEmoji(section);
-  });
-
-  test('googleEntry_saysNeverAScreenshot', async () => {
-    renderApp('/privacy');
-    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
-    const processors = document.getElementById('who-processes-your-data')!;
-    const items = within(processors).getAllByRole('listitem').map((li) => li.textContent ?? '');
-    const google = items.find((t) => t.startsWith('Google (Gemini API)'))!;
-    expect(google).toContain('pasted caption');
-    expect(google).toContain('never a screenshot');
-    expectNoEmoji(processors);
-  });
-
-  test('groqEntry_mentionsPostScreenshots', async () => {
-    renderApp('/privacy');
-    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
-    const processors = document.getElementById('who-processes-your-data')!;
-    const items = within(processors).getAllByRole('listitem').map((li) => li.textContent ?? '');
-    const groq = items.find((t) => t.startsWith('Groq'))!;
-    expect(groq).toContain('screenshots of posts you turn into recipes');
-    expectNoEmoji(processors);
+    expect(screen.getByRole('main')).not.toHaveTextContent(/instagram|screenshot|caption|recipes from a post/i);
   });
 
   test('has section headings as h2', async () => {

@@ -5731,3 +5731,58 @@ Your manual steps
      check that nothing is skipped. A skipped test means V13 is not live.
   4. Approve an upload and check that it gets a number. Edit its ingredients and
      check that the number goes away until re-approval.
+
+
+################################################################################
+################################################################################
+ PART 24 — INSTAGRAM POST IMPORT REMOVED
+ Branch: claude/silly-bohr-1817bf
+################################################################################
+################################################################################
+
+Why this happened
+-----------------
+You decided you don't want this feature, so the recipe from an Instagram post
+(PART 20) is gone. You also dropped two features that were never built: the
+preference cookbook and blogger connect. Cookbooks stay as they are, made only
+from liked recipes.
+
+What went away
+--------------
+  - The Cook page's "From a post" tab, and the tab bar with it. The page is now
+    just the ingredients form and the fridge photo scan. An old /cook?tab=post
+    link opens that same page.
+  - The "From a post" label on saved AI recipes, and the "Based on an Instagram
+    post" and swap lines on the recipe page.
+  - The import endpoint, the code that read captions and screenshots, its
+    prompts and error messages, the check that the AI used its own words, and
+    the plateful.ai.post-order setting.
+  - The About page's line about posts, and the Privacy page's section on posts
+    and its mentions of captions and screenshots. The legal date is now
+    6 November 2026.
+
+What stayed
+-----------
+  - Fridge photo scans and the 10 daily generations work as before.
+  - The old spec, plan and PART 20 stay as history.
+  - V11 stays, because it has already run. V14 undoes it: it deletes any recipes
+    of kind 'post' and allows only 'cook' and 'daily'. You said none exist.
+
+Checks done
+-----------
+  - Backend 1110 tests and frontend 848 tests pass. Those numbers are lower than
+    PART 23 because the tests for the import went with it. Build is clean, and
+    lint shows only warnings that were already there.
+  - Browser check with made-up data, since deleted: the Cook page on desktop and
+    phone width, the old link, the Privacy and About pages and an AI recipe.
+
+Not checked yet
+---------------
+  - V14 has never run on real Postgres. It runs when you restart the backend
+    after merging.
+
+Your manual steps
+-----------------
+  1. Merge, then restart the backend so V14 runs.
+  2. Run GeneratedRecipeKindDbTest with the database password set, and check
+     that nothing is skipped. A skipped test means V14 is not live.

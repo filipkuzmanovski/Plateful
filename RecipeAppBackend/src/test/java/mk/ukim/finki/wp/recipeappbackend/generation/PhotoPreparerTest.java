@@ -195,16 +195,7 @@ class PhotoPreparerTest {
     }
 
     @Test
-    void maxTwo_refusesThree() throws Exception {
-        byte[] one = jpeg(50, 50);
-        assertThat(preparer.prepare(List.of(one, one), 2)).hasSize(2);
-        assertThatThrownBy(() -> preparer.prepare(List.of(one, one, one), 2))
-                .isInstanceOf(InvalidScanPhotoException.class);
-        assertThatThrownBy(() -> preparer.prepare(List.of(), 2)).isInstanceOf(InvalidScanPhotoException.class);
-    }
-
-    @Test
-    void default_stillAllowsThree() throws Exception {
+    void threeFiles_areAllowed() throws Exception {
         byte[] one = jpeg(50, 50);
         assertThat(preparer.prepare(List.of(one, one, one))).hasSize(3);
         assertThatThrownBy(() -> preparer.prepare(List.of(one, one, one, one)))

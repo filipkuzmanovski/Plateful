@@ -21,9 +21,9 @@ import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTest
 
 /**
  * Checks the {@code kind} check constraint of generated_recipes against the real Postgres. Opt-in:
- * skipped unless SUPABASE_DB_PASSWORD is set. The post kind needs V11, which the backend applies on its
- * next start (Flyway is disabled here so a test can never migrate the real database), so that test skips
- * until then. Writes stay in the rolled-back test transaction.
+ * skipped unless SUPABASE_DB_PASSWORD is set. Refusing the old post kind needs V14, which the backend applies
+ * on its next start (Flyway is disabled here so a test can never migrate the real database), so that test
+ * skips until then. Writes stay in the rolled-back test transaction.
  */
 @Tag("db")
 @EnabledIfEnvironmentVariable(named = "SUPABASE_DB_PASSWORD", matches = ".+")
@@ -64,10 +64,13 @@ class GeneratedRecipeKindDbTest {
     }
 
     @Test
-    void postKind_inserts() {
-        assumeTrue(constraintAllowsPost(), "V11 is not applied yet (restart the backend)");
+    void postKind_isRefused() {
+        assumeTrue(!constraintAllowsPost(), "V14 is not applied yet (restart the backend)");
+        UUID userId = newUser();
 
-        assertThat(insert(newUser(), "post")).isEqualTo(1);
+        assertThatThrownBy(() -> insert(userId, "post"))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("generated_recipes_kind_check");
     }
 
     @Test

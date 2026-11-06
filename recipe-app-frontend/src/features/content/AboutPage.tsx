@@ -34,7 +34,6 @@ export default function AboutPage() {
                 Cook with what you have: list your ingredients or scan your fridge, and get a new recipe made for
                 you.
               </li>
-              <li>Turn a recipe post into your own version, adjusted to your food preferences.</li>
               <li>See three meals made for you each day.</li>
               <li>Rate recipes, leave comments and like the ones you enjoy.</li>
               <li>Protect your account with two-factor authentication.</li>

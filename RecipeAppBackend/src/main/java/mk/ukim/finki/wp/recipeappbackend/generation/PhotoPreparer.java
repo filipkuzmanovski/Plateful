@@ -55,13 +55,8 @@ public class PhotoPreparer {
 
     /** Prepares 1 to {@link #MAX_PHOTOS} photos, as the fridge scan allows. */
     public List<AiImage> prepare(List<byte[]> photos) {
-        return prepare(photos, MAX_PHOTOS);
-    }
-
-    /** Prepares 1 to {@code maxPhotos} photos; a post import allows 2. */
-    public List<AiImage> prepare(List<byte[]> photos, int maxPhotos) {
-        if (photos == null || photos.isEmpty() || photos.size() > maxPhotos) {
-            throw new InvalidScanPhotoException("Photo count must be 1 to " + maxPhotos);
+        if (photos == null || photos.isEmpty() || photos.size() > MAX_PHOTOS) {
+            throw new InvalidScanPhotoException("Photo count must be 1 to " + MAX_PHOTOS);
         }
         for (byte[] photo : photos) {
             checkEnvelope(photo);

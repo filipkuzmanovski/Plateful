@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle } from 'lucide-react';
 import { aiUsageQueryKey, generateRecipe, getAiUsage, type GenerateBody } from '@/api/ai';
@@ -12,7 +11,6 @@ import type { MealType } from '@/lib/types';
 import { aiErrorMessage } from './aiMessages';
 import { CookResult } from './CookResult';
 import { PhotoScan } from './PhotoScan';
-import { PostImport } from './PostImport';
 
 const MAX_INGREDIENTS = 15;
 const MIN_INGREDIENTS = 2;
@@ -24,40 +22,23 @@ const MEALS: { value: MealType | null; label: string }[] = [
   { value: 'dinner', label: 'Dinner' },
 ];
 
-const TABS = [
-  {
-    key: 'ingredients',
-    label: 'From my ingredients',
-    intro: `Add ${MIN_INGREDIENTS} to ${MAX_INGREDIENTS} ingredients and get a recipe made for you, in line with your food preferences.`,
-  },
-  {
-    key: 'post',
-    label: 'From a post',
-    intro: 'Saw something good on Instagram? Paste the caption or add screenshots, and get a recipe made for you.',
-  },
-] as const;
-
-type TabKey = (typeof TABS)[number]['key'];
-
-const tabId = (key: TabKey) => `cook-tab-${key}`;
-const panelId = (key: TabKey) => `cook-panel-${key}`;
-
 const legendClass = 'mb-2 text-[15px] font-semibold text-ink';
 
 /** A radio dressed as a toggle chip; the native input stays in the tab order (sr-only). */
 const radioChip =
   'inline-flex min-h-10 cursor-pointer items-center rounded-full border border-field bg-surface px-3.5 py-1.5 text-[15px] font-medium text-ink transition-colors select-none hover:bg-tint has-checked:border-ink has-checked:bg-ink has-checked:text-on-ink has-checked:hover:bg-ink/90 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink';
 
-/** What both tabs share: the generations left today and whether today's limit was hit. */
-interface CounterProps {
-  left: number | null;
-  limitReached: boolean;
-  onRemaining: (n: number) => void;
-  onLimit: () => void;
-}
+/** "Cook with what I have": a new recipe from the user's ingredients, typed or scanned from photos. */
+export default function CookPage() {
+  const { profile } = useAuth();
+  const userId = profile?.id;
+  const queryClient = useQueryClient();
 
-/** The "From my ingredients" tab: chips (typed or scanned from photos), meal and the only-what-I-have switch. */
-function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterProps) {
+  const [limitReached, setLimitReached] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(null); // the latest count the server gave us
+  const usage = useQuery({ queryKey: aiUsageQueryKey(userId), queryFn: getAiUsage });
+  const left = remaining ?? usage.data?.remaining ?? null;
+
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [mealType, setMealType] = useState<MealType | null>(null);
   const [onlyWhatIHave, setOnlyWhatIHave] = useState(false);
@@ -68,10 +49,16 @@ function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterP
   const generate = useMutation({
     mutationFn: generateRecipe,
     onMutate: () => setFlagged({}),
-    onSuccess: (res) => onRemaining(res.remainingToday),
+    onSuccess: (res) => {
+      setRemaining(res.remainingToday);
+      void queryClient.invalidateQueries({ queryKey: aiUsageQueryKey(userId) });
+    },
     onError: (err) => {
       if (!(err instanceof ApiError)) return;
-      if (err.code === 'daily_limit') onLimit();
+      if (err.code === 'daily_limit') {
+        setLimitReached(true);
+        setRemaining(0);
+      }
       if (err.conflicts?.length) setFlagged(Object.fromEntries(err.conflicts.map((c) => [c.ingredient, c.reason])));
     },
   });
@@ -101,8 +88,16 @@ function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterP
   const canGenerate = ingredients.length >= MIN_INGREDIENTS && !generate.isPending && !exhausted;
 
   return (
-    <>
-      <form onSubmit={onSubmit} className="space-y-7">
+    <div className="mx-auto max-w-2xl">
+      <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-ink sm:text-5xl">
+        Cook with what I have
+      </h1>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
+        Add {MIN_INGREDIENTS} to {MAX_INGREDIENTS} ingredients and get a recipe made for you, in line with your food
+        preferences.
+      </p>
+
+      <form onSubmit={onSubmit} className="mt-8 space-y-7">
         <PhotoScan current={ingredients} max={MAX_INGREDIENTS} onFound={changeIngredients} />
 
         <IngredientChipInput
@@ -179,120 +174,6 @@ function IngredientsPanel({ left, limitReached, onRemaining, onLimit }: CounterP
           />
         </div>
       )}
-    </>
-  );
-}
-
-/**
- * "Cook with what I have": a recipe from the user's ingredients or from an Instagram post, one tab each. The tab
- * lives in the URL (`?tab=post`; anything else is the ingredients tab). Both panels stay mounted so the chips, the
- * caption, the screenshots and a running request survive switching. The page owns the shared daily count.
- */
-export default function CookPage() {
-  const { profile } = useAuth();
-  const userId = profile?.id;
-  const queryClient = useQueryClient();
-
-  const [params, setParams] = useSearchParams();
-  const tabParam = params.get('tab');
-  const selected: TabKey = TABS.find((t) => t.key === tabParam)?.key ?? 'ingredients';
-  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ ingredients: null, post: null });
-
-  const [limitReached, setLimitReached] = useState(false);
-  const [remaining, setRemaining] = useState<number | null>(null); // the latest count the server gave us
-
-  const usage = useQuery({ queryKey: aiUsageQueryKey(userId), queryFn: getAiUsage });
-  const left = remaining ?? usage.data?.remaining ?? null;
-
-  const counter: CounterProps = {
-    left,
-    limitReached,
-    onRemaining: (n) => {
-      setRemaining(n);
-      void queryClient.invalidateQueries({ queryKey: aiUsageQueryKey(userId) });
-    },
-    onLimit: () => {
-      setLimitReached(true);
-      setRemaining(0);
-    },
-  };
-
-  function select(key: TabKey) {
-    const next = new URLSearchParams(params);
-    if (key === 'ingredients') next.delete('tab');
-    else next.set('tab', key);
-    setParams(next, { replace: true });
-  }
-
-  function onKeyDown(e: KeyboardEvent) {
-    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return; // leave Alt+Arrow (browser back/forward) etc. alone
-    const current = TABS.findIndex((t) => t.key === selected);
-    let target: number;
-    switch (e.key) {
-      case 'ArrowRight': target = (current + 1) % TABS.length; break;
-      case 'ArrowLeft': target = (current - 1 + TABS.length) % TABS.length; break;
-      case 'Home': target = 0; break;
-      case 'End': target = TABS.length - 1; break;
-      default: return;
-    }
-    e.preventDefault();
-    const key = TABS[target].key;
-    select(key);
-    tabRefs.current[key]?.focus();
-  }
-
-  return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-[-0.015em] text-ink sm:text-5xl">
-        Cook with what I have
-      </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
-        {TABS.find((t) => t.key === selected)?.intro}
-      </p>
-
-      <div
-        role="tablist"
-        aria-label="How to start"
-        onKeyDown={onKeyDown}
-        className="mt-7 flex border-b border-rule max-sm:overflow-x-auto"
-      >
-        {TABS.map(({ key, label }) => {
-          const active = key === selected;
-          return (
-            <button
-              key={key}
-              ref={(el) => { tabRefs.current[key] = el; }}
-              type="button"
-              role="tab"
-              id={tabId(key)}
-              aria-selected={active}
-              aria-controls={panelId(key)}
-              tabIndex={active ? 0 : -1}
-              onClick={() => select(key)}
-              className={`min-h-11 shrink-0 border-b-2 px-4 sm:-mb-px text-[15px] font-semibold transition-colors duration-200 focus-visible:-outline-offset-2 ${
-                active ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Both mounted; the inactive one is hidden, which also keeps it out of the accessibility tree. */}
-      {TABS.map(({ key }) => (
-        <div
-          key={key}
-          role="tabpanel"
-          id={panelId(key)}
-          aria-labelledby={tabId(key)}
-          tabIndex={0}
-          hidden={key !== selected}
-          className="mt-8"
-        >
-          {key === 'ingredients' ? <IngredientsPanel {...counter} /> : <PostImport {...counter} />}
-        </div>
-      ))}
     </div>
   );
 }

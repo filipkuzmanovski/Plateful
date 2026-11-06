@@ -60,7 +60,7 @@ class AiRecipeServiceTest {
         GeneratedRecipe row = row(null);
         GeneratedRecipeDto dto = mock(GeneratedRecipeDto.class);
         StoredRecipe stored = new StoredRecipe("Egg fried rice", "", 4, 5, 10, "chinese", List.of(), List.of(),
-                null, List.of(), null);
+                null, List.of());
         NutritionEstimateDto estimate = new NutritionEstimateDto("ready", 450, 28, 18, 42);
         when(repository.findByIdAndUserId(ID, USER)).thenReturn(Optional.of(row));
         when(mapper.read(row)).thenReturn(stored);

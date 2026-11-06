@@ -92,7 +92,7 @@ export interface GeneratedIngredient { name: string; amount: string; extra: bool
 
 export interface GeneratedRecipe {
   id: string;
-  kind: 'cook' | 'daily' | 'post';
+  kind: 'cook' | 'daily';
   mealType: MealType | null;
   title: string;
   description: string;
@@ -107,17 +107,13 @@ export interface GeneratedRecipe {
   saved: boolean;
   createdAt: string;
   provider: string | null;
-  /** Post imports only: whether the post had a recipe or the AI wrote its own take on the dish. */
-  origin: 'recipe' | 'dish' | null;
-  /** Ingredients replaced to fit the user's food preferences; empty when none. */
-  swaps: { from: string; to: string }[];
   estimate?: NutritionEstimate | null;
 }
 
 /** A generated recipe in a list: no ingredients or steps. `savedAt` is null when not saved. */
 export interface GeneratedRecipeSummary {
   id: string;
-  kind: 'cook' | 'daily' | 'post';
+  kind: 'cook' | 'daily';
   mealType: MealType | null;
   title: string;
   description: string;

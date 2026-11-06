@@ -73,15 +73,6 @@ class AiPropertiesTest {
     }
 
     @Test
-    void postOrder_defaultsToGroq() {
-        assertThat(bind(Map.of()).postOrder()).containsExactly("groq");
-        assertThat(new AiProperties(null, null, null, 0, 0, null, List.of()).postOrder())
-                .containsExactly("groq");
-        assertThat(bind(Map.of("plateful.ai.post-order", "groq,gemini")).postOrder())
-                .containsExactly("groq", "gemini");
-    }
-
-    @Test
     void nutritionDefaults() {
         AiProperties p = new AiProperties(null, null, null, 0, 0);
 
