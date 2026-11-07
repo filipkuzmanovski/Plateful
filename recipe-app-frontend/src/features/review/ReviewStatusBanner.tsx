@@ -21,7 +21,7 @@ export function ReviewStatusBanner({ review, recipeId }: { review: RecipeReview;
         to={`/recipes/${recipeId}/edit`}
         className="mt-3 inline-flex min-h-11 items-center rounded-full border border-danger/50 bg-surface px-4 text-[15px] font-semibold text-danger transition-colors hover:bg-danger hover:text-on-danger"
       >
-        Edit and resubmit
+        Edit recipe
       </Link>
     </div>
   );

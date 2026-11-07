@@ -127,6 +127,26 @@ test("someone else's comment shows no Edit, and Delete only when I own the recip
   expect(within(item).getByRole('button', { name: /delete/i })).toBeInTheDocument();
 });
 
+test('my hidden comment shows no Edit and no reactions, but still Delete', async () => {
+  stubPage({ comments: [commentFixture({ hidden: true })] });
+  renderApp('/recipes/r-1');
+  const item = (await screen.findByText('Delicious!')).closest('li')!;
+  expect(within(item).queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
+  expect(within(item).queryByRole('button', { name: /^like comment$/i })).not.toBeInTheDocument();
+  expect(within(item).queryByRole('button', { name: /^dislike comment$/i })).not.toBeInTheDocument();
+  expect(within(item).getByRole('button', { name: /delete/i })).toBeInTheDocument();
+});
+
+test('my normal comment keeps Edit, Delete and the reaction buttons', async () => {
+  stubPage();
+  renderApp('/recipes/r-1');
+  const item = (await screen.findByText('Delicious!')).closest('li')!;
+  expect(within(item).getByRole('button', { name: /edit/i })).toBeInTheDocument();
+  expect(within(item).getByRole('button', { name: /delete/i })).toBeInTheDocument();
+  expect(within(item).getByRole('button', { name: /^like comment$/i })).toBeInTheDocument();
+  expect(within(item).getByRole('button', { name: /^dislike comment$/i })).toBeInTheDocument();
+});
+
 test('a failed reaction shows the server error in a toast', async () => {
   stubPage();
   server.use(

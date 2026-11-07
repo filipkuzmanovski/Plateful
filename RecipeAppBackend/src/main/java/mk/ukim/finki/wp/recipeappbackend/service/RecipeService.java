@@ -204,8 +204,8 @@ public class RecipeService {
      */
     @Transactional
     public RecipeDisplayDto update(UUID userId, UUID recipeId, RecipeCreateDto dto) {
-        // Row lock, shared with approve/reject: an edit and a review of the same recipe serialize, so
-        // neither overwrites the other's columns (Recipe has no @Version, every column is written on flush).
+        // Row lock, shared by edits, deletes, reports, dismissals and admin removal: they serialize per recipe, so
+        // none overwrites another's columns (Recipe has no @Version, every column is written on flush).
         Recipe recipe = recipeRepository.findForReviewById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
         assertOwnedBy(recipe, userId);
@@ -270,7 +270,7 @@ public class RecipeService {
     /** Delete own recipe. Ratings/comments/ingredients go via ON DELETE CASCADE. */
     @Transactional
     public void delete(UUID userId, UUID recipeId) {
-        // Same row lock as update and the review decisions.
+        // Same row lock as update, reports, dismissals and admin removal.
         Recipe recipe = recipeRepository.findForReviewById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
         assertOwnedBy(recipe, userId);
@@ -288,7 +288,10 @@ public class RecipeService {
     private void publish(Recipe recipe) {
         recipe.setStatus(RecipeStatus.APPROVED);
         recipe.setEverApproved(true);
-        recipe.setApprovedTitle(recipe.getTitle());
+        // a hidden recipe keeps the title strangers see on the unavailable page and saved stubs
+        if (recipe.getHiddenAt() == null) {
+            recipe.setApprovedTitle(recipe.getTitle());
+        }
         recipe.setRejectionReason(null);
         recipe.setReviewedBy(null);
         recipe.setReviewedAt(OffsetDateTime.now());

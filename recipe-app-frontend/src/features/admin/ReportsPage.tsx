@@ -111,10 +111,13 @@ export default function ReportsPage() {
     if (empty && page > 0) setPage(page - 1);
   }, [empty, page]);
 
-  const refresh = (removed: boolean) => {
+  const refresh = (recipeCaches: boolean) => {
     void queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] });
     void queryClient.invalidateQueries({ queryKey: ['admin', 'reportCount'] });
-    if (removed) void queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    if (recipeCaches) {
+      void queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      void queryClient.invalidateQueries({ queryKey: ['recipe'] });
+    }
   };
 
   const act = useMutation({
@@ -126,7 +129,7 @@ export default function ReportsPage() {
       setAction(null);
       setHandled(false);
       toast.success(type === 'dismiss' ? 'Reports dismissed' : item.kind === 'recipe' ? 'Recipe removed' : 'Comment removed');
-      refresh(type === 'remove');
+      refresh(true);
     },
     onError: (e) => {
       if (isAlreadyHandled(e)) {

@@ -40,7 +40,7 @@ public interface RecipeRepository extends JpaRepository<Recipe, UUID>, JpaSpecif
     // how many of a user's recipes are in a given review state (e.g. rejected, for the profile badge)
     long countByUserIdAndStatus(UUID userId, RecipeStatus status);
 
-    // approve/reject take the row lock first, so two admins cannot both decide the same recipe
+    // edits, deletes, reports, dismissals and admin removal take this row lock first, so they serialize per recipe
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Recipe> findForReviewById(UUID id);
 

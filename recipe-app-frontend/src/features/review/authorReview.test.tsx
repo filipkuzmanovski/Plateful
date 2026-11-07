@@ -122,7 +122,7 @@ test('rejectedBannerForAuthor', async () => {
 
   expect(await screen.findByText(REJECTED_BANNER)).toBeInTheDocument();
   expect(screen.getByText('Photos are blurry.')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Edit and resubmit' })).toHaveAttribute('href', '/recipes/r-1/edit');
+  expect(screen.getByRole('link', { name: 'Edit recipe' })).toHaveAttribute('href', '/recipes/r-1/edit');
   expect(screen.queryByRole('region', { name: /comments/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /rate \d stars/i })).not.toBeInTheDocument();
   expectNoEmoji();

@@ -284,13 +284,15 @@ export function CommentsSection({
                   )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1 -ml-2.5">
-                  <ReactionButtons
-                    comment={comment}
-                    recipeId={recipeId}
-                    mine={myReactions.data?.[comment.id] ?? null}
-                    loading={myReactions.isLoading}
-                  />
-                  {isAuthor && editingId !== comment.id && (
+                  {!comment.hidden && (
+                    <ReactionButtons
+                      comment={comment}
+                      recipeId={recipeId}
+                      mine={myReactions.data?.[comment.id] ?? null}
+                      loading={myReactions.isLoading}
+                    />
+                  )}
+                  {isAuthor && !comment.hidden && editingId !== comment.id && (
                     <button
                       aria-label={`Edit comment by ${comment.user.firstName} ${comment.user.lastName}`}
                       className={`${actionClass} hover:bg-tint hover:text-ink`}

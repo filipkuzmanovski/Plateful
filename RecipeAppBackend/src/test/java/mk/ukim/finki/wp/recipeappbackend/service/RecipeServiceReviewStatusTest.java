@@ -202,6 +202,20 @@ class RecipeServiceReviewStatusTest {
     }
 
     @Test
+    void update_ofHiddenRecipe_keepsApprovedTitle() {
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
+        recipe.setEverApproved(true);
+        recipe.setApprovedTitle("Old title");
+        recipe.setHiddenAt(longAgo);
+
+        service.update(userId, recipeId, dto("Renamed"));
+
+        assertThat(recipe.getApprovedTitle()).isEqualTo("Old title");
+        assertThat(recipe.getTitle()).isEqualTo("Renamed");
+    }
+
+    @Test
     void update_bumpsRevision() {
         UUID recipeId = UUID.randomUUID();
         Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);

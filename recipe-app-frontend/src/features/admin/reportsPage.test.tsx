@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '@/test/server';
-import { renderApp } from '@/test/utils';
+import { newTestQueryClient, renderApp } from '@/test/utils';
 import { pageOf, profileFixture } from '@/test/fixtures';
 import { expectNoEmoji } from '@/test/noEmoji';
 
@@ -95,7 +95,9 @@ test('dismissConfirmsPostsAndRemovesTheEntry', async () => {
       return new HttpResponse(null, { status: 204 });
     }),
   );
-  renderApp('/admin/reports');
+  const queryClient = newTestQueryClient();
+  const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+  renderApp('/admin/reports', queryClient);
   const article = (await screen.findByRole('heading', { name: 'Lemon Cake' })).closest('article')!;
   await userEvent.click(within(article).getByRole('button', { name: 'Dismiss' }));
   const dialog = await screen.findByRole('dialog');
@@ -106,6 +108,8 @@ test('dismissConfirmsPostsAndRemovesTheEntry', async () => {
   await userEvent.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
   await waitFor(() => expect(screen.queryByRole('heading', { name: 'Lemon Cake' })).not.toBeInTheDocument());
   expect(dismissed).toBe(true);
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['recipe'] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['recipes'] });
   expect(screen.getByText(commentItem.text)).toBeInTheDocument();
 });
 

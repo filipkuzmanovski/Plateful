@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  * Comments. Moderation policy (product decision): a comment can be deleted
  * by its AUTHOR or by the OWNER of the recipe it sits on ("my recipe, my
  * comment section"). Every write needs an approved recipe and every read a visible one (spec 4.2); a comment
- * on a recipe that went back to review stays as it is until the recipe is approved again. Editing stays author-only — moderators remove content,
+ * on a recipe that is hidden stays as it is until the recipe is visible again. Editing stays author-only — moderators remove content,
  * they don't rewrite other people's words.
  * <p>
  * A comment hidden by reports (spec 3.2) is listed only for its author and admins, and cannot be edited;
