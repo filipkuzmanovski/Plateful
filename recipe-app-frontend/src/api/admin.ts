@@ -1,7 +1,44 @@
 import { ApiError, api, apiVoid } from './client';
+import type { ReportReason } from './reports';
+import type { Page } from '@/lib/types';
 
-export const getPendingCount = async (): Promise<number> =>
-  (await api<{ count: number }>('/api/admin/recipes/pending/count')).count;
+export interface ReportEntry {
+  reason: ReportReason;
+  note: string | null;
+  createdAt: string;
+}
+
+/** One reported recipe or comment in the admin queue. Never carries who reported it. */
+export interface ReportedItem {
+  kind: 'recipe' | 'comment';
+  id: string;
+  recipeId: string;
+  /** A comment's text, or a recipe's title. */
+  text: string;
+  /** Null for an imported recipe. */
+  authorName: string | null;
+  postedAt: string;
+  openCount: number;
+  hidden: boolean;
+  /** Oldest first. */
+  reports: ReportEntry[];
+}
+
+/** The reported items waiting for an admin, in the order the server ranks them. */
+export const getReports = (page: number): Promise<Page<ReportedItem>> =>
+  api(`/api/admin/reports?page=${page}`);
+
+/** The number of reported items waiting for an admin. */
+export const getReportCount = async (): Promise<number> =>
+  (await api<{ count: number }>('/api/admin/reports/count')).count;
+
+/** Closes the open reports on a recipe without removing it; a hidden recipe shows again. */
+export const dismissRecipeReports = (id: string) =>
+  apiVoid(`/api/admin/reports/recipes/${encodeURIComponent(id)}/dismiss`, { method: 'POST' });
+
+/** Closes the open reports on a comment without removing it; a hidden comment shows again. */
+export const dismissCommentReports = (id: string) =>
+  apiVoid(`/api/admin/reports/comments/${encodeURIComponent(id)}/dismiss`, { method: 'POST' });
 
 /** An admin takes down any recipe; its author is emailed the reason. */
 export const removeRecipe = (id: string, reason: string) =>

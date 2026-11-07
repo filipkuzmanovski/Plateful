@@ -2,7 +2,7 @@ import { Link } from 'react-router';
 import { ShieldCheck } from 'lucide-react';
 import { EmptyState } from '@/components/ui';
 
-/** Shown on both admin pages, in place of the queue, to an admin who has not set up two-factor authentication yet. */
+/** Shown on the Reports page, in place of the queue, to an admin who has not set up two-factor authentication yet. */
 export function AdminMfaPanel() {
   return (
     <EmptyState
@@ -16,7 +16,7 @@ export function AdminMfaPanel() {
         </Link>
       }
     >
-      Set up two-factor authentication to use the review queue.
+      Set up two-factor authentication to use the Reports page.
     </EmptyState>
   );
 }

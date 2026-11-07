@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ClipboardCheck, LogOut, Plus, UserRound } from 'lucide-react';
-import { getPendingCount } from '@/api/admin';
+import { getReportCount } from '@/api/admin';
 import { useAuth } from '@/auth/AuthProvider';
 import { IdleSessionGuard } from '@/auth/IdleSessionGuard';
 import { OnboardingRedirect } from '@/auth/OnboardingRedirect';
@@ -30,9 +30,9 @@ const pillLink =
 const menuItem =
   'flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[15px] text-ink transition-colors hover:bg-tint';
 
-/** The number of recipes waiting for review. No retries: an admin without two-factor gets a 403 here, and the link works fine without a badge. */
-function usePendingCount() {
-  const { data: count = 0 } = useQuery({ queryKey: ['admin', 'pendingCount'], queryFn: getPendingCount, retry: false });
+/** The number of reported items waiting for an admin. No retries: an admin without two-factor gets a 403 here, and the link works fine without a badge. */
+function useReportCount() {
+  const { data: count = 0 } = useQuery({ queryKey: ['admin', 'reportCount'], queryFn: getReportCount, retry: false });
   return count;
 }
 
@@ -47,33 +47,33 @@ function CountBadge({ count }: { count: number }) {
   );
 }
 
-/** The admin's way into the queue, with the number of recipes waiting once there are any. */
-function ReviewQueueLink() {
-  const count = usePendingCount();
+/** The admin's way into the reports queue, with the number of open items once there are any. */
+function ReportsLink() {
+  const count = useReportCount();
   return (
     <NavLink
-      to="/admin/review"
-      aria-label={count > 0 ? `Review queue, ${count} pending` : undefined}
+      to="/admin/reports"
+      aria-label={count > 0 ? `Reports, ${count} open` : undefined}
       className={(s) => `${wideOnly(s)} gap-1.5`}
     >
-      Review queue
+      Reports
       {count > 0 && <CountBadge count={count} />}
     </NavLink>
   );
 }
 
 /** The same link inside the user menu, for phones. */
-function ReviewQueueMenuItem({ onNavigate }: { onNavigate: () => void }) {
-  const count = usePendingCount();
+function ReportsMenuItem({ onNavigate }: { onNavigate: () => void }) {
+  const count = useReportCount();
   return (
     <Link
-      to="/admin/review"
+      to="/admin/reports"
       onClick={onNavigate}
-      aria-label={count > 0 ? `Review queue, ${count} pending` : undefined}
+      aria-label={count > 0 ? `Reports, ${count} open` : undefined}
       className={`${menuItem} md:hidden`}
     >
       <ClipboardCheck aria-hidden="true" className="size-4 text-ink-soft" />
-      <span className="flex-1">Review queue</span>
+      <span className="flex-1">Reports</span>
       {count > 0 && <CountBadge count={count} />}
     </Link>
   );
@@ -123,7 +123,7 @@ export default function AppShell() {
                   New recipe
                 </NavLink>
               )}
-              {status === 'ready' && profile?.isAdmin && <ReviewQueueLink />}
+              {status === 'ready' && profile?.isAdmin && <ReportsLink />}
               <ThemeMenu />
               {status === 'ready' && profile ? (
                 <div ref={menuRef} className="relative ml-1">
@@ -157,7 +157,7 @@ export default function AppShell() {
                         <Plus aria-hidden="true" className="size-4 text-ink-soft" />
                         New recipe
                       </Link>
-                      {profile.isAdmin && <ReviewQueueMenuItem onNavigate={() => setMenuOpen(false)} />}
+                      {profile.isAdmin && <ReportsMenuItem onNavigate={() => setMenuOpen(false)} />}
                       <Link to="/me" onClick={() => setMenuOpen(false)} className={menuItem}>
                         <UserRound aria-hidden="true" className="size-4 text-ink-soft" />
                         My profile

@@ -38,11 +38,11 @@ vi.mock('@/auth/supabaseClient', () => ({
   },
 }));
 
-function serve(profile: MyProfile, pending = 3) {
+function serve(profile: MyProfile, open = 3) {
   server.use(
     http.get(`${BASE}/api/users/me`, () => HttpResponse.json(profile)),
     http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))),
-    http.get(`${BASE}/api/admin/recipes/pending/count`, () => HttpResponse.json({ count: pending })),
+    http.get(`${BASE}/api/admin/reports/count`, () => HttpResponse.json({ count: open })),
   );
 }
 
@@ -57,14 +57,14 @@ test('adminUserMenuHasPhoneLinksProfileAndSignOut', async () => {
 
   await userEvent.click(await screen.findByRole('button', { name: /jane/i }));
   const menu = screen.getByTestId('user-menu');
-  expect(await within(menu).findByRole('link', { name: 'Review queue, 3 pending' })).toHaveAttribute('href', '/admin/review');
+  expect(await within(menu).findByRole('link', { name: 'Reports, 3 open' })).toHaveAttribute('href', '/admin/reports');
   expect(within(menu).getByRole('link', { name: 'New recipe' })).toHaveAttribute('href', '/recipes/new');
   expect(within(menu).getByRole('link', { name: 'My profile' })).toHaveAttribute('href', '/me');
   expect(within(menu).getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   expectNoEmoji();
 });
 
-test('nonAdminUserMenuHasNoReviewQueue', async () => {
+test('nonAdminUserMenuHasNoReports', async () => {
   serve(profileFixture);
   renderApp('/');
 
@@ -72,8 +72,8 @@ test('nonAdminUserMenuHasNoReviewQueue', async () => {
   const menu = screen.getByTestId('user-menu');
   expect(within(menu).getByRole('link', { name: 'New recipe' })).toBeInTheDocument();
   expect(within(menu).getByRole('link', { name: 'My profile' })).toBeInTheDocument();
-  expect(within(menu).queryByRole('link', { name: /review queue/i })).not.toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: /review queue/i })).not.toBeInTheDocument();
+  expect(within(menu).queryByRole('link', { name: /reports/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /reports/i })).not.toBeInTheDocument();
 });
 
 test('signedOutHeaderHasThemeButtonAndSignIn', async () => {
@@ -93,7 +93,7 @@ test('phoneHiddenHeaderLinksNeverCarryABareDisplayClass', async () => {
 
   const header = within(screen.getByRole('banner'));
   const wideOnly = [
-    await header.findByRole('link', { name: 'Review queue, 3 pending' }),
+    await header.findByRole('link', { name: 'Reports, 3 open' }),
     header.getByRole('link', { name: 'New recipe' }),
     header.getByRole('link', { name: 'Browse' }),
   ];
@@ -116,7 +116,7 @@ test('userMenuItemsOnlyForPhonesDoNotCarryHiddenOrInlineDisplayConflicts', async
 
   await userEvent.click(await screen.findByRole('button', { name: /jane/i }));
   const menu = within(screen.getByTestId('user-menu'));
-  for (const name of ['New recipe', 'Review queue, 3 pending']) {
+  for (const name of ['New recipe', 'Reports, 3 open']) {
     const tokens = (await menu.findByRole('link', { name })).className.split(/\s+/);
     expect(tokens).toContain('md:hidden');
     expect(tokens).not.toContain('hidden');

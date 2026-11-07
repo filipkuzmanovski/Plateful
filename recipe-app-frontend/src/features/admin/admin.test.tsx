@@ -31,31 +31,31 @@ function signedInAs(profile: MyProfile) {
 }
 
 /** Serves the admin API: the header count. */
-function serveAdmin(opts: { queue?: unknown[]; count?: number } = {}) {
-  server.use(http.get(`${BASE}/api/admin/recipes/pending/count`, () => HttpResponse.json({ count: opts.count ?? 0 })));
+function serveAdmin(opts: { count?: number } = {}) {
+  server.use(http.get(`${BASE}/api/admin/reports/count`, () => HttpResponse.json({ count: opts.count ?? 0 })));
 }
 
 test('headerLinkOnlyForAdmins', async () => {
   signedInAs(admin);
-  serveAdmin({ queue: [], count: 3 });
+  serveAdmin({ count: 3 });
   server.use(http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))));
   renderApp('/');
 
-  const link = await screen.findByRole('link', { name: 'Review queue, 3 pending' });
-  expect(link).toHaveAttribute('href', '/admin/review');
-  expect(within(link).getByText('Review queue')).toBeInTheDocument();
+  const link = await screen.findByRole('link', { name: 'Reports, 3 open' });
+  expect(link).toHaveAttribute('href', '/admin/reports');
+  expect(within(link).getByText('Reports')).toBeInTheDocument();
   expect(within(link).getByText('3')).toBeInTheDocument();
   expectNoEmoji();
 });
 
-test('headerLinkHasNoBadgeWithoutPendingRecipes', async () => {
+test('headerLinkHasNoBadgeWithoutOpenReports', async () => {
   signedInAs(admin);
-  serveAdmin({ queue: [], count: 0 });
+  serveAdmin({ count: 0 });
   server.use(http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))));
   renderApp('/');
 
-  const link = await screen.findByRole('link', { name: 'Review queue' });
-  await waitFor(() => expect(link).toHaveTextContent(/^Review queue$/));
+  const link = await screen.findByRole('link', { name: 'Reports' });
+  await waitFor(() => expect(link).toHaveTextContent(/^Reports$/));
 });
 
 test('headerLinkAbsentForNonAdmins', async () => {
@@ -63,7 +63,7 @@ test('headerLinkAbsentForNonAdmins', async () => {
   signedInAs(profileFixture);
   server.use(
     http.get(`${BASE}/api/recipes`, () => HttpResponse.json(pageOf([]))),
-    http.get(`${BASE}/api/admin/recipes/pending/count`, () => {
+    http.get(`${BASE}/api/admin/reports/count`, () => {
       countAsked = true;
       return HttpResponse.json({ count: 3 });
     }),
@@ -71,7 +71,7 @@ test('headerLinkAbsentForNonAdmins', async () => {
   renderApp('/');
 
   expect(await screen.findByRole('button', { name: /jane/i })).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: /review queue/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /reports/i })).not.toBeInTheDocument();
   expect(countAsked).toBe(false);
 });
 

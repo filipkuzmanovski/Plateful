@@ -3,6 +3,8 @@ import { SearchX } from 'lucide-react';
 import { EmptyState } from '@/components/ui';
 import AppShell from '@/components/AppShell';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
+import { AdminRoute } from '@/features/admin/AdminRoute';
+import ReportsPage from '@/features/admin/ReportsPage';
 import LoginPage from '@/features/auth/LoginPage';
 import SignupPage from '@/features/auth/SignupPage';
 import VerifyTwoFactorPage from '@/features/auth/VerifyTwoFactorPage';
@@ -46,6 +48,7 @@ export default function AppRoutes() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/admin/reports" element={<AdminRoute><ReportsPage /></AdminRoute>} />
         <Route path="/admin/review" element={<Navigate to="/admin/reports" replace />} />
         <Route path="/admin/review/:id" element={<Navigate to="/admin/reports" replace />} />
         <Route path="*" element={<EmptyState icon={SearchX}>Page not found.</EmptyState>} />
