@@ -81,7 +81,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
-    /** A refused report: its own status with code invalid_report, own_content, already_reported or report_limit. */
+    /** A refused report: its own status with code invalid_report, own_content, already_reported, report_limit or already_handled. */
     @ExceptionHandler(ReportException.class)
     ProblemDetail handleReport(ReportException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());

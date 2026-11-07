@@ -51,6 +51,10 @@ public interface RecipeCommentRepository extends JpaRepository<RecipeComment, UU
     @Query("SELECT c.recipe.id FROM RecipeComment c WHERE c.id = :id")
     Optional<UUID> findRecipeIdById(@Param("id") UUID id);
 
+    // the admin reports queue: the page's comments with their authors in one query
+    @Query("SELECT c FROM RecipeComment c LEFT JOIN FETCH c.user WHERE c.id IN :ids")
+    List<RecipeComment> findWithAuthorByIdIn(@Param("ids") Collection<UUID> ids);
+
     long countByRecipeId(UUID recipeId);
 
     // BUGFIX (review issue #6, N+1 aggregates): batched variant for recipe

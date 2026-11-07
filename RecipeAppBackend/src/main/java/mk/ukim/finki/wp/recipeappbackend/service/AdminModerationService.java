@@ -54,11 +54,19 @@ public class AdminModerationService {
         events.publishEvent(event);
     }
 
-    /** No approved-recipe check: an admin can remove a comment on a recipe in any status too. */
+    /**
+     * No approved-recipe check: an admin can remove a comment on a recipe in any status too. Locks the
+     * comment's recipe first and then the comment, the order reports and dismissals use, so a removal and a
+     * dismissal or report of the same comment serialize.
+     */
     @Transactional
     public void removeComment(UUID adminId, UUID commentId, String reason) {
         String trimmed = validReason(reason);
-        RecipeComment comment = commentRepository.findById(commentId)
+        UUID recipeId = commentRepository.findRecipeIdById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment", commentId));
+        recipeRepository.findForReviewById(recipeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment", commentId));
+        RecipeComment comment = commentRepository.findForUpdateById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", commentId));
         User author = comment.getUser();
         CommentRemovedEvent event = new CommentRemovedEvent(

@@ -212,6 +212,83 @@ class ContentReportRepositoryDbTest {
         assertThat(reports.countByReporterIdAndCreatedAtAfter(reporterId, now.minusHours(24))).isEqualTo(2);
     }
 
+    // ---- admin queue ----
+
+    private UUID newRecipe(String title) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO recipes (id, user_id, title, status) VALUES (?, ?, ?, 'approved')", id, authorId, title);
+        return id;
+    }
+
+    private void insertAt(UUID reporter, UUID recipe, UUID comment, OffsetDateTime at) {
+        jdbc.update("INSERT INTO content_reports (reporter_id, recipe_id, comment_id, reason, created_at) "
+                + "VALUES (?, ?, ?, 'spam', ?)", reporter, recipe, comment, at);
+    }
+
+    @Test
+    void queue_ordersByOpenCountThenOldestReportThenId_mixingKinds() {
+        OffsetDateTime now = OffsetDateTime.now();
+        UUID twoReports = newRecipe("two");
+        UUID oldSingle = newRecipe("old single");
+        UUID newSingle = newRecipe("new single");
+        // the comment has 1 open report, older than the new single but newer than the old single
+        insertAt(newUser("A"), twoReports, null, now.minusHours(1));
+        insertAt(newUser("B"), twoReports, null, now.minusHours(2));
+        insertAt(newUser("C"), oldSingle, null, now.minusHours(10));
+        insertAt(newUser("D"), null, commentId, now.minusHours(5));
+        insertAt(newUser("E"), newSingle, null, now.minusHours(3));
+        // dismissed reports count for nothing
+        insert(newUser("F"), newRecipe("dismissed only"), null, "spam", "dismissed");
+
+        var mine = List.of(twoReports, oldSingle, newSingle, commentId);
+        var rows = reports.findQueue(org.springframework.data.domain.PageRequest.of(0, 50)).getContent().stream()
+                .filter(r -> mine.contains(r.getId())).toList();
+
+        // other open reports already in the database do not matter: only the relative order of ours does
+        assertThat(rows).extracting(ContentReportRepository.QueueRow::getId)
+                .containsExactly(twoReports, oldSingle, commentId, newSingle);
+        assertThat(rows).extracting(ContentReportRepository.QueueRow::getKind)
+                .containsExactly("recipe", "recipe", "comment", "recipe");
+        assertThat(rows.get(0).getOpenCount()).isEqualTo(2);
+    }
+
+    @Test
+    void count_countsItemsNotReports() {
+        long before = reports.countReportedItems();
+        insert(newUser("A"), recipeId, null, "spam", "open");
+        insert(newUser("B"), recipeId, null, "spam", "open");
+        insert(newUser("C"), null, commentId, "spam", "open");
+        insert(newUser("D"), newRecipe("dismissed only"), null, "spam", "dismissed");
+
+        assertThat(reports.countReportedItems()).isEqualTo(before + 2);
+    }
+
+    @Test
+    void dismiss_closesOnlyOpenReports_andReturnsHowMany() {
+        insert(newUser("A"), recipeId, null, "spam", "open");
+        insert(newUser("B"), recipeId, null, "spam", "open");
+        insert(newUser("C"), recipeId, null, "spam", "dismissed");
+        insert(newUser("D"), null, commentId, "spam", "open");
+
+        assertThat(reports.dismissOpenForRecipe(recipeId)).isEqualTo(2);
+        assertThat(reports.dismissOpenForRecipe(recipeId)).isZero();
+        assertThat(reports.dismissOpenForComment(commentId)).isEqualTo(1);
+        assertThat(reports.dismissOpenForComment(commentId)).isZero();
+    }
+
+    @Test
+    void openReportsForItems_areOldestFirst() {
+        OffsetDateTime now = OffsetDateTime.now();
+        insertAt(newUser("A"), recipeId, null, now.minusHours(1));
+        insertAt(newUser("B"), recipeId, null, now.minusHours(3));
+        insert(newUser("C"), recipeId, null, "spam", "dismissed");
+
+        var found = reports.findOpenForRecipes(List.of(recipeId));
+
+        assertThat(found).hasSize(2);
+        assertThat(found.get(0).getCreatedAt()).isBefore(found.get(1).getCreatedAt());
+    }
+
     @Test
     void existsAndReportedCommentIds_seeEveryState() {
         UUID otherComment = UUID.randomUUID();

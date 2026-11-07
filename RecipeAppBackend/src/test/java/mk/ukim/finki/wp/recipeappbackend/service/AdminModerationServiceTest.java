@@ -137,10 +137,29 @@ class AdminModerationServiceTest {
 
     // ---- remove comment ------------------------------------------------------------------------
 
+    private void lockComment(RecipeComment comment) {
+        when(commentRepository.findRecipeIdById(commentId)).thenReturn(Optional.of(recipeId));
+        when(recipeRepository.findForReviewById(recipeId)).thenReturn(Optional.of(comment.getRecipe()));
+        when(commentRepository.findForUpdateById(commentId)).thenReturn(Optional.of(comment));
+    }
+
+    @Test
+    void removeCommentLocksTheRecipeFirstThenTheComment() {
+        RecipeComment comment = comment(recipe(author, RecipeStatus.APPROVED));
+        lockComment(comment);
+
+        service.removeComment(adminId, commentId, "Rude");
+
+        var order = org.mockito.Mockito.inOrder(recipeRepository, commentRepository);
+        order.verify(recipeRepository).findForReviewById(recipeId);
+        order.verify(commentRepository).findForUpdateById(commentId);
+        order.verify(commentRepository).delete(comment);
+    }
+
     @Test
     void removeCommentDeletesItAndPublishesCapturedFields() {
         RecipeComment comment = comment(recipe(author, RecipeStatus.APPROVED));
-        when(commentRepository.findById(commentId)).thenReturn(Optional.of(comment));
+        lockComment(comment);
 
         service.removeComment(adminId, commentId, " Rude ");
 
@@ -163,7 +182,9 @@ class AdminModerationServiceTest {
             RecipeCommentRepository repo = mock(RecipeCommentRepository.class);
             ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
             RecipeComment comment = comment(recipe(author, status));
-            when(repo.findById(commentId)).thenReturn(Optional.of(comment));
+            when(repo.findRecipeIdById(commentId)).thenReturn(Optional.of(recipeId));
+            when(recipeRepository.findForReviewById(recipeId)).thenReturn(Optional.of(comment.getRecipe()));
+            when(repo.findForUpdateById(commentId)).thenReturn(Optional.of(comment));
 
             new AdminModerationService(recipeRepository, repo, events).removeComment(adminId, commentId, "Rude");
 
@@ -174,7 +195,7 @@ class AdminModerationServiceTest {
 
     @Test
     void removeMissingCommentIs404() {
-        when(commentRepository.findById(commentId)).thenReturn(Optional.empty());
+        when(commentRepository.findRecipeIdById(commentId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.removeComment(adminId, commentId, "Rude"))
                 .isInstanceOf(ResourceNotFoundException.class);

@@ -12,6 +12,7 @@ public class ReportException extends RuntimeException {
     public static final String OWN_CONTENT = "own_content";
     public static final String ALREADY_REPORTED = "already_reported";
     public static final String REPORT_LIMIT = "report_limit";
+    public static final String ALREADY_HANDLED = "already_handled";
 
     private final HttpStatus status;
     private final String code;
@@ -37,6 +38,11 @@ public class ReportException extends RuntimeException {
     public static ReportException limit() {
         return new ReportException(HttpStatus.TOO_MANY_REQUESTS, REPORT_LIMIT,
                 "You've sent 20 reports today. You can report more tomorrow.");
+    }
+
+    /** An admin dismissed an item that has no open reports (someone else got there first). */
+    public static ReportException alreadyHandled() {
+        return new ReportException(HttpStatus.CONFLICT, ALREADY_HANDLED, "These reports were already handled.");
     }
 
     public HttpStatus getStatus() {
