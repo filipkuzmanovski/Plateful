@@ -36,7 +36,7 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, UU
      * open report is oldest, then id. The pageable must be unsorted (the order is fixed here).
      */
     @Query(value = """
-            SELECT q.kind AS kind, q.id AS id, q.open_count AS openCount
+            SELECT q.kind AS kind, q.id AS id, q.open_count AS "openCount"
             FROM (
                 SELECT CAST('recipe' AS text) AS kind, recipe_id AS id, count(*) AS open_count, min(created_at) AS oldest
                 FROM content_reports WHERE state = 'open' AND recipe_id IS NOT NULL GROUP BY recipe_id
