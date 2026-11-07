@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router';
+import { Navigate, Route, Routes } from 'react-router';
 import { SearchX } from 'lucide-react';
 import { EmptyState } from '@/components/ui';
 import AppShell from '@/components/AppShell';
@@ -21,9 +21,6 @@ import AboutPage from '@/features/content/AboutPage';
 import PrivacyPage from '@/features/content/PrivacyPage';
 import TermsPage from '@/features/content/TermsPage';
 import ContactPage from '@/features/content/ContactPage';
-import { AdminRoute } from '@/features/admin/AdminRoute';
-import ReviewQueuePage from '@/features/admin/ReviewQueuePage';
-import ReviewRecipePage from '@/features/admin/ReviewRecipePage';
 
 export default function AppRoutes() {
   return (
@@ -49,8 +46,8 @@ export default function AppRoutes() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/contact" element={<ContactPage />} />
-        <Route path="/admin/review" element={<AdminRoute><ReviewQueuePage /></AdminRoute>} />
-        <Route path="/admin/review/:id" element={<AdminRoute><ReviewRecipePage /></AdminRoute>} />
+        <Route path="/admin/review" element={<Navigate to="/admin/reports" replace />} />
+        <Route path="/admin/review/:id" element={<Navigate to="/admin/reports" replace />} />
         <Route path="*" element={<EmptyState icon={SearchX}>Page not found.</EmptyState>} />
       </Route>
     </Routes>

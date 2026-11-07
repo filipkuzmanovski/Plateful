@@ -357,9 +357,9 @@ describe('RecipeCard', () => {
   test('the badge sits beside the review status badge', () => {
     renderCard({
       video,
-      review: { status: 'pending', rejectionReason: null, everApproved: false, revision: 1, submittedAt: '2026-10-18T10:00:00Z' },
+      review: { status: 'rejected', rejectionReason: null, everApproved: false, revision: 1, submittedAt: '2026-10-18T10:00:00Z', hidden: false },
     });
     expect(screen.getByText('Video')).toBeInTheDocument();
-    expect(screen.getByText(/pending/i)).toBeInTheDocument();
+    expect(screen.getByText(/rejected/i)).toBeInTheDocument();
   });
 });

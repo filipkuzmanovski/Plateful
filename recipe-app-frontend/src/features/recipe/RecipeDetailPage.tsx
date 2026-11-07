@@ -17,6 +17,7 @@ import { RecipeBody } from './RecipeBody';
 import { ShareRecipe } from './ShareRecipe';
 import { SaveRecipeButton } from '@/features/saved/SaveRecipeButton';
 import { HiddenRecipePage } from './HiddenRecipePage';
+import { isLive } from '@/lib/live';
 import { ReviewStatusBanner } from '@/features/review/ReviewStatusBanner';
 import { ReasonDialog } from '@/features/admin/ReasonDialog';
 import { LikeButton } from '@/features/likes/LikeButton';
@@ -121,7 +122,7 @@ export default function RecipeDetailPage() {
   const isOwner = !!profile && recipe.user?.id === profile.id;
   const canRemove = !!profile?.isAdmin && !isOwner;
   // Only an approved recipe is open to feedback; the API refuses writes on the others (409 recipe_not_approved).
-  const acceptsFeedback = !recipe.review || recipe.review.status === 'approved';
+  const acceptsFeedback = isLive(recipe);
 
   return (
     <RecipeBody

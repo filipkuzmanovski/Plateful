@@ -174,7 +174,7 @@ export default function RecipeFormPage() {
       if (unusedVideo.length > 0) void deleteVideoFiles(unusedVideo);
       // A save can change how many of the author's recipes are rejected; keep the profile tab label current.
       void refreshProfile();
-      if (!id && !profile?.isAdmin) toast.success("Submitted for review. We'll email you when it's approved.");
+      if (!id) toast.success('Your recipe goes live as soon as you save it.');
       navigate(`/recipes/${saved.id}`);
     } catch (e) {
       if (e instanceof ApiError && e.errors) {
@@ -204,10 +204,6 @@ export default function RecipeFormPage() {
   if (id && existing.data && existing.data.user?.id !== profile?.id) {
     return <EmptyState icon={LockKeyhole}>You can only edit your own recipes.</EmptyState>;
   }
-
-  // Non-admins' edits to a decided recipe go back to the queue; a pending one is already there.
-  const reviewStatus = existing.data?.review?.status;
-  const needsReviewNotice = !!id && !profile?.isAdmin && (reviewStatus === 'approved' || reviewStatus === 'rejected');
 
   return (
     <form noValidate onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-3xl">
@@ -390,12 +386,6 @@ export default function RecipeFormPage() {
       </div>
 
       {/* Save stays within reach on long forms. */}
-      {needsReviewNotice && (
-        <p className="mt-6 rounded-card border border-accent/40 bg-accent/15 px-4 py-3 text-[15px] font-medium text-accent-ink">
-          Saving changes sends this recipe back for review. It will be hidden from others until it's approved.
-        </p>
-      )}
-
       <div className="sticky bottom-4 z-10 mt-8 flex items-center justify-end gap-3">
         {photosBusy && <p className="rounded-full border border-rule bg-surface/95 px-3 py-1.5 text-[13px] text-ink-soft">Waiting for photos to finish uploading</p>}
         <div className="rounded-full border border-rule bg-surface/95 p-1.5">

@@ -26,14 +26,14 @@ vi.mock('@/api/photos', async (importOriginal) => ({
   deletePhotos: vi.fn(async () => {}),
 }));
 
-const SUBMITTED_TOAST = "Submitted for review. We'll email you when it's approved.";
-const EDIT_NOTICE =
-  "Saving changes sends this recipe back for review. It will be hidden from others until it's approved.";
+const LIVE_TOAST = 'Your recipe goes live as soon as you save it.';
+const REJECTED_BANNER = 'Not published. Edit it to publish it.';
+const HIDDEN_BANNER = 'Hidden while an admin looks at reports.';
 
 function review(overrides: Partial<RecipeReview> = {}): RecipeReview {
   return {
-    status: 'pending', rejectionReason: null, everApproved: false, revision: 1,
-    submittedAt: '2026-10-18T10:00:00Z', ...overrides,
+    status: 'approved', rejectionReason: null, everApproved: true, revision: 1,
+    submittedAt: '2026-10-18T10:00:00Z', hidden: false, ...overrides,
   };
 }
 
@@ -57,9 +57,7 @@ function serveRecipe(recipe: RecipeDisplay) {
 function createdBy(profile: MyProfile) {
   return recipeFixture({
     id: 'r-new', title: 'My Pie', user: profile,
-    review: profile.isAdmin
-      ? review({ status: 'approved', everApproved: true })
-      : review({ status: 'pending' }),
+    review: review(),
   });
 }
 
@@ -88,56 +86,41 @@ async function createRecipeAs(profile: MyProfile) {
   return detailGets;
 }
 
-test('createShowsSubmittedToast', async () => {
+test('createShowsLiveToast', async () => {
   await createRecipeAs(profileFixture);
-  expect(await screen.findByText(SUBMITTED_TOAST)).toBeInTheDocument();
+  expect(await screen.findByText(LIVE_TOAST)).toBeInTheDocument();
   expectNoEmoji();
 });
 
-test('createShowsPendingBannerImmediately', async () => {
-  const detailGets = await createRecipeAs(profileFixture);
+test('adminCreateShowsTheSameToast', async () => {
+  await createRecipeAs({ ...profileFixture, isAdmin: true });
+  expect(await screen.findByText(LIVE_TOAST)).toBeInTheDocument();
+});
 
-  expect(screen.getByText('Waiting for review. Only you can see this recipe.')).toBeInTheDocument();
-  expect(screen.queryByRole('region', { name: /comments/i })).not.toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: /^comments/i })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /rate \d stars/i })).not.toBeInTheDocument();
-  // The page comes from the create response alone; it needs no extra GET to know it is pending.
+test('createShowsNoBannerAndKeepsFeedbackControls', async () => {
+  const detailGets = await createRecipeAs(profileFixture);
+  expect(screen.queryByText(/waiting for review|not published|hidden while/i)).not.toBeInTheDocument();
+  expect(await screen.findByRole('region', { name: /comments/i })).toBeInTheDocument();
   expect(detailGets.count).toBe(0);
   expectNoEmoji();
 });
 
-test('adminCreateHasNoReviewToast', async () => {
-  await createRecipeAs({ ...profileFixture, isAdmin: true });
-  // Give a wrongly shown toast time to render before asserting it is absent.
-  await expect(screen.findByText(SUBMITTED_TOAST, {}, { timeout: 400 })).rejects.toThrow();
-  expectNoEmoji();
-});
-
-test('pendingBannerForAuthor', async () => {
+test('a leftover pending status shows no banner', async () => {
   signedInAs();
   serveRecipe(recipeFixture({ user: profileFixture, review: review({ status: 'pending' }) }));
   renderApp('/recipes/r-1');
-
-  expect(await screen.findByText('Waiting for review. Only you can see this recipe.')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: /bruschetta pork/i })).toBeInTheDocument();
-  expect(screen.queryByRole('region', { name: /comments/i })).not.toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: /^comments/i })).not.toBeInTheDocument();
-  expect(screen.queryByText(/your rating/i)).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /rate \d stars/i })).not.toBeInTheDocument();
-  expectNoEmoji();
+  await screen.findByRole('heading', { name: /bruschetta pork/i });
+  expect(screen.queryByText(/waiting for review/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(REJECTED_BANNER)).not.toBeInTheDocument();
+  expect(screen.queryByText(HIDDEN_BANNER)).not.toBeInTheDocument();
 });
 
-test('rejectedBannerShowsReasonAndResubmitLink', async () => {
+test('rejectedBannerForAuthor', async () => {
   signedInAs();
-  serveRecipe(
-    recipeFixture({
-      user: profileFixture,
-      review: review({ status: 'rejected', rejectionReason: 'Photos are blurry.' }),
-    }),
-  );
+  serveRecipe(recipeFixture({ user: profileFixture, review: review({ status: 'rejected', rejectionReason: 'Photos are blurry.' }) }));
   renderApp('/recipes/r-1');
 
-  expect(await screen.findByText("This recipe wasn't approved.")).toBeInTheDocument();
+  expect(await screen.findByText(REJECTED_BANNER)).toBeInTheDocument();
   expect(screen.getByText('Photos are blurry.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Edit and resubmit' })).toHaveAttribute('href', '/recipes/r-1/edit');
   expect(screen.queryByRole('region', { name: /comments/i })).not.toBeInTheDocument();
@@ -145,47 +128,43 @@ test('rejectedBannerShowsReasonAndResubmitLink', async () => {
   expectNoEmoji();
 });
 
+test('hiddenBannerForAuthorRemovesFeedbackControls', async () => {
+  signedInAs();
+  serveRecipe(recipeFixture({ user: profileFixture, likeCount: 2, review: review({ hidden: true }) }));
+  renderApp('/recipes/r-1');
+
+  expect(await screen.findByText(HIDDEN_BANNER)).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: /comments/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /rate \d stars/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /like/i })).not.toBeInTheDocument();
+  expectNoEmoji();
+});
+
+test('hidden wins over rejected in the banner', async () => {
+  signedInAs();
+  serveRecipe(recipeFixture({ user: profileFixture, review: review({ status: 'rejected', hidden: true, rejectionReason: 'No.' }) }));
+  renderApp('/recipes/r-1');
+  expect(await screen.findByText(HIDDEN_BANNER)).toBeInTheDocument();
+  expect(screen.queryByText(REJECTED_BANNER)).not.toBeInTheDocument();
+});
+
 test('approved recipe shows no banner and keeps comments and rating', async () => {
   signedInAs();
-  serveRecipe(recipeFixture({ user: profileFixture, review: review({ status: 'approved', everApproved: true }) }));
+  serveRecipe(recipeFixture({ user: profileFixture, review: review() }));
   renderApp('/recipes/r-1');
 
   expect(await screen.findByRole('region', { name: /comments/i })).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: /rate 3 stars/i })).toBeInTheDocument();
   expect(screen.queryByText(/waiting for review/i)).not.toBeInTheDocument();
-  expect(screen.queryByText("This recipe wasn't approved.")).not.toBeInTheDocument();
+  expect(screen.queryByText(REJECTED_BANNER)).not.toBeInTheDocument();
 });
 
-test('editApprovedShowsNotice', async () => {
-  signedInAs();
-  serveRecipe(recipeFixture({ user: profileFixture, review: review({ status: 'approved', everApproved: true }) }));
-  renderApp('/recipes/r-1/edit');
-
-  expect(await screen.findByText(EDIT_NOTICE)).toBeInTheDocument();
-  expectNoEmoji();
-});
-
-test('edit notice also shows for a rejected recipe but not a pending one', async () => {
+test('edit form no longer warns about review', async () => {
   signedInAs();
   serveRecipe(recipeFixture({ user: profileFixture, review: review({ status: 'rejected', rejectionReason: 'No.' }) }));
-  const { unmount } = renderApp('/recipes/r-1/edit');
-  expect(await screen.findByText(EDIT_NOTICE)).toBeInTheDocument();
-  unmount();
-
-  serveRecipe(recipeFixture({ user: profileFixture, review: review({ status: 'pending' }) }));
   renderApp('/recipes/r-1/edit');
   await screen.findByRole('button', { name: /^save recipe$/i });
-  expect(screen.queryByText(EDIT_NOTICE)).not.toBeInTheDocument();
-});
-
-test('adminEditHasNoNotice', async () => {
-  signedInAs({ ...profileFixture, isAdmin: true });
-  serveRecipe(recipeFixture({ user: profileFixture, review: review({ status: 'approved', everApproved: true }) }));
-  renderApp('/recipes/r-1/edit');
-
-  await screen.findByRole('button', { name: /^save recipe$/i });
-  expect(screen.queryByText(EDIT_NOTICE)).not.toBeInTheDocument();
-  expectNoEmoji();
+  expect(screen.queryByText(/back for review/i)).not.toBeInTheDocument();
 });
 
 test('myRecipesBadges', async () => {
@@ -194,8 +173,8 @@ test('myRecipesBadges', async () => {
     http.get(`${BASE}/api/users/u-1/recipes`, () =>
       HttpResponse.json(
         pageOf([
-          recipeFixture({ id: 'a', title: 'Approved Soup', user: profileFixture, review: review({ status: 'approved', everApproved: true }) }),
-          recipeFixture({ id: 'p', title: 'Pending Pie', user: profileFixture, review: review({ status: 'pending' }) }),
+          recipeFixture({ id: 'a', title: 'Approved Soup', user: profileFixture, review: review() }),
+          recipeFixture({ id: 'p', title: 'Hidden Pie', user: profileFixture, review: review({ hidden: true }) }),
           recipeFixture({ id: 'x', title: 'Rejected Roast', user: profileFixture, review: review({ status: 'rejected', rejectionReason: 'No.' }) }),
         ]),
       ),
@@ -206,9 +185,9 @@ test('myRecipesBadges', async () => {
 
   const card = async (title: string) =>
     (await screen.findByRole('heading', { name: title })).closest('a') as HTMLElement;
-  expect(within(await card('Pending Pie')).getByText('Pending review')).toBeInTheDocument();
+  expect(within(await card('Hidden Pie')).getByText('Hidden')).toBeInTheDocument();
   expect(within(await card('Rejected Roast')).getByText('Rejected')).toBeInTheDocument();
-  expect(within(await card('Approved Soup')).queryByText(/pending review|rejected/i)).not.toBeInTheDocument();
+  expect(within(await card('Approved Soup')).queryByText(/hidden|rejected|pending/i)).not.toBeInTheDocument();
   expectNoEmoji();
 });
 

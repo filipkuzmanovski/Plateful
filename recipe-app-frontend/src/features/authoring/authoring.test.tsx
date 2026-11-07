@@ -13,7 +13,7 @@ const BASE = 'http://localhost:8080';
 /** The review block the backend attaches to an author's create/edit response (a non-admin's save is pending). */
 const PENDING = {
   status: 'pending' as const, rejectionReason: null, everApproved: false, revision: 1,
-  submittedAt: '2026-10-18T10:00:00Z',
+  submittedAt: '2026-10-18T10:00:00Z', hidden: false,
 };
 
 // Storage is never reached: uploads and deletes are mocked, the URL helpers stay real.

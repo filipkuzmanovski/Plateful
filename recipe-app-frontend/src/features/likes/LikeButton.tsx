@@ -1,16 +1,17 @@
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { isLive } from '@/lib/live';
 import type { RecipeDisplay } from '@/lib/types';
 import { useLikeControl } from './useLikeControl';
 
 /**
  * The public heart and count. "card" sits over a recipe card's photo, as a sibling of the card link and never
  * inside it; "page" sits with the actions on the recipe page. Only published recipes can be liked, so a recipe
- * the viewer sees under review shows nothing.
+ * the viewer sees hidden or rejected shows nothing.
  */
 export function LikeButton({ recipe, variant }: { recipe: RecipeDisplay; variant: 'card' | 'page' }) {
   const { liked, disabled, pending, toggle } = useLikeControl(recipe.id);
-  if (recipe.review && recipe.review.status !== 'approved') return null;
+  if (!isLive(recipe)) return null;
 
   const count = `${recipe.likeCount} ${recipe.likeCount === 1 ? 'like' : 'likes'}`;
   const label = `${liked ? 'Remove like from' : 'Like'} ${recipe.title}, ${count}`;

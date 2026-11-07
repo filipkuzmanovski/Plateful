@@ -11,7 +11,7 @@ import { capturePoster, probeVideo } from '@/lib/videoProbe';
 const BASE = 'http://localhost:8080';
 const PENDING = {
   status: 'pending' as const, rejectionReason: null, everApproved: false, revision: 1,
-  submittedAt: '2026-10-18T10:00:00Z',
+  submittedAt: '2026-10-18T10:00:00Z', hidden: false,
 };
 
 const TYPE_MESSAGE = 'Videos must be MP4, WebM or MOV, up to 50 MB.';

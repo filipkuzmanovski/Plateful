@@ -162,14 +162,14 @@ test('stubsAreNotOffered', async () => {
   expect(screen.queryByText('Hidden Stew')).not.toBeInTheDocument();
 });
 
-test('aRecipeUnderReviewIsNotOffered', async () => {
+test('aHiddenRecipeIsNotOffered', async () => {
   fakeServer([
     ...items(5),
     {
       kind: 'recipe',
       recipe: recipeFixture({
-        id: 'r-own', title: 'My Pending Pie',
-        review: { status: 'pending', rejectionReason: null, everApproved: true, revision: 2, submittedAt: '2026-11-05T10:00:00Z' },
+        id: 'r-own', title: 'My Hidden Pie',
+        review: { status: 'approved', rejectionReason: null, everApproved: true, revision: 2, submittedAt: '2026-11-05T10:00:00Z', hidden: true },
       }),
       stub: null,
     },
@@ -177,14 +177,14 @@ test('aRecipeUnderReviewIsNotOffered', async () => {
       kind: 'recipe',
       recipe: recipeFixture({
         id: 'r-fine', title: 'My Approved Pie',
-        review: { status: 'approved', rejectionReason: null, everApproved: true, revision: 1, submittedAt: '2026-11-05T10:00:00Z' },
+        review: { status: 'approved', rejectionReason: null, everApproved: true, revision: 1, submittedAt: '2026-11-05T10:00:00Z', hidden: false },
       }),
       stub: null,
     },
   ]);
   renderPage();
   await box('My Approved Pie');
-  expect(screen.queryByText('My Pending Pie')).not.toBeInTheDocument();
+  expect(screen.queryByText('My Hidden Pie')).not.toBeInTheDocument();
 });
 
 test('saysWhenFewerThanFiveCanBeChosen', async () => {

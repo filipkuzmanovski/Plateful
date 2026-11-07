@@ -28,7 +28,7 @@ export function recipeFixture(overrides: Partial<RecipeDisplay> = {}): RecipeDis
 export function commentFixture(overrides: Partial<CommentDisplay> = {}): CommentDisplay {
   return {
     id: 'c-1', user: profileFixture, body: 'Delicious!', likeCount: 3, dislikeCount: 0,
-    createdAt: '2026-07-14T00:00:00Z', ...overrides,
+    createdAt: '2026-07-14T00:00:00Z', hidden: false, ...overrides,
   };
 }
 

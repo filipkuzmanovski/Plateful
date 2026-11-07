@@ -6,6 +6,7 @@ import { Pill } from './ui';
 import { CARD_IMAGE_SIZES, recipeImageSrcSet } from '@/lib/recipeImage';
 import { BookmarkButton } from '@/features/saved/BookmarkButton';
 import { LikeButton } from '@/features/likes/LikeButton';
+import { isLive } from '@/lib/live';
 import { StatusBadge } from '@/features/review/StatusBadge';
 
 export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
@@ -51,8 +52,8 @@ export function RecipeCard({ recipe }: { recipe: RecipeDisplay }) {
               </span>
             )}
           </div>
-          {recipe.review && recipe.review.status !== 'approved' && (
-            <div><StatusBadge status={recipe.review.status} /></div>
+          {recipe.review && !isLive(recipe) && (
+            <div><StatusBadge review={recipe.review} /></div>
           )}
           {recipe.cuisines.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

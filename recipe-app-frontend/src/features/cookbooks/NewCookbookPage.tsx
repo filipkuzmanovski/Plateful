@@ -7,6 +7,7 @@ import { createCookbook } from '@/api/cookbooks';
 import { getLikedRecipes } from '@/api/likes';
 import { useAuth } from '@/auth/AuthProvider';
 import { Button, EmptyState, Field, Spinner, TextInput } from '@/components/ui';
+import { isLive } from '@/lib/live';
 import type { RecipeDisplay } from '@/lib/types';
 import { DEFAULT_SUBTITLE, MAX_RECIPES, MAX_SUBTITLE, MIN_RECIPES } from './constants';
 import { PickGrid } from './PickGrid';
@@ -29,12 +30,12 @@ export default function NewCookbookPage() {
     refetchOnMount: 'always',
   });
 
-  // Only published recipes can go in a book. Hidden ones come back as stubs; your own under review as cards.
+  // Only published recipes can go in a book. Hidden ones come back as stubs; your own hidden or rejected ones as cards.
   const recipes = useMemo<RecipeDisplay[]>(
     () =>
       (liked.data?.pages ?? []).flatMap((page) =>
         page.content.flatMap((item) =>
-          item.recipe && (!item.recipe.review || item.recipe.review.status === 'approved') ? [item.recipe] : [],
+          item.recipe && isLive(item.recipe) ? [item.recipe] : [],
         ),
       ),
     [liked.data],

@@ -33,7 +33,7 @@ function stubPage(recipe = recipeFixture()) {
 
 const review = (status: RecipeReview['status']): RecipeReview => ({
   status, rejectionReason: status === 'rejected' ? 'Not a recipe.' : null, everApproved: false,
-  revision: 1, submittedAt: '2026-10-18T10:00:00Z',
+  revision: 1, submittedAt: '2026-10-18T10:00:00Z', hidden: false,
 });
 
 describe('Share on the recipe page', () => {

@@ -14,6 +14,8 @@ export type ReviewStatus = 'pending' | 'approved' | 'rejected';
 export interface RecipeReview {
   status: ReviewStatus; rejectionReason: string | null; everApproved: boolean;
   revision: number; submittedAt: string;
+  /** True while reports have the recipe hidden from everyone but its author and admins. */
+  hidden: boolean;
 }
 
 /** A recipe's optional clip: the public file URLs and its length, rounded up to whole seconds. */
@@ -47,7 +49,7 @@ export interface RecipeDisplay {
   estimate?: NutritionEstimate | null;
 }
 
-export interface CommentDisplay { id: string; user: UserDisplay; body: string; likeCount: number; dislikeCount: number; createdAt: string | null; }
+export interface CommentDisplay { id: string; user: UserDisplay; body: string; likeCount: number; dislikeCount: number; createdAt: string | null; hidden: boolean; }
 export interface RatingDisplay { id: string; user: UserDisplay; rating: number; createdAt: string | null; }
 export interface ReactionDisplay { user: UserDisplay; isLike: boolean; createdAt: string | null; }
 
