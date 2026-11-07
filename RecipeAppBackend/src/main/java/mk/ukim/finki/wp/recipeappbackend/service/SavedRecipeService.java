@@ -1,7 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
-import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeDisplayDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.RecipeReviewDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.SavedItemDto;
@@ -102,8 +101,7 @@ public class SavedRecipeService {
     }
 
     private static SavedRecipeStubDto stubOf(Recipe recipe) {
-        String state = recipe.getStatus() == RecipeStatus.PENDING ? "under_review" : "unavailable";
-        return new SavedRecipeStubDto(recipe.getId(), recipe.getApprovedTitle(), state);
+        return new SavedRecipeStubDto(recipe.getId(), recipe.getApprovedTitle(), "unavailable");
     }
 
     @Transactional(readOnly = true)

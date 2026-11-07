@@ -155,7 +155,7 @@ class RecipeServiceVideoTest {
     }
 
     @Test
-    void videoOnlyEditGoesBackToReview() {
+    void videoOnlyEditStaysLiveAndBumpsRevision() {
         UUID recipeId = UUID.randomUUID();
         Recipe recipe = existing(recipeId);
         when(photoRepository.existsByRecipeId(recipeId)).thenReturn(true);
@@ -164,7 +164,7 @@ class RecipeServiceVideoTest {
         service.update(userId, recipeId, dto(List.of(), clipA));
 
         assertThat(recipe.getRevision()).isEqualTo(4);
-        assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.PENDING);
+        assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.APPROVED);
     }
 
     @Test

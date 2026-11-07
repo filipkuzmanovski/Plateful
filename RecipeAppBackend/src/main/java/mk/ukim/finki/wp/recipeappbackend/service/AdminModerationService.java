@@ -1,5 +1,6 @@
 package mk.ukim.finki.wp.recipeappbackend.service;
 
+import mk.ukim.finki.wp.recipeappbackend.exception.InvalidReviewReasonException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.RecipeComment;
@@ -15,11 +16,13 @@ import java.util.UUID;
 /**
  * An admin removes any recipe or comment, whatever its review status, with a reason that is emailed
  * to the author. The caller has already passed {@link mk.ukim.finki.wp.recipeappbackend.security.AdminGuard}.
- * The reason is checked first, with the same rule as a rejection; the event is published inside the
+ * The reason is checked first, (trimmed, 1-500 characters); the event is published inside the
  * transaction, so the email goes out only if the delete commits.
  */
 @Service
 public class AdminModerationService {
+
+    static final int MAX_REASON = 500;
 
     private final RecipeRepository recipeRepository;
     private final RecipeCommentRepository commentRepository;
@@ -36,7 +39,7 @@ public class AdminModerationService {
     /** Takes the same row lock as an edit or a review, so none of them races the delete. Children cascade. */
     @Transactional
     public void removeRecipe(UUID adminId, UUID recipeId, String reason) {
-        String trimmed = AdminReviewService.validReason(reason);
+        String trimmed = validReason(reason);
         Recipe recipe = recipeRepository.findForReviewById(recipeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe", recipeId));
         User author = recipe.getUser();
@@ -51,10 +54,10 @@ public class AdminModerationService {
         events.publishEvent(event);
     }
 
-    /** No approved-recipe check: an admin can remove a comment on a pending or rejected recipe too. */
+    /** No approved-recipe check: an admin can remove a comment on a recipe in any status too. */
     @Transactional
     public void removeComment(UUID adminId, UUID commentId, String reason) {
-        String trimmed = AdminReviewService.validReason(reason);
+        String trimmed = validReason(reason);
         RecipeComment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", commentId));
         User author = comment.getUser();
@@ -68,5 +71,16 @@ public class AdminModerationService {
                 adminId);
         commentRepository.delete(comment);
         events.publishEvent(event);
+    }
+
+    static String validReason(String reason) {
+        String trimmed = reason == null ? "" : reason.trim();
+        if (trimmed.isEmpty()) {
+            throw new InvalidReviewReasonException("A reason is required");
+        }
+        if (trimmed.length() > MAX_REASON) {
+            throw new InvalidReviewReasonException("The reason must be at most " + MAX_REASON + " characters");
+        }
+        return trimmed;
     }
 }

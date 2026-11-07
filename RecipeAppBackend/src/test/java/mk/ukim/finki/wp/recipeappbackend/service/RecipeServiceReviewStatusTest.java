@@ -136,171 +136,91 @@ class RecipeServiceReviewStatusTest {
     }
 
     @Test
-    void userCreateIsPending() {
-        when(visibility.isAdmin(userId)).thenReturn(false);
-
-        service.create(userId, dto("Soup"));
-
-        Recipe saved = savedByCreate();
-        assertThat(saved.getStatus()).isEqualTo(RecipeStatus.PENDING);
-        assertThat(saved.getSubmittedAt()).isNotNull();
-        assertThat(saved.isEverApproved()).isFalse();
-        assertThat(saved.getApprovedTitle()).isNull();
-        assertThat(saved.getReviewedBy()).isNull();
-    }
-
-    @Test
-    void adminCreateIsApproved() {
-        when(visibility.isAdmin(userId)).thenReturn(true);
-
+    void create_byAnyUser_isApprovedAtOnce() {
         service.create(userId, dto("Soup"));
 
         Recipe saved = savedByCreate();
         assertThat(saved.getStatus()).isEqualTo(RecipeStatus.APPROVED);
         assertThat(saved.isEverApproved()).isTrue();
         assertThat(saved.getApprovedTitle()).isEqualTo("Soup");
-        assertThat(saved.getReviewedBy()).isSameAs(owner);
+        assertThat(saved.getReviewedBy()).isNull();
         assertThat(saved.getReviewedAt()).isNotNull();
         assertThat(saved.getRejectionReason()).isNull();
     }
 
     @Test
-    void createResponseCarriesThePendingReviewBlock() {
-        when(visibility.isAdmin(userId)).thenReturn(false);
-
-        RecipeDisplayDto result = service.create(userId, dto("Soup"));
-
-        assertThat(result.review()).isNotNull();
-        assertThat(result.review().status()).isEqualTo("pending");
-        assertThat(result.review().everApproved()).isFalse();
-    }
-
-    @Test
-    void adminCreateResponseCarriesTheApprovedReviewBlock() {
-        when(visibility.isAdmin(userId)).thenReturn(true);
-
+    void createResponseCarriesTheApprovedReviewBlock() {
         RecipeDisplayDto result = service.create(userId, dto("Soup"));
 
         assertThat(result.review()).isNotNull();
         assertThat(result.review().status()).isEqualTo("approved");
         assertThat(result.review().everApproved()).isTrue();
+        assertThat(result.review().hidden()).isFalse();
     }
 
     @Test
-    void updateResponseCarriesThePendingReviewBlock() {
-        UUID recipeId = UUID.randomUUID();
-        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
-        recipe.setEverApproved(true);
-        when(visibility.isAdmin(userId)).thenReturn(false);
-
-        RecipeDisplayDto result = service.update(userId, recipeId, dto("Edited"));
-
-        assertThat(result.review()).isNotNull();
-        assertThat(result.review().status()).isEqualTo("pending");
-        assertThat(result.review().everApproved()).isTrue();
-        assertThat(result.review().revision()).isEqualTo(4);
-    }
-
-    @Test
-    void adminUpdateResponseCarriesTheApprovedReviewBlock() {
-        UUID recipeId = UUID.randomUUID();
-        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
-        recipe.setEverApproved(true);
-        when(visibility.isAdmin(userId)).thenReturn(true);
-
-        RecipeDisplayDto result = service.update(userId, recipeId, dto("Edited"));
-
-        assertThat(result.review()).isNotNull();
-        assertThat(result.review().status()).isEqualTo("approved");
-    }
-
-    @Test
-    void editApprovedGoesPending() {
-        UUID recipeId = UUID.randomUUID();
-        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
-        recipe.setEverApproved(true);
-        recipe.setApprovedTitle("Approved title");
-        when(visibility.isAdmin(userId)).thenReturn(false);
-
-        service.update(userId, recipeId, dto("New title"));
-
-        assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.PENDING);
-        assertThat(recipe.getSubmittedAt()).isAfter(longAgo);
-        assertThat(recipe.getRevision()).isEqualTo(4);
-        assertThat(recipe.isEverApproved()).isTrue();
-        assertThat(recipe.getApprovedTitle()).isEqualTo("Approved title");
-        assertThat(recipe.getTitle()).isEqualTo("New title");
-    }
-
-    @Test
-    void editRejectedGoesPendingAndClearsReason() {
-        UUID recipeId = UUID.randomUUID();
-        Recipe recipe = existing(recipeId, RecipeStatus.REJECTED);
-        recipe.setRejectionReason("Missing steps");
-        when(visibility.isAdmin(userId)).thenReturn(false);
-
-        service.update(userId, recipeId, dto("Fixed"));
-
-        assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.PENDING);
-        assertThat(recipe.getRejectionReason()).isNull();
-        assertThat(recipe.getSubmittedAt()).isAfter(longAgo);
-        assertThat(recipe.getRevision()).isEqualTo(4);
-    }
-
-    @Test
-    void editWhilePendingKeepsQueuePosition() {
-        UUID recipeId = UUID.randomUUID();
-        Recipe recipe = existing(recipeId, RecipeStatus.PENDING);
-        when(visibility.isAdmin(userId)).thenReturn(false);
-
-        service.update(userId, recipeId, dto("Tweaked"));
-
-        assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.PENDING);
-        assertThat(recipe.getSubmittedAt()).isEqualTo(longAgo);
-        assertThat(recipe.getRevision()).isEqualTo(4);
-    }
-
-    @Test
-    void photoOnlyEditBumpsRevision() {
-        UUID recipeId = UUID.randomUUID();
-        Recipe recipe = existing(recipeId, RecipeStatus.PENDING);
-        recipe.setTitle("Same");
-        when(visibility.isAdmin(userId)).thenReturn(false);
-
-        service.update(userId, recipeId, dto("Same", List.of(p1), null));
-
-        assertThat(recipe.getRevision()).isEqualTo(4);
-    }
-
-    @Test
-    void adminEditStaysApproved() {
+    void update_ofApprovedRecipe_staysApprovedAndFollowsTitle() {
         UUID recipeId = UUID.randomUUID();
         Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
         recipe.setEverApproved(true);
         recipe.setApprovedTitle("Old title");
-        when(visibility.isAdmin(userId)).thenReturn(true);
 
-        service.update(userId, recipeId, dto("Renamed"));
+        RecipeDisplayDto result = service.update(userId, recipeId, dto("Renamed"));
 
         assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.APPROVED);
-        assertThat(recipe.getRevision()).isEqualTo(4);
         assertThat(recipe.getApprovedTitle()).isEqualTo("Renamed");
-        assertThat(recipe.getReviewedBy()).isSameAs(owner);
-        assertThat(recipe.getReviewedAt()).isNotNull();
+        assertThat(recipe.getReviewedBy()).isNull();
+        assertThat(result.review().status()).isEqualTo("approved");
+        assertThat(result.review().revision()).isEqualTo(4);
+    }
+
+    @Test
+    void update_ofRejectedRecipe_publishesIt() {
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = existing(recipeId, RecipeStatus.REJECTED);
+        recipe.setRejectionReason("Missing steps");
+
+        service.update(userId, recipeId, dto("Fixed"));
+
+        assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.APPROVED);
+        assertThat(recipe.isEverApproved()).isTrue();
+        assertThat(recipe.getApprovedTitle()).isEqualTo("Fixed");
+        assertThat(recipe.getRejectionReason()).isNull();
+    }
+
+    @Test
+    void update_keepsHiddenAt() {
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
+        recipe.setEverApproved(true);
+        recipe.setHiddenAt(longAgo);
+
+        RecipeDisplayDto result = service.update(userId, recipeId, dto("Edited"));
+
+        assertThat(recipe.getHiddenAt()).isEqualTo(longAgo);
+        assertThat(result.review().hidden()).isTrue();
+    }
+
+    @Test
+    void update_bumpsRevision() {
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
+
+        service.update(userId, recipeId, dto("Same", List.of(p1), null));
+
+        assertThat(recipe.getRevision()).isEqualTo(4);
+        assertThat(recipe.getSubmittedAt()).isEqualTo(longAgo);
     }
 
     @Test
     void rejectedEditLeavesRevisionAndStatusUntouched() {
         UUID recipeId = UUID.randomUUID();
-        Recipe recipe = existing(recipeId, RecipeStatus.APPROVED);
-        recipe.setEverApproved(true);
-        when(visibility.isAdmin(userId)).thenReturn(false);
+        Recipe recipe = existing(recipeId, RecipeStatus.REJECTED);
 
         assertThatThrownBy(() -> service.update(userId, recipeId, dto("Bad", List.of(), List.of("Atlantis"))))
                 .isInstanceOf(InvalidCuisineException.class);
 
         assertThat(recipe.getRevision()).isEqualTo(3);
-        assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.APPROVED);
-        assertThat(recipe.getSubmittedAt()).isEqualTo(longAgo);
+        assertThat(recipe.getStatus()).isEqualTo(RecipeStatus.REJECTED);
     }
 }

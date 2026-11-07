@@ -5,9 +5,10 @@ import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import java.util.UUID;
 
 /**
- * A recipe that was approved once but is not visible to this viewer right now (edited and waiting
- * for review, or rejected after an edit). GlobalExceptionHandler turns it into a 404 that carries
- * the last approved title, so the client can say "under review" instead of "not found".
+ * A recipe that was approved once but is not visible to this viewer right now (for example
+ * rejected before recipes went live at once). GlobalExceptionHandler turns it into a 404 that
+ * carries the last approved title, so the client can say "unavailable" instead of "not found".
+ * A pending status no longer occurs; only old rows could still have it.
  */
 public class RecipeHiddenException extends RuntimeException {
 

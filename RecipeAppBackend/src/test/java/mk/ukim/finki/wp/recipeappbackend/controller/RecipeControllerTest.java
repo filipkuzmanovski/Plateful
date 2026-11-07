@@ -263,18 +263,6 @@ class RecipeControllerTest {
     }
 
     @Test
-    void getUnderReviewIs404WithCode() throws Exception {
-        UUID recipeId = UUID.randomUUID();
-        when(recipeService.getById(recipeId, null))
-                .thenThrow(new RecipeHiddenException(recipeId, "Old Title", RecipeStatus.PENDING));
-
-        mockMvc.perform(get("/api/recipes/" + recipeId))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("under_review"))
-                .andExpect(jsonPath("$.approvedTitle").value("Old Title"));
-    }
-
-    @Test
     void getRejectedEverApprovedIs404Unavailable() throws Exception {
         UUID recipeId = UUID.randomUUID();
         when(recipeService.getById(recipeId, null))
@@ -300,12 +288,12 @@ class RecipeControllerTest {
     @Test
     void authorGetsReviewBlock() throws Exception {
         UUID recipeId = UUID.randomUUID();
-        RecipeReviewDto review = new RecipeReviewDto("pending", null, true, 3, OffsetDateTime.now());
+        RecipeReviewDto review = new RecipeReviewDto("approved", null, true, 3, OffsetDateTime.now(), false);
         when(recipeService.getById(recipeId, USER_ID)).thenReturn(sampleRecipe(recipeId).withReview(review));
 
         mockMvc.perform(get("/api/recipes/" + recipeId).with(authed()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.review.status").value("pending"))
+                .andExpect(jsonPath("$.review.status").value("approved"))
                 .andExpect(jsonPath("$.review.revision").value(3));
     }
 

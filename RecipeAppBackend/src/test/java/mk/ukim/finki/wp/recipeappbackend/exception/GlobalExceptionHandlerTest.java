@@ -101,7 +101,7 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void hiddenPendingMapsTo404UnderReviewWithApprovedTitle() {
+    void hiddenPendingOldRowStillMapsTo404UnderReview() {
         ProblemDetail problem = handler.handleRecipeHidden(
                 new RecipeHiddenException(UUID.randomUUID(), "Old Title", RecipeStatus.PENDING));
 

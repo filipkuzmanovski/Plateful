@@ -117,12 +117,7 @@ public class RecipeService {
         RecipeVideoCreateDto video = videoPaths.validate(userId, dto.video());
         applyVideo(toSave, video);
         toSave.setImage(coverUrl(photos, video));
-        // An admin's own recipes skip the queue; everyone else's wait for review.
-        if (visibility.isAdmin(userId)) {
-            markApproved(toSave, owner);
-        } else {
-            enterPending(toSave);
-        }
+        publish(toSave);
         Recipe saved = recipeRepository.save(toSave);
         List<RecipeIngredient> ingredients =
                 ingredientRepository.saveAll(dto.toIngredientEntities(saved));
@@ -238,14 +233,10 @@ public class RecipeService {
         recipe.setVegetarian(dto.vegetarian());
         recipe.setCuisines(cuisines);
         applyVideo(recipe, video);
-        // Every successful edit changes what a reviewer would see, so it bumps the revision
-        // (a stale approve/reject is then refused), and it re-enters review unless the author is an admin.
+        // Every successful edit bumps the revision, and the recipe is live again at once
+        // (a hidden mark is left alone: only an admin lifts it).
         recipe.setRevision(recipe.getRevision() + 1);
-        if (visibility.isAdmin(userId)) {
-            markApproved(recipe, recipe.getUser());
-        } else if (recipe.getStatus() != RecipeStatus.PENDING) {
-            enterPending(recipe);
-        }
+        publish(recipe);
         // NOT touched: source, spoonacularId, user, timestamps — server-owned.
         // @UpdateTimestamp refreshes updated_at automatically on flush.
 
@@ -291,24 +282,16 @@ public class RecipeService {
     // ------------------------------------------------------------------
 
     /**
-     * Approve a recipe: an admin creating or editing their own recipe, or an admin approving
-     * another author's. approvedTitle always follows the current title, so an ever-approved recipe
-     * never has a null one.
+     * Recipes go live when saved: approved at once, whoever the author is. approvedTitle always
+     * follows the current title, so an ever-approved recipe never has a null one.
      */
-    void markApproved(Recipe recipe, User reviewer) {
+    private void publish(Recipe recipe) {
         recipe.setStatus(RecipeStatus.APPROVED);
         recipe.setEverApproved(true);
         recipe.setApprovedTitle(recipe.getTitle());
         recipe.setRejectionReason(null);
-        recipe.setReviewedBy(reviewer);
+        recipe.setReviewedBy(null);
         recipe.setReviewedAt(OffsetDateTime.now());
-    }
-
-    /** (Re-)enter the review queue at the back; any earlier rejection reason no longer applies. */
-    private void enterPending(Recipe recipe) {
-        recipe.setStatus(RecipeStatus.PENDING);
-        recipe.setSubmittedAt(OffsetDateTime.now());
-        recipe.setRejectionReason(null);
     }
 
     /** Normalize against the curated catalogue; the 10-cap applies after dedupe. */

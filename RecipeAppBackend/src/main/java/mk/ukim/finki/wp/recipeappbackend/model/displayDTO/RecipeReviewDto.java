@@ -13,7 +13,8 @@ public record RecipeReviewDto(
         String rejectionReason,
         boolean everApproved,
         int revision,
-        OffsetDateTime submittedAt
+        OffsetDateTime submittedAt,
+        boolean hidden
 ) {
     public static RecipeReviewDto of(Recipe recipe) {
         return new RecipeReviewDto(
@@ -21,7 +22,8 @@ public record RecipeReviewDto(
                 recipe.getRejectionReason(),
                 recipe.isEverApproved(),
                 recipe.getRevision(),
-                recipe.getSubmittedAt()
+                recipe.getSubmittedAt(),
+                recipe.getHiddenAt() != null
         );
     }
 }

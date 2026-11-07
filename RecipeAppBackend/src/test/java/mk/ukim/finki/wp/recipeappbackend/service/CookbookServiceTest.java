@@ -372,7 +372,7 @@ class CookbookServiceTest {
 
         assertThat(book.chapters()).hasSize(1);
         assertThat(book.chapters().get(0).stub().approvedTitle()).isEqualTo("Old");
-        assertThat(book.chapters().get(0).stub().state()).isEqualTo("under_review");
+        assertThat(book.chapters().get(0).stub().state()).isEqualTo("unavailable");
     }
 
     @Test

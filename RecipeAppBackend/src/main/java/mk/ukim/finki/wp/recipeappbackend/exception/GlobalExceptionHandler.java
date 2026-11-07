@@ -47,7 +47,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     /**
      * A recipe that was approved once but is hidden from this viewer: 404 with a machine-readable code
-     * ("under_review" while pending, "unavailable" once rejected) and the last approved title.
+     * ("unavailable", or "under_review" for an old row that is still pending) and the last approved title.
      */
     @ExceptionHandler(RecipeHiddenException.class)
     ProblemDetail handleRecipeHidden(RecipeHiddenException ex) {
@@ -73,15 +73,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
-    /** Approve/reject on a recipe that is no longer pending or has been edited since: 409 with code "not_pending" or "recipe_changed". */
-    @ExceptionHandler(ReviewConflictException.class)
-    ProblemDetail handleReviewConflict(ReviewConflictException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-        problem.setProperty("code", ex.getCode());
-        return problem;
-    }
-
-    /** Missing, blank or over-long rejection reason -> 400 in the bean-validation shape. */
+    /** Missing, blank or over-long removal reason -> 400 in the bean-validation shape. */
     @ExceptionHandler(InvalidReviewReasonException.class)
     ProblemDetail handleInvalidReviewReason(InvalidReviewReasonException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");

@@ -180,7 +180,7 @@ class SavedRecipeServiceTest {
         SavedItemDto first = result.getContent().get(0);
         assertThat(first.recipe()).isNull();
         assertThat(first.stub().id()).isEqualTo(e);
-        assertThat(first.stub().state()).isEqualTo("under_review");
+        assertThat(first.stub().state()).isEqualTo("unavailable");
         // The approved title, never the edited one still awaiting review.
         assertThat(first.stub().approvedTitle()).isEqualTo("Approved title E");
         SavedItemDto second = result.getContent().get(1);

@@ -1,13 +1,13 @@
 package mk.ukim.finki.wp.recipeappbackend.security;
 
 import mk.ukim.finki.wp.recipeappbackend.config.SecurityConfig;
-import mk.ukim.finki.wp.recipeappbackend.controller.AdminReviewController;
+import mk.ukim.finki.wp.recipeappbackend.controller.AdminModerationController;
 import mk.ukim.finki.wp.recipeappbackend.controller.PreferencesController;
 import mk.ukim.finki.wp.recipeappbackend.controller.RecipeController;
 import mk.ukim.finki.wp.recipeappbackend.controller.SavedRecipeController;
 import mk.ukim.finki.wp.recipeappbackend.controller.UserController;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.MyProfileDto;
-import mk.ukim.finki.wp.recipeappbackend.service.AdminReviewService;
+import mk.ukim.finki.wp.recipeappbackend.service.AdminModerationService;
 import mk.ukim.finki.wp.recipeappbackend.service.PreferencesService;
 import mk.ukim.finki.wp.recipeappbackend.service.RecipeService;
 import mk.ukim.finki.wp.recipeappbackend.service.SavedRecipeService;
@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({UserController.class, RecipeController.class, SavedRecipeController.class, AdminReviewController.class,
+@WebMvcTest({UserController.class, RecipeController.class, SavedRecipeController.class, AdminModerationController.class,
         PreferencesController.class})
 @Import(SecurityConfig.class)
 class MfaEnforcementFilterTest {
@@ -60,7 +60,7 @@ class MfaEnforcementFilterTest {
     @MockitoBean
     SavedRecipeService savedRecipeService;
     @MockitoBean
-    AdminReviewService adminReviewService;
+    AdminModerationService adminModerationService;
     @MockitoBean
     PreferencesService preferencesService;
     @MockitoBean
@@ -268,10 +268,10 @@ class MfaEnforcementFilterTest {
     @Test
     void adminGetAal2Passes() throws Exception {
         when(mfaFactorLookup.hasVerifiedFactor(USER_ID)).thenReturn(true);
-        when(adminReviewService.pending(any())).thenReturn(Page.empty());
 
-        mockMvc.perform(get("/api/admin/recipes/pending").with(token("aal2")))
-                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/admin/recipes/" + UUID.randomUUID() + "/remove").with(token("aal2"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"spam\"}"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -298,7 +298,7 @@ class MfaEnforcementFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("mfa_required"));
 
-        verifyNoInteractions(userService, recipeService, savedRecipeService, adminReviewService, preferencesService,
+        verifyNoInteractions(userService, recipeService, savedRecipeService, adminModerationService, preferencesService,
                 adminGuard);
     }
 
@@ -309,7 +309,7 @@ class MfaEnforcementFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("mfa_required"));
 
-        verifyNoInteractions(userService, recipeService, savedRecipeService, adminReviewService, preferencesService,
+        verifyNoInteractions(userService, recipeService, savedRecipeService, adminModerationService, preferencesService,
                 adminGuard);
     }
 
