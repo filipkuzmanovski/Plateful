@@ -49,10 +49,11 @@ public class RecipeComment {
     @Column(name = "body", nullable = false, columnDefinition = "text")
     private String body;
 
-    @CreationTimestamp
+    // Set when enough reports hide the comment (V15); null while it is shown.
     @Column(name = "hidden_at")
     private OffsetDateTime hiddenAt;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
