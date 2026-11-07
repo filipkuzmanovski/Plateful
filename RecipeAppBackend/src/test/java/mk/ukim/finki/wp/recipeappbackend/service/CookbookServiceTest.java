@@ -218,6 +218,25 @@ class CookbookServiceTest {
     }
 
     @Test
+    void hiddenRecipe_cannotGoInABook() {
+        List<UUID> five = ids(5);
+        when(likes.findLikedAmong(user, five)).thenReturn(five);
+        List<Recipe> found = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            Recipe r = Recipe.builder().id(five.get(i)).title("T").status(RecipeStatus.APPROVED).build();
+            if (i == 0) {
+                r.setHiddenAt(java.time.OffsetDateTime.now());
+            }
+            found.add(r);
+        }
+        when(recipes.findAllById(five)).thenReturn(found);
+
+        assertThatThrownBy(() -> service.create(user, new CookbookCreateDto(five, null)))
+                .isInstanceOf(CookbookConflictException.class);
+        verify(cookbooks, never()).saveAndFlush(any());
+    }
+
+    @Test
     void create_recipeNotApproved_conflict() {
         List<UUID> five = ids(5);
         when(likes.findLikedAmong(user, five)).thenReturn(five);

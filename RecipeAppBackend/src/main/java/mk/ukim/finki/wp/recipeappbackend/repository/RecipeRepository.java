@@ -32,7 +32,7 @@ public interface RecipeRepository extends JpaRepository<Recipe, UUID>, JpaSpecif
     Page<Recipe> findByUserId(UUID userId, Pageable pageable);
 
     // the same listing narrowed to one review state (the public profile shows APPROVED only)
-    Page<Recipe> findByUserIdAndStatus(UUID userId, RecipeStatus status, Pageable pageable);
+    Page<Recipe> findByUserIdAndStatusAndHiddenAtIsNull(UUID userId, RecipeStatus status, Pageable pageable);
 
     // how many of a user's recipes are in a given review state (e.g. rejected, for the profile badge)
     long countByUserIdAndStatus(UUID userId, RecipeStatus status);
@@ -47,6 +47,6 @@ public interface RecipeRepository extends JpaRepository<Recipe, UUID>, JpaSpecif
     Optional<Recipe> findForReviewById(UUID id);
 
     // approved recipe count per cuisine key (unnests the text[] column); callers map keys onto the catalogue
-    @Query(value = "select c as key, count(*) as count from recipes, unnest(cuisines) c where status = 'approved' group by c", nativeQuery = true)
+    @Query(value = "select c as key, count(*) as count from recipes, unnest(cuisines) c where status = 'approved' and hidden_at is null group by c", nativeQuery = true)
     List<CuisineCount> countCuisines();
 }

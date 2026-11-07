@@ -3,7 +3,6 @@ package mk.ukim.finki.wp.recipeappbackend.service;
 import mk.ukim.finki.wp.recipeappbackend.exception.RecipeHiddenException;
 import mk.ukim.finki.wp.recipeappbackend.exception.RecipeNotApprovedException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
-import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
 import mk.ukim.finki.wp.recipeappbackend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
@@ -14,12 +13,12 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /**
- * The one visibility rule for recipe reads: a recipe is visible to viewer V when it is approved,
- * or V is its author, or V is an admin. Admin status is read from users.is_admin on every call
+ * The one visibility rule for recipe reads: a recipe is visible to viewer V when it is live (approved and
+ * not hidden), or V is its author, or V is an admin. Admin status is read from users.is_admin on every call
  * (the JWT only supplies the aal2 requirement, see {@link #isAdmin}). A null viewer is an anonymous request.
  * <p>
- * Listing queries (browse, cuisine counts) use the approved-only specification instead, because
- * they are approved-only even for authors and admins.
+ * Listing queries (browse, cuisine counts) use the live-only specification instead, because
+ * they are live-only even for authors and admins.
  */
 @Component
 public class RecipeVisibility {
@@ -50,7 +49,7 @@ public class RecipeVisibility {
     }
 
     public boolean canSee(Recipe recipe, UUID viewerId) {
-        return recipe.getStatus() == RecipeStatus.APPROVED || isAuthorOrAdmin(recipe, viewerId);
+        return recipe.isLive() || isAuthorOrAdmin(recipe, viewerId);
     }
 
     /**
@@ -69,12 +68,12 @@ public class RecipeVisibility {
 
     /**
      * Guard for every comment, rating and reaction write, deletes included: the recipe must be visible
-     * (same exceptions as {@link #requireVisible}) and approved. A viewer who can see an unapproved
-     * recipe (its author or an admin) gets {@link RecipeNotApprovedException}.
+     * (same exceptions as {@link #requireVisible}) and live. A viewer who can see a recipe that is not live
+     * (an unapproved or hidden one) (its author or an admin) gets {@link RecipeNotApprovedException}.
      */
     public void requireApprovedForInteraction(Recipe recipe, UUID viewerId) {
         requireVisible(recipe, viewerId);
-        if (recipe.getStatus() != RecipeStatus.APPROVED) {
+        if (!recipe.isLive()) {
             throw new RecipeNotApprovedException(recipe.getId(), recipe.getStatus());
         }
     }

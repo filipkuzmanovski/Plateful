@@ -50,6 +50,9 @@ public class RecipeComment {
     private String body;
 
     @CreationTimestamp
+    @Column(name = "hidden_at")
+    private OffsetDateTime hiddenAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

@@ -53,7 +53,7 @@ public class PlatefulComparisonRepository {
                         SELECT r.id
                         FROM recipes r
                         JOIN recipe_ingredients i ON i.recipe_id = r.id
-                        WHERE r.status = 'approved'
+                        WHERE r.status = 'approved' AND r.hidden_at IS NULL
                           AND lower(i.ingredient_name) LIKE ANY (CAST(:patterns AS text[]))
                         GROUP BY r.id
                         ORDER BY count(*) DESC, r.id
@@ -71,7 +71,7 @@ public class PlatefulComparisonRepository {
                         SELECT r.id, COALESCE(r.approved_title, r.title) AS title, i.ingredient_name
                         FROM recipes r
                         JOIN recipe_ingredients i ON i.recipe_id = r.id
-                        WHERE r.status = 'approved' AND r.id IN (:ids)
+                        WHERE r.status = 'approved' AND r.hidden_at IS NULL AND r.id IN (:ids)
                         ORDER BY r.id, i.sort_order
                         """,
                 new MapSqlParameterSource().addValue("ids", ids),

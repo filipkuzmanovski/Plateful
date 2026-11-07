@@ -135,6 +135,15 @@ class NutritionEstimatesTest {
     }
 
     @Test
+    void hiddenRecipe_hasNoEstimateTarget() {
+        Recipe hidden = upload(RecipeStatus.APPROVED, 4);
+        hidden.setHiddenAt(OffsetDateTime.now());
+
+        assertThat(estimates.forRecipe(hidden)).isEqualTo(NutritionEstimateDto.none());
+        verify(repo, never()).forRecipe(any());
+    }
+
+    @Test
     void imported_isNone_andNeverQueried() {
         Recipe imported = Recipe.builder().id(ID).source("spoonacular").status(RecipeStatus.APPROVED)
                 .servings(4).build();

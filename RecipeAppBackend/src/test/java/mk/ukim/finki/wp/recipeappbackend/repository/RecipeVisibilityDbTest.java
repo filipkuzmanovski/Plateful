@@ -91,7 +91,7 @@ class RecipeVisibilityDbTest {
     @Test
     void browseShowsApprovedOnlyForEveryone() {
         List<Recipe> result = recipeRepository.findAll(
-                RecipeSpecifications.approvedOnly()
+                RecipeSpecifications.liveOnly()
                         .and(RecipeSpecifications.withFilter(search(marker), Optional.empty())));
 
         assertThat(result).extracting(Recipe::getId).containsExactly(approved.getId());
@@ -110,7 +110,7 @@ class RecipeVisibilityDbTest {
                 .extracting(Recipe::getId)
                 .containsExactlyInAnyOrder(approved.getId(), pendingNeverApproved.getId(), pendingEverApproved.getId());
 
-        assertThat(recipeRepository.findByUserIdAndStatus(authorId, RecipeStatus.APPROVED, PageRequest.of(0, 10))
+        assertThat(recipeRepository.findByUserIdAndStatusAndHiddenAtIsNull(authorId, RecipeStatus.APPROVED, PageRequest.of(0, 10))
                 .getContent())
                 .extracting(Recipe::getId)
                 .containsExactly(approved.getId());

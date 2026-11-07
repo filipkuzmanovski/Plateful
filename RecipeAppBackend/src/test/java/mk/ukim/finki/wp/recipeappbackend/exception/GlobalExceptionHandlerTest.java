@@ -112,6 +112,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void hiddenApprovedMapsTo404Unavailable() {
+        ProblemDetail problem = handler.handleRecipeHidden(
+                new RecipeHiddenException(UUID.randomUUID(), "Old Title", RecipeStatus.APPROVED));
+
+        assertThat(problem.getStatus()).isEqualTo(404);
+        assertThat(problem.getProperties()).containsEntry("code", "unavailable");
+    }
+
+    @Test
     void hiddenRejectedMapsTo404UnavailableWithApprovedTitle() {
         ProblemDetail problem = handler.handleRecipeHidden(
                 new RecipeHiddenException(UUID.randomUUID(), "Old Title", RecipeStatus.REJECTED));

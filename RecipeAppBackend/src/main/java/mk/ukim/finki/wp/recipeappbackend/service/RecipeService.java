@@ -182,7 +182,7 @@ public class RecipeService {
         // applies with or without a filter.
         Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
         return toDisplayPage(recipeRepository.findAll(
-                RecipeSpecifications.approvedOnly()
+                RecipeSpecifications.liveOnly()
                         .and(RecipeSpecifications.withFilter(effective, cuisineKeys))
                         .and(RecipeSpecifications.withSort(sort)),
                 unsorted));
@@ -196,7 +196,7 @@ public class RecipeService {
     public Page<RecipeDisplayDto> getByAuthor(UUID authorId, UUID viewerId, Pageable pageable) {
         boolean seesAll = authorId.equals(viewerId) || visibility.isAdmin(viewerId);
         if (!seesAll) {
-            return toDisplayPage(recipeRepository.findByUserIdAndStatus(authorId, RecipeStatus.APPROVED, pageable));
+            return toDisplayPage(recipeRepository.findByUserIdAndStatusAndHiddenAtIsNull(authorId, RecipeStatus.APPROVED, pageable));
         }
         return toDisplayPage(recipeRepository.findByUserId(authorId, pageable), true);
     }

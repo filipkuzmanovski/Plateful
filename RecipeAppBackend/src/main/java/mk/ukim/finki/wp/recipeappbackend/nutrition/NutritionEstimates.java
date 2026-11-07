@@ -6,7 +6,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.NutritionEstimateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.GeneratedRecipe;
 import mk.ukim.finki.wp.recipeappbackend.model.entities.Recipe;
@@ -37,7 +36,7 @@ public class NutritionEstimates {
 
     /** Not approved wins over everything; imported recipes are never estimated. */
     public NutritionEstimateDto forRecipe(Recipe recipe) {
-        if (recipe.getStatus() != RecipeStatus.APPROVED || !"user".equals(recipe.getSource())
+        if (!recipe.isLive() || !"user".equals(recipe.getSource())
                 || recipe.getServings() == null || recipe.getServings() < 1) {
             return NutritionEstimateDto.none();
         }

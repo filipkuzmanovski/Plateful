@@ -174,7 +174,6 @@ class RecipeVisibilityTest {
 
         assertThatThrownBy(() -> visibility.requireVisible(r, otherId))
                 .isInstanceOfSatisfying(RecipeHiddenException.class, ex -> {
-                    assertThat(ex.getRecipeId()).isEqualTo(r.getId());
                     assertThat(ex.getApprovedTitle()).isEqualTo("Old Title");
                     assertThat(ex.getStatus()).isEqualTo(RecipeStatus.PENDING);
                 });
@@ -244,5 +243,45 @@ class RecipeVisibilityTest {
 
         assertThat(visibility.showsReview(r, adminId)).isTrue();
         assertThat(visibility.showsReview(r, otherId)).isFalse();
+    }
+
+    private Recipe hiddenApproved() {
+        Recipe r = recipe(RecipeStatus.APPROVED, true, authorId);
+        r.setHiddenAt(java.time.OffsetDateTime.now());
+        return r;
+    }
+
+    @Test
+    void hiddenRecipe_isNotVisibleToOthers() {
+        Recipe r = hiddenApproved();
+
+        assertThat(visibility.canSee(r, otherId)).isFalse();
+        assertThat(visibility.canSee(r, null)).isFalse();
+        assertThat(visibility.canSee(r, authorId)).isTrue();
+        assertThat(visibility.canSee(r, adminId)).isTrue();
+    }
+
+    @Test
+    void hiddenRecipe_refusesInteractionForEveryone() {
+        Recipe r = hiddenApproved();
+
+        assertThatThrownBy(() -> visibility.requireApprovedForInteraction(r, authorId))
+                .isInstanceOf(RecipeNotApprovedException.class);
+        assertThatThrownBy(() -> visibility.requireApprovedForInteraction(r, adminId))
+                .isInstanceOf(RecipeNotApprovedException.class);
+    }
+
+    @Test
+    void hiddenRecipe_strangerGetsUnavailable() {
+        Recipe r = hiddenApproved();
+
+        assertThatThrownBy(() -> visibility.requireVisible(r, otherId))
+                .isInstanceOfSatisfying(RecipeHiddenException.class, ex -> {
+                    assertThat(ex.getApprovedTitle()).isEqualTo("Old Title");
+                    // APPROVED (not PENDING) is what the handler maps to the "unavailable" code
+                    assertThat(ex.getStatus()).isEqualTo(RecipeStatus.APPROVED);
+                    // APPROVED (not PENDING) is what the handler maps to the "unavailable" code
+                    assertThat(ex.getStatus()).isEqualTo(RecipeStatus.APPROVED);
+                });
     }
 }

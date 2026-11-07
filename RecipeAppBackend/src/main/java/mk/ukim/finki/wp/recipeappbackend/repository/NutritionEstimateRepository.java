@@ -34,7 +34,7 @@ public class NutritionEstimateRepository {
     private static final String NEXT = "SELECT kind, id FROM ("
             + " SELECT 'recipe' AS kind, r.id, COALESCE(r.reviewed_at, r.created_at) AS dated_at"
             + "   FROM recipes r"
-            + "  WHERE r.source = 'user' AND r.status = 'approved' AND r.servings >= 1"
+            + "  WHERE r.source = 'user' AND r.status = 'approved' AND r.hidden_at IS NULL AND r.servings >= 1"
             + "    AND NOT EXISTS (SELECT 1 FROM nutrition_estimates e WHERE e.recipe_id = r.id)"
             + " UNION ALL"
             + " SELECT 'generated', g.id, g.created_at"

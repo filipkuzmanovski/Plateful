@@ -3,7 +3,6 @@ package mk.ukim.finki.wp.recipeappbackend.service;
 import mk.ukim.finki.wp.recipeappbackend.exception.CookbookConflictException;
 import mk.ukim.finki.wp.recipeappbackend.exception.InvalidCookbookException;
 import mk.ukim.finki.wp.recipeappbackend.exception.ResourceNotFoundException;
-import mk.ukim.finki.wp.recipeappbackend.model.RecipeStatus;
 import mk.ukim.finki.wp.recipeappbackend.model.createDTO.CookbookCreateDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.CookbookDto;
 import mk.ukim.finki.wp.recipeappbackend.model.displayDTO.CookbookSummaryDto;
@@ -161,8 +160,7 @@ public class CookbookService {
     private void requireLikedAndApproved(UUID userId, List<UUID> recipeIds) {
         long liked = likes.findLikedAmong(userId, recipeIds).size();
         long approved = recipes.findAllById(recipeIds).stream()
-                .map(Recipe::getStatus)
-                .filter(status -> status == RecipeStatus.APPROVED)
+                .filter(Recipe::isLive)
                 .count();
         if (liked != recipeIds.size() || approved != recipeIds.size()) {
             throw new CookbookConflictException(UNAVAILABLE_MESSAGE);

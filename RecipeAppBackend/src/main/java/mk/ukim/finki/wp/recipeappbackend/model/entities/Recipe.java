@@ -143,6 +143,15 @@ public class Recipe {
     @Column(name = "status", nullable = false)
     private RecipeStatus status = RecipeStatus.PENDING;
 
+    // Set when enough reports hide the recipe (V15); null for every recipe that is not hidden.
+    @Column(name = "hidden_at")
+    private OffsetDateTime hiddenAt;
+
+    /** Live means shown to the public: approved and not hidden by reports. */
+    public boolean isLive() {
+        return status == RecipeStatus.APPROVED && hiddenAt == null;
+    }
+
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
 

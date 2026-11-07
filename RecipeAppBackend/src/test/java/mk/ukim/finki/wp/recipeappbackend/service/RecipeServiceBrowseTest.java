@@ -121,6 +121,30 @@ class RecipeServiceBrowseTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void hiddenRecipe_isLeftOutOfBrowseAndAuthorPage() {
+        when(recipeRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<Recipe>(List.of(), pageable, 0));
+        service.browse(null, RecipeSort.TOP_RATED, pageable);
+
+        ArgumentCaptor<Specification<Recipe>> spec = ArgumentCaptor.forClass(Specification.class);
+        verify(recipeRepository).findAll(spec.capture(), any(Pageable.class));
+        var root = mock(jakarta.persistence.criteria.Root.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+        var cb = mock(jakarta.persistence.criteria.CriteriaBuilder.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+        var query = mock(jakarta.persistence.criteria.CriteriaQuery.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+        var hiddenAt = mock(jakarta.persistence.criteria.Path.class);
+        when(root.get("hiddenAt")).thenReturn(hiddenAt);
+        spec.getValue().toPredicate(root, query, cb);
+        verify(cb).isNull(hiddenAt);
+
+        UUID authorId = UUID.randomUUID();
+        when(recipeRepository.findByUserIdAndStatusAndHiddenAtIsNull(authorId, RecipeStatus.APPROVED, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+        service.getByAuthor(authorId, UUID.randomUUID(), pageable);
+        verify(recipeRepository).findByUserIdAndStatusAndHiddenAtIsNull(authorId, RecipeStatus.APPROVED, pageable);
+    }
+
+    @Test
     void getByAuthorBranchesOnViewer() {
         UUID authorId = UUID.randomUUID();
         UUID adminId = UUID.randomUUID();
@@ -133,7 +157,7 @@ class RecipeServiceBrowseTest {
         Page<Recipe> all = new PageImpl<>(List.of(pending, approved), pageable, 2);
         Page<Recipe> approvedOnly = new PageImpl<>(List.of(approved), pageable, 1);
         when(recipeRepository.findByUserId(authorId, pageable)).thenReturn(all);
-        when(recipeRepository.findByUserIdAndStatus(authorId, RecipeStatus.APPROVED, pageable))
+        when(recipeRepository.findByUserIdAndStatusAndHiddenAtIsNull(authorId, RecipeStatus.APPROVED, pageable))
                 .thenReturn(approvedOnly);
 
         for (UUID viewer : new UUID[]{authorId, adminId}) {
@@ -146,7 +170,7 @@ class RecipeServiceBrowseTest {
             assertThat(page.getContent().get(1).review().status()).isEqualTo("approved");
         }
         verify(recipeRepository, never())
-                .findByUserIdAndStatus(any(), any(), any());
+                .findByUserIdAndStatusAndHiddenAtIsNull(any(), any(), any());
 
         for (UUID viewer : new UUID[]{otherId, null}) {
             Page<RecipeDisplayDto> page = service.getByAuthor(authorId, viewer, pageable);
@@ -155,7 +179,7 @@ class RecipeServiceBrowseTest {
             assertThat(page.getContent().get(0).review()).isNull();
         }
         verify(recipeRepository, times(2))
-                .findByUserIdAndStatus(eq(authorId), eq(RecipeStatus.APPROVED), eq(pageable));
+                .findByUserIdAndStatusAndHiddenAtIsNull(eq(authorId), eq(RecipeStatus.APPROVED), eq(pageable));
         verify(recipeRepository, times(2)).findByUserId(authorId, pageable);
     }
 

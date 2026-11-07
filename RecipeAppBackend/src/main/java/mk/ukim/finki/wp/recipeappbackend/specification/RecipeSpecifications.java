@@ -62,8 +62,9 @@ public final class RecipeSpecifications {
     }
 
     /** Only approved recipes: what browse and search show to everyone, authors and admins included. */
-    public static Specification<Recipe> approvedOnly() {
-        return (root, query, cb) -> cb.equal(root.get("status"), RecipeStatus.APPROVED);
+    public static Specification<Recipe> liveOnly() {
+        return (root, query, cb) -> cb.and(cb.equal(root.get("status"), RecipeStatus.APPROVED),
+                cb.isNull(root.get("hiddenAt")));
     }
 
     /**
