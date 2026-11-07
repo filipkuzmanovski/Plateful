@@ -21,6 +21,8 @@ import { isLive } from '@/lib/live';
 import { ReviewStatusBanner } from '@/features/review/ReviewStatusBanner';
 import { ReasonDialog } from '@/features/admin/ReasonDialog';
 import { LikeButton } from '@/features/likes/LikeButton';
+import { ReportButton } from '@/features/reports/ReportButton';
+import { useMyReports } from '@/features/reports/useMyReports';
 import type { RecipeDisplay } from '@/lib/types';
 
 /** Best-effort: once a recipe row is gone its photos and video are orphans; the helpers never throw. */
@@ -39,7 +41,9 @@ export default function RecipeDetailPage() {
   // Set once the recipe is known to be gone, so dropping its cached query is not followed by a refetch of it.
   const [gone, setGone] = useState(false);
   const query = useQuery({ queryKey: ['recipe', id], queryFn: () => getRecipe(id!), retry: false, enabled: !gone });
-  const { profile, refreshProfile } = useAuth();
+  const { status, profile, refreshProfile } = useAuth();
+  const [commentIds, setCommentIds] = useState<string[] | null>(null);
+  const myReports = useMyReports(id!, commentIds);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -140,6 +144,14 @@ export default function RecipeDetailPage() {
           <LikeButton recipe={recipe} variant="page" />
           <SaveRecipeButton recipeId={recipe.id} />
           {acceptsFeedback && <ShareRecipe recipe={recipe} />}
+          {status === 'ready' && !isOwner && acceptsFeedback && (
+            <ReportButton
+              variant="page"
+              title="Report this recipe"
+              target={{ recipeId: recipe.id }}
+              reported={myReports.data?.recipeIds.includes(recipe.id) ?? false}
+            />
+          )}
           {isOwner && (
             <>
               <Link
@@ -195,7 +207,12 @@ export default function RecipeDetailPage() {
               Comments <span className="font-sans text-base font-medium text-ink-soft tabular-nums">({recipe.commentCount})</span>
             </SectionHeading>
             <section aria-label="comments">
-              <CommentsSection recipeId={recipe.id} recipeOwnerId={recipe.user?.id ?? null} />
+              <CommentsSection
+                recipeId={recipe.id}
+                recipeOwnerId={recipe.user?.id ?? null}
+                reported={myReports.data}
+                onVisibleIds={setCommentIds}
+              />
             </section>
           </>
         )

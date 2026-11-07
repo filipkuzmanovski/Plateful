@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MessageCircle, Pencil, ShieldX, ThumbsDown, ThumbsUp, Trash2, type LucideIcon } from 'lucide-react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -11,6 +11,8 @@ import { Button, Spinner } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Pagination } from '@/components/Pagination';
 import { ReasonDialog } from '@/features/admin/ReasonDialog';
+import { ReportButton } from '@/features/reports/ReportButton';
+import type { MyReports } from '@/api/reports';
 import type { CommentDisplay } from '@/lib/types';
 
 const showError = (e: unknown) =>
@@ -113,9 +115,15 @@ function ReactionButtons({
 export function CommentsSection({
   recipeId,
   recipeOwnerId,
+  reported,
+  onVisibleIds,
 }: {
   recipeId: string;
   recipeOwnerId: string | null;
+  /** What the user already reported on this page (from /api/reports/mine), when known. */
+  reported?: MyReports;
+  /** Tells the page which comment ids are on screen, so it can ask which of them were reported. */
+  onVisibleIds?: (ids: string[]) => void;
 }) {
   const { status, profile } = useAuth();
   const [page, setPage] = useState(0);
@@ -190,6 +198,14 @@ export function CommentsSection({
     },
   });
 
+  const visibleIds = query.data?.content.map((c) => c.id);
+  const visibleKey = visibleIds?.join(',');
+  useEffect(() => {
+    if (visibleIds) onVisibleIds?.(visibleIds);
+    // visibleKey stands in for the array, which is new on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKey]);
+
   if (query.isPending) return <Spinner />;
   if (query.isError) return <p className="text-[15px] text-danger">Couldn't load comments.</p>;
 
@@ -263,6 +279,9 @@ export function CommentsSection({
                       {comment.body}
                     </p>
                   )}
+                  {comment.hidden && (
+                    <p className="mt-1 text-[13px] text-ink-soft">Hidden while an admin looks at reports.</p>
+                  )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1 -ml-2.5">
                   <ReactionButtons
@@ -290,6 +309,15 @@ export function CommentsSection({
                       <Trash2 aria-hidden="true" className="size-3" />
                       Delete
                     </button>
+                  )}
+                  {status === 'ready' && !isAuthor && !comment.hidden && (
+                    <ReportButton
+                      variant="inline"
+                      title="Report this comment"
+                      label={`comment by ${comment.user.firstName} ${comment.user.lastName}`}
+                      target={{ commentId: comment.id }}
+                      reported={reported?.commentIds.includes(comment.id) ?? false}
+                    />
                   )}
                   {canRemove && (
                     <button
