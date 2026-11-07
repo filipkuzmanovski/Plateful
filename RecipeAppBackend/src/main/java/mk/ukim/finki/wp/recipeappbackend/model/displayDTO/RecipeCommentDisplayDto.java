@@ -14,6 +14,7 @@ import java.util.UUID;
  * parameters rather than deriving them from the entity alone. The service
  * layer computes them (one GROUP BY query per page of comments, not one
  * query per comment) and passes them in here.
+ * hidden is true when reports hid the comment; only its author and admins are ever sent one (spec 3.2).
  */
 public record RecipeCommentDisplayDto(
         UUID id,
@@ -21,7 +22,8 @@ public record RecipeCommentDisplayDto(
         String body,
         long likeCount,
         long dislikeCount,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        boolean hidden
 ) {
     public static RecipeCommentDisplayDto fromEntity(RecipeComment comment, long likeCount, long dislikeCount) {
         return new RecipeCommentDisplayDto(
@@ -30,7 +32,8 @@ public record RecipeCommentDisplayDto(
                 comment.getBody(),
                 likeCount,
                 dislikeCount,
-                comment.getCreatedAt()
+                comment.getCreatedAt(),
+                comment.getHiddenAt() != null
         );
     }
 }

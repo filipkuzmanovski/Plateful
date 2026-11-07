@@ -83,6 +83,7 @@ class InteractionReviewGuardTest {
 
         when(userRepository.findById(authorId)).thenReturn(Optional.of(User.builder().id(authorId).build()));
         when(commentRepository.findByRecipeIdOrderByCreatedAtDesc(any(), any())).thenReturn(Page.empty());
+        when(commentRepository.findShownByRecipeId(any(), any(), any())).thenReturn(Page.empty());
         when(ratingRepository.findByRecipeId(any(), any())).thenReturn(Page.empty());
         when(reactionRepository.findByCommentId(any(), any())).thenReturn(Page.empty());
         when(commentRepository.save(any(RecipeComment.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -109,6 +110,7 @@ class InteractionReviewGuardTest {
                 .body("Tasty")
                 .build();
         when(commentRepository.findById(c.getId())).thenReturn(Optional.of(c));
+        when(commentRepository.findForUpdateById(c.getId())).thenReturn(Optional.of(c));
         return c;
     }
 

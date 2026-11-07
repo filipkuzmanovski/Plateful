@@ -44,6 +44,22 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void reportExceptionsMapToTheirStatusAndCode() {
+        record Expected(ReportException ex, int status, String code) { }
+        for (Expected e : List.of(
+                new Expected(ReportException.invalid("Pick one of the reasons."), 400, "invalid_report"),
+                new Expected(ReportException.ownContent(), 403, "own_content"),
+                new Expected(ReportException.alreadyReported(), 409, "already_reported"),
+                new Expected(ReportException.limit(), 429, "report_limit"))) {
+            ProblemDetail problem = handler.handleReport(e.ex());
+
+            assertThat(problem.getStatus()).isEqualTo(e.status());
+            assertThat(problem.getProperties()).containsEntry("code", e.code());
+            assertThat(problem.getDetail()).isEqualTo(e.ex().getMessage());
+        }
+    }
+
+    @Test
     void unexpectedExceptionMapsTo500WithGenericDetail() {
         ProblemDetail problem = handler.handleUnexpected(new IllegalStateException("secret internals"));
 

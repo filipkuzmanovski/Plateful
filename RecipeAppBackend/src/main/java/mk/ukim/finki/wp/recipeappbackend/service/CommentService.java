@@ -30,6 +30,9 @@ import java.util.stream.Collectors;
  * comment section"). Every write needs an approved recipe and every read a visible one (spec 4.2); a comment
  * on a recipe that went back to review stays as it is until the recipe is approved again. Editing stays author-only — moderators remove content,
  * they don't rewrite other people's words.
+ * <p>
+ * A comment hidden by reports (spec 3.2) is listed only for its author and admins, and cannot be edited;
+ * its author can still delete it.
  */
 @Service
 public class CommentService {
@@ -66,11 +69,15 @@ public class CommentService {
     /** Author-only. */
     @Transactional
     public RecipeCommentDisplayDto edit(UUID userId, UUID commentId, RecipeCommentCreateDto dto) {
-        RecipeComment comment = commentRepository.findById(commentId)
+        // Row lock: a report hiding this comment must not be overwritten by the edit's write, or the reverse.
+        RecipeComment comment = commentRepository.findForUpdateById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", commentId));
         visibility.requireApprovedForInteraction(comment.getRecipe(), userId);
         if (!comment.getUser().getId().equals(userId)) {
             throw new ForbiddenOperationException("Only the author can edit a comment");
+        }
+        if (comment.getHiddenAt() != null) {
+            throw new ForbiddenOperationException("A hidden comment can't be edited");
         }
         comment.setBody(dto.body()); // @UpdateTimestamp bumps updated_at
         RecipeComment savedComment=commentRepository.save(comment);
@@ -105,12 +112,14 @@ public class CommentService {
      * Paged comments with like/dislike counts. Fixed query count per page:
      * comments (+authors via @EntityGraph) in one, reaction summary GROUP BY
      * in one — never per-comment queries (see N+1 BUGFIX notes in the repos).
+     * Admins get every comment; anyone else gets the shown ones plus their own hidden ones.
      */
     @Transactional(readOnly = true)
     public Page<RecipeCommentDisplayDto> getForRecipe(UUID viewerId, UUID recipeId, Pageable pageable) {
         requireVisibleRecipe(viewerId, recipeId);
-        Page<RecipeComment> page =
-                commentRepository.findByRecipeIdOrderByCreatedAtDesc(recipeId, pageable);
+        Page<RecipeComment> page = visibility.isAdmin(viewerId)
+                ? commentRepository.findByRecipeIdOrderByCreatedAtDesc(recipeId, pageable)
+                : commentRepository.findShownByRecipeId(recipeId, viewerId, pageable);
 
         List<UUID> ids = page.getContent().stream().map(RecipeComment::getId).toList();
         Map<UUID, CommentReactionSummary> summaries = ids.isEmpty() ? Map.of()

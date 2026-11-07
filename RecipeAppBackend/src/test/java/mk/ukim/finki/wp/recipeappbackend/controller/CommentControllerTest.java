@@ -64,7 +64,7 @@ class CommentControllerTest {
 
     private static RecipeCommentDisplayDto sampleComment(String body) {
         return new RecipeCommentDisplayDto(COMMENT_ID,
-                new UserDisplayDto(USER_ID, "Jane", "Doe"), body, 0, 0, null);
+                new UserDisplayDto(USER_ID, "Jane", "Doe"), body, 0, 0, null, false);
     }
 
     @Test
@@ -74,7 +74,8 @@ class CommentControllerTest {
 
         mockMvc.perform(get("/api/recipes/" + RECIPE_ID + "/comments"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].body").value("Tasty!"));
+                .andExpect(jsonPath("$.content[0].body").value("Tasty!"))
+                .andExpect(jsonPath("$.content[0].hidden").value(false));
     }
 
     @Test
