@@ -148,12 +148,12 @@ describe('Privacy Policy', () => {
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
     expect(
       screen.getByText(
-        'The titles, servings and ingredient lists of AI recipes and of approved uploaded recipes are also sent to Groq to estimate calories, and never to Google for this.',
+        'The titles, servings and ingredient lists of AI recipes and of uploaded recipes are also sent to Groq to estimate calories, and never to Google for this.',
       ),
     ).toBeInTheDocument();
   });
 
-  test('groq entry says it estimates calories for AI and approved uploaded recipes', async () => {
+  test('groq entry says it estimates calories for AI and uploaded recipes', async () => {
     renderApp('/privacy');
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
     const processors = document.getElementById('who-processes-your-data')!;
@@ -161,11 +161,35 @@ describe('Privacy Policy', () => {
       .getAllByRole('listitem')
       .map((li) => li.textContent ?? '')
       .find((t) => t.startsWith('Groq'))!;
-    expect(groq).toContain('estimates the calories of AI recipes and of approved uploaded recipes');
+    expect(groq).toContain('estimates the calories of AI recipes and of uploaded recipes');
   });
 
-  test('the policy date was bumped for the calorie estimates', () => {
-    expect(SITE.legalLastUpdated).toBe('6 November 2026');
+  test('the policy date was bumped for reports and instant publishing', () => {
+    expect(SITE.legalLastUpdated).toBe('7 November 2026');
+  });
+
+  test('has a Reports part saying what is stored and who sees it', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    expect(screen.getByRole('heading', { level: 2, name: 'Reports' })).toBeInTheDocument();
+    const section = document.getElementById('reports')!;
+    expect(section).not.toBeNull();
+    expect(section).toHaveTextContent(
+      'who reported, which item, the reason you chose, your note if you wrote one, and the date',
+    );
+    expect(section).toHaveTextContent('Admins see the reason and the note, but not your name.');
+    expect(section).toHaveTextContent('deleted when the reported item is deleted or when your account is deleted');
+    expect(section).toHaveTextContent('kept only so the same person cannot report the same item again');
+    expectNoEmoji(section);
+  });
+
+  test('has no review-era wording and says content is public when posted', async () => {
+    renderApp('/privacy');
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+    const main = screen.getByRole('main');
+    expect(main).not.toHaveTextContent(/approved|approval|rejected|rejection|before they are public/i);
+    expect(main).toHaveTextContent('public as soon as they are posted');
+    expect(main).toHaveTextContent('email the author the reason');
   });
 
   test('shows the last-updated date from SITE', async () => {
@@ -301,6 +325,16 @@ describe('Terms of Service', () => {
   test('shows the last-updated date from SITE', async () => {
     renderApp('/terms');
     expect(await screen.findByText(`Last updated: ${SITE.legalLastUpdated}`)).toBeInTheDocument();
+  });
+
+  test('says content goes live at once, can be hidden after reports and removed with a reason', async () => {
+    renderApp('/terms');
+    await screen.findByRole('heading', { level: 1, name: 'Terms of Service' });
+    const section = document.getElementById('moderation')!;
+    expect(section).toHaveTextContent('Recipes and comments go live as soon as they are posted.');
+    expect(section).toHaveTextContent('hidden after reports from other users');
+    expect(section).toHaveTextContent('removed by an admin, who gives a reason');
+    expect(screen.getByRole('main')).not.toHaveTextContent(/approved|approval|rejected|before they are public/i);
   });
 
   test('covers videos in the sentence about copied content', async () => {

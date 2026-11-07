@@ -63,7 +63,15 @@ export default function TermsPage() {
         {
           id: 'moderation',
           title: 'Moderation',
-          body: <p>We may remove content or suspend accounts that break these terms.</p>,
+          body: (
+            <>
+              <p>
+                Recipes and comments go live as soon as they are posted. Other users can report them, and an item is
+                hidden after reports from other users. An item can also be removed by an admin, who gives a reason.
+              </p>
+              <p>We may also suspend accounts that break these terms.</p>
+            </>
+          ),
         },
         {
           id: 'imported-recipes',

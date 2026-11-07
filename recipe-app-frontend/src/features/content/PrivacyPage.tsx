@@ -112,7 +112,7 @@ export default function PrivacyPage() {
                 </li>
                 <li>
                   <Strong>Groq</Strong> writes AI recipes, reads the photos you scan for ingredients and estimates
-                  the calories of AI recipes and of approved uploaded recipes from their titles, servings and
+                  the calories of AI recipes and of uploaded recipes from their titles, servings and
                   ingredient lists. It processes the data sent for AI recipes (see below) outside the EU.
                 </li>
                 <li>
@@ -148,7 +148,7 @@ export default function PrivacyPage() {
                 account.
               </p>
               <p>
-                The titles, servings and ingredient lists of AI recipes and of approved uploaded recipes are also sent
+                The titles, servings and ingredient lists of AI recipes and of uploaded recipes are also sent
                 to Groq to estimate calories, and never to Google for this.
               </p>
               <p>
@@ -184,8 +184,29 @@ export default function PrivacyPage() {
                 {SITE.name}, not only to people who are signed in. Please do not post anything you want to keep private.
               </p>
               <p>
+                Recipes and comments are public as soon as they are posted. Nobody checks them first. Admins can remove
+                one that breaks the rules, and they email the author the reason.
+              </p>
+              <p>
                 The number of likes on a recipe is public too. Who liked a recipe may be shown publicly in a later
                 version of {SITE.name}.
+              </p>
+            </>
+          ),
+        },
+        {
+          id: 'reports',
+          title: 'Reports',
+          body: (
+            <>
+              <p>
+                When you report a recipe or a comment, {SITE.name} stores who reported, which item, the reason you
+                chose, your note if you wrote one, and the date.
+              </p>
+              <p>Admins see the reason and the note, but not your name.</p>
+              <p>
+                A report is deleted when the reported item is deleted or when your account is deleted. Reports an admin
+                dismissed are kept only so the same person cannot report the same item again.
               </p>
             </>
           ),
