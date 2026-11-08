@@ -5786,3 +5786,108 @@ Your manual steps
   1. Merge, then restart the backend so V14 runs.
   2. Run GeneratedRecipeKindDbTest with the database password set, and check
      that nothing is skipped. A skipped test means V14 is not live.
+
+
+################################################################################
+################################################################################
+ PART 25 — REPORTS AND INSTANT PUBLISHING
+ Branch: claude/silly-bohr-1817bf
+################################################################################
+################################################################################
+
+Why this exists
+---------------
+You want Plateful to feel like a social app, so uploads now go live at once
+instead of waiting for an admin. People report what looks wrong, and admins
+deal with reports instead of approving everything. This is sub-project 1 of
+3 of the social plan. Video posts with a swipeable feed come next, then
+follows.
+Spec: docs/superpowers/specs/2026-11-07-reports-and-instant-publishing-design.md
+Plan: docs/superpowers/plans/2026-11-07-reports-and-instant-publishing.md
+
+The decisions you made
+----------------------
+  - Recipes, and later video posts, go live as soon as they are saved.
+  - Recipes and comments can be reported by signed-in people. A report is one
+    reason (Spam, Offensive or hateful, Unsafe food advice, Not food related,
+    Other) and an optional note of up to 500 characters.
+  - An item reported by 3 different people hides until an admin acts.
+  - At the switch, recipes waiting for review go live. Rejected ones stay
+    hidden until their author edits them.
+  - The code keeps the old status column and adds a "hidden" mark, rather
+    than removing statuses.
+
+How it works
+------------
+  1. Saving or editing a recipe publishes it straight away, for everyone.
+  2. Report sits next to Share on a recipe and on each comment. It never shows
+     on your own content, on hidden items or when signed out.
+  3. You can report each item once, and send at most 20 reports a day.
+  4. At the third person's report the item hides. Others no longer see it in
+     Browse, search, author pages, cookbooks or saved lists, and nobody can
+     like, rate or comment on it. Its author sees "Hidden while an admin
+     looks at reports."
+  5. The header's Review queue link is now Reports. Each entry shows what was
+     reported, by how many people, and every reason and note, but never who
+     reported. Remove deletes the item and emails the author your reason, as
+     before. Dismiss closes the reports and brings the item back.
+  6. Old /admin/review links forward to /admin/reports.
+
+What went away
+--------------
+  - Approve, reject, the pending queue and their emails.
+  - The "Waiting for review" banners. A rejected recipe now says "Not
+    published. Edit it to publish it." with an "Edit recipe" link.
+
+Decisions I took along the way
+------------------------------
+  - Reporting something hidden or gone gives "This is no longer available",
+    even for its author.
+  - Editing or reacting to a hidden comment is refused, so those buttons are
+    gone from it. Its author can still delete it.
+  - Admins see the "hidden" note on hidden comments too.
+  - Editing a hidden recipe keeps the title strangers last saw.
+  - Every action that changes a recipe or its comments takes the same lock,
+    recipe first, so two of them can never deadlock or undo each other.
+  - The browser check and this log were done by me, not a helper, because the
+    helpers have no browser.
+
+Checks done
+-----------
+  - Backend 1156 tests and frontend 851 tests pass. Build is clean, and lint
+    shows only warnings that were already there.
+  - Each of the 8 tasks was reviewed, then the whole branch. Bugs found and
+    fixed on the way:
+      - new comments would have been hidden from the start;
+      - the admin queue would have crashed on the real database;
+      - authors could press Edit on a hidden comment.
+  - Browser check with made-up data, since deleted: reporting a recipe, the
+    hidden-comment note, hidden and rejected banners, the old link forwarding,
+    the Reports queue with Dismiss, at desktop and phone width, light and
+    dark.
+
+Not checked yet
+---------------
+  - V15 has never run on real Postgres. It runs at the next backend restart
+    after merging. Until then three database tests skip:
+    ContentReportRepositoryDbTest, LiveRecipeQueriesDbTest and the queue
+    test inside the first. The admin queue's database query has only been
+    read, not run.
+
+Deferred
+--------
+  - A hidden item whose reporters all delete their accounts leaves the queue
+    but stays hidden. Unhiding it needs a small fix later.
+  - Comment counts still include hidden comments.
+  - The admin Open link for a comment goes to the recipe page without
+    jumping to the comment.
+  - Some dead code for the old review flow is left, such as the
+    "under_review" state.
+
+Your manual steps
+-----------------
+  1. Merge, then restart the backend so V15 runs.
+  2. Run ContentReportRepositoryDbTest and LiveRecipeQueriesDbTest with the
+     database password set, or ask me to. Nothing should skip.
+  3. Report one recipe from 3 accounts and check it hides. Then dismiss it
+     from Reports and check it comes back.
